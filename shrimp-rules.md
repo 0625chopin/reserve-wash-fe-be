@@ -24,13 +24,13 @@
 | `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`) | 인증 가드 등 |
 | `app/layouts/` | 공통 레이아웃(자동 임포트) | `default.vue` 등. `app.vue`는 `<NuxtLayout><NuxtPage /></NuxtLayout>` |
 | `app/assets/` | `base.css`·`main.css` 등 스타일 자원 | `nuxt.config.ts`의 `css`로 등록 |
-| `app/types/` *(생성됨 · `.gitkeep`, 내용 Phase 1)* | 도메인 TS 타입/인터페이스/유니언 | `domain.ts`, `enums.ts`. **명시 import 대상** |
-| `app/data/` *(생성됨 · `.gitkeep`, 내용 Phase 1)* | 더미 데이터(매장/베이/가격/매니저/사용자) | `prices.ts` 등. **명시 import 대상** |
-| `app/services/` *(생성됨 · 계약은 `README.md`, 내용 Phase 1)* | 데이터 접근 추상화 계층 | `reservationService.ts` 등. **명시 import 대상**. 계약: `app/services/README.md` |
+| `app/types/` *(Phase 1 구현됨)* | 도메인 TS 타입/인터페이스/유니언 | `enums.ts`, `domain.ts`. **명시 import 대상**(`import type`) |
+| `app/data/` *(Phase 1 구현됨)* | 더미 데이터(매장/베이/가격/매니저/사용자) | `prices.ts`·`stores.ts`·`managers.ts`·`users.ts`. **명시 import 대상** |
+| `app/services/` *(Phase 1 일부 · 계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts` 등. **명시 import 대상**. 계약: `app/services/README.md` |
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
-- `app/types`·`app/data`·`app/composables`·`app/middleware`·`app/layouts`·`app/services` 디렉터리 골격은 생성 완료다. 실제 도메인 타입·더미 데이터·미들웨어 인증 로직·`app.vue`의 `<NuxtLayout>` 전환은 `docs/ROADMAP.md` Phase 1/2에서 채운다. `app/layouts/default.vue`는 현재 휴면 상태(`app.vue` 미opt-in).
+- `app/types`·`app/data`·`app/composables`·`app/services`는 Phase 1에서 실제 코드가 채워졌다(타입·더미 데이터·`useSlots`·`priceService`). `app/middleware`(`.gitkeep` 유지)·`app/layouts`는 골격 단계로, 미들웨어 인증 로직·`app.vue`의 `<NuxtLayout>` 전환은 `docs/ROADMAP.md` Phase 2에서 채운다. `app/layouts/default.vue`는 현재 휴면 상태(`app.vue` 미opt-in).
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
