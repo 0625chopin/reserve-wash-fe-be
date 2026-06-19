@@ -22,9 +22,20 @@
 | `app/components/` | 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함) | 재사용 단위만 배치 |
 | `app/composables/` | 재사용 로직(자동 임포트) | Composition 함수 배치 |
 | `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`) | 인증 가드 등 |
+| `app/layouts/` | 공통 레이아웃(자동 임포트) | `default.vue` 등. `app.vue`는 `<NuxtLayout><NuxtPage /></NuxtLayout>` |
 | `app/assets/` | `base.css`·`main.css` 등 스타일 자원 | `nuxt.config.ts`의 `css`로 등록 |
+| `app/types/` *(생성됨 · `.gitkeep`, 내용 Phase 1)* | 도메인 TS 타입/인터페이스/유니언 | `domain.ts`, `enums.ts`. **명시 import 대상** |
+| `app/data/` *(생성됨 · `.gitkeep`, 내용 Phase 1)* | 더미 데이터(매장/베이/가격/매니저/사용자) | `prices.ts` 등. **명시 import 대상** |
+| `app/services/` *(생성됨 · 계약은 `README.md`, 내용 Phase 1)* | 데이터 접근 추상화 계층 | `reservationService.ts` 등. **명시 import 대상**. 계약: `app/services/README.md` |
 
-- **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공)
+- **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
+- **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
+- `app/types`·`app/data`·`app/composables`·`app/middleware`·`app/layouts`·`app/services` 디렉터리 골격은 생성 완료다. 실제 도메인 타입·더미 데이터·미들웨어 인증 로직·`app.vue`의 `<NuxtLayout>` 전환은 `docs/ROADMAP.md` Phase 1/2에서 채운다. `app/layouts/default.vue`는 현재 휴면 상태(`app.vue` 미opt-in).
+
+### 자동 임포트 vs 명시 import (강제 구분)
+
+- **자동 임포트되어 import 구문을 작성하지 마라**: `app/components/`(컴포넌트), `app/stores/`(`useXxxStore`), `app/composables/`, `app/middleware/`, `app/layouts/`, Nuxt 매크로(`definePageMeta`, `defineNuxtRouteMiddleware`, `navigateTo`, `useRoute`, `useCookie`).
+- **반드시 명시 import 하라**: `app/types/`(타입), `app/data/`, `app/services/`, 그리고 `vue`/`pinia`의 `ref`·`computed`·`defineStore`.
 
 ## 코드 스타일 규칙 (최우선 강제)
 
@@ -100,6 +111,19 @@ export default defineNuxtRouteMiddleware((to) => {
 - **신규 페이지 추가 시**: `app/pages/`에 `.vue` 파일을 생성하면 라우트가 자동 등록된다(수동 등록 불필요). 보호가 필요하면 `definePageMeta({ middleware: 'auth' })`를 함께 지정하라.
 - **전역 모듈/플러그인 추가 시**: 의존성 설치 → `nuxt.config.ts`의 `modules`에 등록(또는 `app/plugins/`에 플러그인 생성)을 함께 수행하라.
 - **의존성 설치 후**: `npm run postinstall`(`nuxt prepare`)로 `.nuxt` 타입을 재생성하라.
+- **npm 스크립트 추가 시**: `package.json`과 `CLAUDE.md`의 "주요 명령어" 표를 함께 갱신하라.
+
+## 도메인/문서 정합성 규칙 (정본 우선순위)
+
+- **도메인 모델·가격·enum의 정본은 `docs/require_v1.md`다.** `app/types/enums.ts`·`app/types/domain.ts`·`app/data/prices.ts`를 작성·수정할 때 값은 require_v1.md의 5장(도메인)·10장(가격 매트릭스)·11장(프로세스 코드 `FW/M/S`)과 **정확히 일치**시켜라. 불일치 시 require_v1.md를 따르라.
+- **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/ROADMAP.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 ROADMAP.md를 따르라.
+- 화면/스토어/서비스를 구현하면 해당 `docs/ROADMAP.md` Phase의 체크리스트·DoD를 함께 갱신하라.
+
+## 테스트(Playwright) 규칙
+
+- E2E 테스트는 **`e2e/`에 `*.spec.ts`** 로 작성하라. `baseURL`은 `http://localhost:3000`(Vite의 5173 아님)이다.
+- 셀렉터는 **`data-testid` + `getByTestId`** 를 우선 사용하라. 텍스트/클래스 기반 셀렉터는 지양하라. 테스트 대상 컴포넌트에 `data-testid`를 부여하라.
+- 더미 데이터는 고정값이므로 결정적으로 단정(assert)하라. `Math.random()`·현재 시각 의존을 피하고 고정 날짜를 사용하라.
 
 ## 언어/커뮤니케이션 규칙
 
@@ -123,4 +147,8 @@ export default defineNuxtRouteMiddleware((to) => {
 - `tsc` 단독 실행으로 타입 검사 **금지** (`nuxt typecheck` 사용).
 - `<RouterView>`/`<RouterLink>` 직접 사용 및 vue-router 수동 설정 **금지** (`<NuxtPage>`/`<NuxtLink>`·파일 기반 라우팅 사용).
 - 단위 테스트 러너(vitest 등)는 미설치이므로 임의로 설정 파일을 생성하지 **말 것** (사용자 요청 시에만). E2E는 Playwright(`e2e/`)를 사용하라.
+- 자동 임포트 대상(components/stores/composables/middleware/layouts)에 명시 import 구문 작성 **금지**.
+- SSR 단계에서 `localStorage`/`window`/`document` 직접 접근 **금지** (`import.meta.client` 가드 또는 `onMounted` 사용).
+- 컴포넌트/스토어에서 `app/data/` 더미 데이터 직접 import **금지** (`app/services/` 경유).
+- 가격/차종/서비스 enum을 `docs/require_v1.md`와 다른 값으로 작성 **금지**.
 - `node_modules/`, `.nuxt/`, `.output/` 등 빌드 산출물 직접 수정 **금지**.
