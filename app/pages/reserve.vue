@@ -256,25 +256,41 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 예약 접수 토스트 — 화면 중앙, 5초 후 자동 닫힘 -->
+    <!-- 배경 폼(라임 선택 표시)과 토스트가 섞이지 않도록 딤+블러 scrim으로 배경을 가라앉힘 -->
     <Teleport to="body">
       <Transition name="toast">
         <div
           v-if="reserved"
-          class="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+          class="toast-scrim pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
         >
           <div
             data-testid="reserve-result"
             role="status"
-            class="toast-card pointer-events-auto flex items-start gap-3 rounded-2xl border border-[--color-brand-accent]/40 bg-[--color-surface-2] px-5 py-4 shadow-2xl"
+            aria-live="polite"
+            class="toast-card pointer-events-auto w-full max-w-sm overflow-hidden rounded-2xl"
           >
-            <span class="toast-check" aria-hidden="true">✓</span>
-            <div class="flex flex-col gap-0.5 text-sm">
-              <span class="font-semibold text-[--color-brand-accent]">예약이 접수되었어요</span>
-              <span class="text-[--color-content]">
-                {{ reserved.store }} · {{ reserved.manager }} · {{ reserved.carType }} ·
-                {{ reserved.bay }} · {{ reserved.date }} {{ reserved.time }}
+            <!-- 헤더: 라임 채움 배지로 성공 상태를 면(面)으로 강조 (텍스트 라임 대신 고대비 흰색) -->
+            <div class="toast-header flex items-center gap-3 px-5 py-4">
+              <span class="toast-check" aria-hidden="true">✓</span>
+              <span class="text-base font-semibold text-[--color-content-strong]">
+                예약이 접수되었어요
               </span>
             </div>
+            <!-- 요약: 라벨(muted) + 값(strong) 위계로 또렷하게 -->
+            <dl class="toast-summary grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 px-5 py-4 text-sm">
+              <dt class="text-[--color-content-muted]">매장</dt>
+              <dd class="font-medium text-[--color-content-strong]">{{ reserved.store }}</dd>
+              <dt class="text-[--color-content-muted]">매니저</dt>
+              <dd class="font-medium text-[--color-content-strong]">{{ reserved.manager }}</dd>
+              <dt class="text-[--color-content-muted]">차종 · 베이</dt>
+              <dd class="font-medium text-[--color-content-strong]">
+                {{ reserved.carType }} · {{ reserved.bay }}
+              </dd>
+              <dt class="text-[--color-content-muted]">일시</dt>
+              <dd class="font-medium text-[--color-content-strong]">
+                {{ reserved.date }} {{ reserved.time }}
+              </dd>
+            </dl>
           </div>
         </div>
       </Transition>
@@ -283,31 +299,60 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 토스트 체크 아이콘 */
+/* scrim — 배경 폼을 딤+블러로 가라앉혀 토스트가 또렷이 떠오르게 함.
+   5초 자동 닫힘이라 클릭 차단은 불필요 → pointer-events는 래퍼 none 유지(상위 클래스에서) */
+.toast-scrim {
+  background-color: color-mix(in oklab, var(--color-surface-base) 64%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+/* 카드 — surface-1 본문 + 라임 보더로 성공 상태 테두리, 깊은 그림자로 입체감 */
+.toast-card {
+  background-color: var(--color-surface-1);
+  border: 1px solid color-mix(in oklab, var(--color-brand-accent) 45%, var(--color-line));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 24px 48px -16px rgb(0 0 0 / 0.7);
+}
+
+/* 헤더 — 라임을 면(面)으로 채워 성공을 한눈에. 배경 라임 텍스트와 동색 충돌 회피 */
+.toast-header {
+  background-color: color-mix(in oklab, var(--color-brand-accent) 14%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--color-brand-accent) 28%, transparent);
+}
+
+/* 토스트 체크 아이콘 — 라임 채움 배지(고대비 다크 글리프) */
 .toast-check {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 9999px;
-  background-color: color-mix(in oklab, var(--color-brand-accent) 22%, transparent);
-  color: var(--color-brand-accent);
-  font-size: 0.875rem;
-  font-weight: 700;
+  background-color: var(--color-brand-accent);
+  color: var(--color-surface-base);
+  font-size: 0.9375rem;
+  font-weight: 800;
 }
 
-/* 등장/퇴장 트랜지션 — 가운데에서 살짝 떠오르며 페이드 */
+/* 등장/퇴장 트랜지션 — scrim 페이드 + 카드가 가운데서 살짝 떠오름 */
 .toast-enter-active,
 .toast-leave-active {
   transition:
     opacity 0.25s var(--ease-out-soft),
-    transform 0.25s var(--ease-out-soft);
+    backdrop-filter 0.25s var(--ease-out-soft);
+}
+.toast-enter-active .toast-card,
+.toast-leave-active .toast-card {
+  transition: transform 0.25s var(--ease-out-soft);
 }
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(8px) scale(0.98);
+}
+.toast-enter-from .toast-card,
+.toast-leave-to .toast-card {
+  transform: translateY(12px) scale(0.97);
 }
 </style>
