@@ -15,15 +15,25 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/*
+  배경 라디얼 글로우 — 뷰포트에 고정. background-attachment:fixed는
+  스크롤마다 리페인트를 유발(화면 흔들림)하므로, 합성되는 fixed 레이어로 대체한다.
+*/
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(60rem 40rem at 80% -10%, rgb(56 189 248 / 0.08), transparent 60%),
+    radial-gradient(50rem 36rem at 0% 110%, rgb(163 230 53 / 0.05), transparent 60%);
+}
+
 body {
   min-height: 100vh;
   color: #e2e8f0; /* slate-200 */
   background-color: #0b1120; /* 네이비 */
-  /* 미묘한 라디얼 글로우로 평면감 제거 (상단 스카이/하단 라임) */
-  background-image:
-    radial-gradient(60rem 40rem at 80% -10%, rgb(56 189 248 / 0.08), transparent 60%),
-    radial-gradient(50rem 36rem at 0% 110%, rgb(163 230 53 / 0.05), transparent 60%);
-  background-attachment: fixed;
   line-height: 1.6;
   font-family:
     Inter,

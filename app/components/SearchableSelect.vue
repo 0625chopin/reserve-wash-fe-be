@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
         v-for="(option, index) in filtered"
         :key="String(option[valueKey])"
         :data-testid="`${tid}-option`"
-        :class="{ active: index === highlighted }"
+        :class="{ active: index === highlighted, selected: option[valueKey] === model }"
         @mousedown.prevent="select(option)"
       >
         {{ option[labelKey] }}
@@ -183,7 +183,6 @@ onBeforeUnmount(() => {
   padding: 0.375rem;
   list-style: none;
   border-radius: 0.75rem;
-  border: 1px solid var(--color-line);
   background: var(--color-surface-2);
   max-height: 16rem;
   overflow-y: auto;
@@ -207,9 +206,14 @@ onBeforeUnmount(() => {
   background: color-mix(in oklab, var(--color-brand-primary) 14%, transparent);
   color: var(--color-content-strong);
 }
-/* 키보드 하이라이트 — 좌측 라임 액센트 바 + 강조 표면 */
+/* 키보드 하이라이트 — 강조 표면만(좌측 바 없음. 앞테두리는 선택값 전용) */
 .options li.active {
   background: color-mix(in oklab, var(--color-brand-primary) 20%, transparent);
+  color: var(--color-content-strong);
+}
+
+/* 현재 선택된 값 — 좌측 초록색 앞테두리로 표시 */
+.options li.selected {
   color: var(--color-content-strong);
   box-shadow: inset 2px 0 0 var(--color-brand-accent);
 }

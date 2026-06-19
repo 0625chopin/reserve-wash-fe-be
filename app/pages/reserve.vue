@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 예약 페이지 (FW3 매장선택 → FW4 매니저선택 → 베이 → 날짜·시간 선택) — 보호 라우트
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { CarType } from '~/types/enums'
 import {
   getApprovedStores,
@@ -129,6 +129,9 @@ const reserved = ref<{
   time: string
 } | null>(null)
 
+// 예약 접수 토스트 — 5초 후 자동 닫힘
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
 function onReserve() {
   if (!canReserve.value) return
   reserved.value = {
@@ -139,7 +142,15 @@ function onReserve() {
     date: selectedDate.value ?? '',
     time: selectedTime.value ?? '',
   }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    reserved.value = null
+  }, 5000)
 }
+
+onBeforeUnmount(() => {
+  if (toastTimer) clearTimeout(toastTimer)
+})
 </script>
 
 <template>
@@ -154,7 +165,7 @@ function onReserve() {
     </header>
 
     <!-- 단계형 폼 카드 -->
-    <div class="card space-y-10 p-6 sm:p-8">
+    <div class="card space-y-12 p-6 sm:p-8 sm:py-10">
       <!-- 매장 -->
       <div>
         <span class="field-label">매장 선택</span>
@@ -242,19 +253,61 @@ function onReserve() {
           매장 · 매니저 · 차종 · 베이 · 날짜 · 시간을 모두 선택해 주세요.
         </p>
       </div>
-
-      <!-- 예약 확정 요약 -->
-      <div
-        v-if="reserved"
-        data-testid="reserve-result"
-        class="flex flex-col gap-1 rounded-xl border border-[--color-brand-accent]/40 bg-[--color-brand-accent]/10 px-4 py-3.5 text-sm"
-      >
-        <span class="font-semibold text-[--color-brand-accent]">예약이 접수되었어요</span>
-        <span class="text-[--color-content]">
-          {{ reserved.store }} · {{ reserved.manager }} · {{ reserved.carType }} ·
-          {{ reserved.bay }} · {{ reserved.date }} {{ reserved.time }}
-        </span>
-      </div>
     </div>
+
+    <!-- 예약 접수 토스트 — 화면 중앙, 5초 후 자동 닫힘 -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div
+          v-if="reserved"
+          class="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div
+            data-testid="reserve-result"
+            role="status"
+            class="toast-card pointer-events-auto flex items-start gap-3 rounded-2xl border border-[--color-brand-accent]/40 bg-[--color-surface-2] px-5 py-4 shadow-2xl"
+          >
+            <span class="toast-check" aria-hidden="true">✓</span>
+            <div class="flex flex-col gap-0.5 text-sm">
+              <span class="font-semibold text-[--color-brand-accent]">예약이 접수되었어요</span>
+              <span class="text-[--color-content]">
+                {{ reserved.store }} · {{ reserved.manager }} · {{ reserved.carType }} ·
+                {{ reserved.bay }} · {{ reserved.date }} {{ reserved.time }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
+
+<style scoped>
+/* 토스트 체크 아이콘 */
+.toast-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--color-brand-accent) 22%, transparent);
+  color: var(--color-brand-accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* 등장/퇴장 트랜지션 — 가운데에서 살짝 떠오르며 페이드 */
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity 0.25s var(--ease-out-soft),
+    transform 0.25s var(--ease-out-soft);
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+</style>

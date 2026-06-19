@@ -127,6 +127,7 @@ onMounted(() => {
   padding: 80px 0; /* 첫/마지막 항목이 중앙에 올 수 있도록(2행분) */
   list-style: none;
   overflow-y: auto;
+  overscroll-behavior: contain; /* 휠 스크롤이 페이지로 전파돼 흔들리는 것 방지 */
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
 }
