@@ -1,6 +1,6 @@
 # start-kit2
 
-This template should help get you started developing with Vue 3 in Vite.
+This project is built with [Nuxt 4](https://nuxt.com/) (Vue 3 `<script setup>` + Vite + Nitro). See the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
 
 ## Recommended IDE Setup
 
@@ -17,11 +17,11 @@ This template should help get you started developing with Vue 3 in Vite.
 
 ## Type Support for `.vue` Imports in TS
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+TypeScript cannot handle type information for `.vue` imports by default. Type checking runs through `nuxt typecheck` (which uses `vue-tsc` internally). In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
 
 ## Customize configuration
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+See [Nuxt Configuration Reference](https://nuxt.com/docs/api/configuration/nuxt-config).
 
 ## Project Setup
 
@@ -29,16 +29,27 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
+> `postinstall` runs `nuxt prepare` to generate the `.nuxt` types. If it does not run automatically, run `npm run postinstall` manually.
+
 ### Compile and Hot-Reload for Development
+
+The dev server runs at http://localhost:3000 by default.
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### Type-Check and Build for Production
 
 ```sh
+npm run type-check
 npm run build
+```
+
+### Preview the Production Build
+
+```sh
+npm run preview
 ```
 
 ### Lint with [ESLint](https://eslint.org/)

@@ -1,11 +1,5 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    },
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ]
+  // https://nuxt.com/docs/guide/concepts/typescript
+  // .nuxt/tsconfig.json 은 `nuxt prepare`(postinstall) 시 자동 생성됨
+  "extends": "./.nuxt/tsconfig.json"
 }
