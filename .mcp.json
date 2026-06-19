@@ -1,0 +1,40 @@
+{
+    "mcpServers": {
+      "context7": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@upstash/context7-mcp",
+          "--api-key",
+          "YOUR_API_KEY"
+        ],
+        "env": {}
+      },
+      "playwright": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest"]
+      },
+      "sequential-thinking": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-sequential-thinking"
+        ]
+      },
+      "shadcn": {
+        "command": "npx",
+        "args": ["shadcn@latest", "mcp"]
+      },
+      "shrimp-task-manager": {
+        "command": "node",
+        "args": ["E:/claudeStudy/workspaces/mcp-shrimp-task-manager/dist/index.js"],
+        "env": {
+          "DATA_DIR": "E:/claudeStudy/workspaces/AuctionAll/shrimp_data",
+          "TEMPLATES_USE": "en",
+          "ENABLE_GUI": "true"
+        }
+      }
+    }
+  }
