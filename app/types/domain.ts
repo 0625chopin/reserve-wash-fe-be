@@ -1,5 +1,12 @@
 // 도메인 엔티티 인터페이스 (require_v1.md 5.4 표 기준)
-import type { CarType, ReservationStatus, ServiceType, SlotStatus, UserRole } from '~/types/enums'
+import type {
+  BaySize,
+  CarType,
+  ReservationStatus,
+  ServiceType,
+  SlotStatus,
+  UserRole,
+} from '~/types/enums'
 
 // 사용자 (require 3.1)
 export interface User {
@@ -22,6 +29,7 @@ export interface Bay {
   id: string
   storeId: string
   code: string // 'A1' ~ 'AN'
+  size: BaySize // 수용 가능한 차 크기 등급 (이 등급 이하의 차를 수용)
 }
 
 // 매니저 (require 3.1, 6.1)

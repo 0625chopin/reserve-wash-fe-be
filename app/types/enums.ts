@@ -9,6 +9,9 @@ export type CarType = 'LIGHT' | 'SMALL' | 'MID' | 'LARGE' | 'VAN_ETC'
 // 서비스 4분류 (require 10.2 확정)
 export type ServiceType = 'EXT' | 'INT' | 'FULL' | 'PREMIUM'
 
+// 베이 수용 크기 등급 — 차의 크기(소/중/대)에 따라 예약 가능한 베이가 달라짐
+export type BaySize = 'SMALL' | 'MID' | 'LARGE'
+
 // 슬롯 상태 — 동시성 1단계 시뮬레이션의 핵심 (require 7.1)
 export type SlotStatus = 'AVAILABLE' | 'HOLDING' | 'RESERVED' | 'COMPLETED'
 
