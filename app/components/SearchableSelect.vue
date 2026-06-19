@@ -62,15 +62,25 @@ function onKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="searchable-select">
-    <input
-      v-model="keyword"
-      :placeholder="placeholder"
-      :data-testid="`${tid}-input`"
-      @focus="open = true"
-      @input="onInput"
-      @keydown="onKeydown"
-    />
-    <ul v-if="open && filtered.length" :data-testid="`${tid}-options`">
+    <!-- 검색 입력 — 좌측 돋보기 아이콘 + 공통 .input-field 스타일 -->
+    <div class="input-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+        <path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <input
+        v-model="keyword"
+        :placeholder="placeholder"
+        :data-testid="`${tid}-input`"
+        class="input-field has-icon"
+        @focus="open = true"
+        @input="onInput"
+        @keydown="onKeydown"
+      />
+    </div>
+
+    <!-- 드롭다운 — 다크 표면/보더/하이라이트 -->
+    <ul v-if="open && filtered.length" :data-testid="`${tid}-options`" class="options">
       <li
         v-for="(option, index) in filtered"
         :key="String(option[valueKey])"
@@ -87,29 +97,67 @@ function onKeydown(event: KeyboardEvent) {
 <style scoped>
 .searchable-select {
   position: relative;
-  display: inline-block;
+  width: 100%;
 }
 
-.searchable-select ul {
+/* 입력 래퍼 — 아이콘 절대배치 */
+.input-wrap {
+  position: relative;
+}
+.search-icon {
   position: absolute;
-  z-index: 10;
+  top: 50%;
+  left: 0.875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  transform: translateY(-50%);
+  color: var(--color-content-muted);
+  pointer-events: none;
+}
+/* 아이콘 자리만큼 좌측 패딩 확보 */
+.input-field.has-icon {
+  padding-left: 2.5rem;
+}
+
+/* 드롭다운 패널 — 표면 위계/그림자/라운드 */
+.options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  right: 0;
   margin: 0;
-  padding: 0;
+  padding: 0.375rem;
   list-style: none;
-  border: 1px solid var(--color-border, #ccc);
-  background: var(--color-background, #fff);
-  min-width: 12rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-2);
   max-height: 16rem;
   overflow-y: auto;
+  box-shadow: 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
 
-.searchable-select li {
-  padding: 0.4rem 0.8rem;
+/* 옵션 항목 — 기본/hover/active(키보드 하이라이트) */
+.options li {
+  display: flex;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  color: var(--color-content);
   cursor: pointer;
+  transition:
+    background-color 0.15s var(--ease-out-soft),
+    color 0.15s var(--ease-out-soft);
 }
-
-.searchable-select li.active,
-.searchable-select li:hover {
-  background: var(--color-background-mute, #eee);
+.options li:hover {
+  background: color-mix(in oklab, var(--color-brand-primary) 14%, transparent);
+  color: var(--color-content-strong);
+}
+/* 키보드 하이라이트 — 좌측 라임 액센트 바 + 강조 표면 */
+.options li.active {
+  background: color-mix(in oklab, var(--color-brand-primary) 20%, transparent);
+  color: var(--color-content-strong);
+  box-shadow: inset 2px 0 0 var(--color-brand-accent);
 }
 </style>
