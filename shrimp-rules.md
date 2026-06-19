@@ -9,7 +9,7 @@
 - 라우팅: **Nuxt 파일 기반 라우팅** (`app/pages/`). vue-router를 수동 설정하지 않는다(Nuxt 내장).
 - 언어: **TypeScript** (`typescript ~6.0.0`), 빌드 도구: **Nuxt(Vite 내장)**, 타입 검사: **`nuxt typecheck`(내부 vue-tsc)**.
 - 렌더링: **기본 SSR**. 클라이언트 전용 로직은 `import.meta.client` 가드 또는 `useCookie` 등을 사용하라.
-- 테스트 러너 **미설치** (vitest/cypress/playwright 없음).
+- E2E 테스트: **Playwright 설치됨**(`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`). 단위 테스트 러너(vitest)는 미설치.
 
 ## 프로젝트 아키텍처
 
@@ -122,5 +122,5 @@ export default defineNuxtRouteMiddleware((to) => {
 - Prettier CLI 직접 호출 **금지** (oxfmt 사용).
 - `tsc` 단독 실행으로 타입 검사 **금지** (`nuxt typecheck` 사용).
 - `<RouterView>`/`<RouterLink>` 직접 사용 및 vue-router 수동 설정 **금지** (`<NuxtPage>`/`<NuxtLink>`·파일 기반 라우팅 사용).
-- 테스트 러너 미설치 상태에서 임의로 vitest/cypress/playwright 설정 파일을 생성하지 **말 것** (사용자 요청 시에만).
+- 단위 테스트 러너(vitest 등)는 미설치이므로 임의로 설정 파일을 생성하지 **말 것** (사용자 요청 시에만). E2E는 Playwright(`e2e/`)를 사용하라.
 - `node_modules/`, `.nuxt/`, `.output/` 등 빌드 산출물 직접 수정 **금지**.

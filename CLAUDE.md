@@ -28,9 +28,11 @@ npm run postinstall  # nuxt prepare (.nuxt 타입 생성)
 npm run type-check   # nuxt typecheck (내부적으로 vue-tsc)
 npm run lint         # lint:oxlint → lint:eslint 순차 실행 (run-s), 둘 다 --fix
 npm run format       # oxfmt로 app/ 포맷팅
+npm run test:e2e     # Playwright E2E 테스트 (dev 서버 자동 기동)
+npm run test:e2e:ui  # Playwright UI 모드
 ```
 
-테스트 러너는 아직 설정되어 있지 않음 (vitest/cypress/playwright 미설치).
+E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`, dev 서버 자동 기동). 단위 테스트 러너(vitest)는 미설치.
 
 ## 린트/포맷 파이프라인 (중요)
 
