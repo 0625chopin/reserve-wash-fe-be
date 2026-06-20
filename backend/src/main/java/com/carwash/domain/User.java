@@ -18,4 +18,5 @@ public class User {
     private String email;
     private String name;
     private UserRole role;
+    private String passwordHash; // BCrypt 해시 (Phase 3 인증) — 응답 DTO에는 절대 노출 금지
 }

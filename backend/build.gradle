@@ -26,6 +26,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     // 영속 계층: MyBatis (매퍼 인터페이스 + XML SQL) — JPA 미사용
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+    // 인증/인가(Phase 3): Spring Security + JWT(jjwt) — BCrypt·stateless JWT
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     // 2단계 인메모리 DB (H2)
     runtimeOnly 'com.h2database:h2'
     // 도메인 POJO 보일러플레이트 축소(@Getter·@Builder·@NoArgsConstructor) — 컴파일 전용 (ROADMAP_2 2.3)
@@ -35,6 +40,7 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
     // 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
 }
 
 tasks.named('test') {

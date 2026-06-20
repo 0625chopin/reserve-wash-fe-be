@@ -11,7 +11,14 @@
         SELECT id, email, name, role FROM users WHERE id = #{id}
     </select>
 
+    <!-- 로그인 인증용 — password_hash 포함(map-underscore-to-camel-case로 passwordHash 매핑) -->
     <select id="findByEmail" resultType="com.carwash.domain.User">
-        SELECT id, email, name, role FROM users WHERE email = #{email}
+        SELECT id, email, name, role, password_hash FROM users WHERE email = #{email}
     </select>
+
+    <!-- 회원가입 영속 (id는 앱이 부여) -->
+    <insert id="insert">
+        INSERT INTO users (id, email, name, role, password_hash)
+        VALUES (#{id}, #{email}, #{name}, #{role}, #{passwordHash})
+    </insert>
 </mapper>

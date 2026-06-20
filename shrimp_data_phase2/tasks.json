@@ -738,6 +738,301 @@
       "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
       "summary": "P2-8 완료. playwright.config.ts webServer를 배열화(FE npm run dev :3000 + BE Spring Boot :8080). BE 명령은 플랫폼 분기: Windows는 'cd backend && .\\gradlew.bat bootRun'(이 시스템은 cmd의 현재 디렉터리 실행이 비활성이라 .\\ 접두 필수 — 실측으로 발견·수정), 그 외 './gradlew bootRun'. BE ready 대기는 http://localhost:8080/api/health(timeout 180s). BE+FE 동시 기동 하에 npm run test:e2e 25건 전부 통과(8.6s) — 서버 데이터로 회귀: 승인 매장만(판교점 제외, /api/stores), 매장별 매니저(/api/managers), 대형 차종 베이 노출(/api/bays + SIZE_RANK), 매니저 휴무 비활성(서버 dayoffs), 가격 표시(/api/prices) 모두 동일. 시드 RESERVED 슬롯은 FE 더미 유지(getSeededSlotStatus, Phase 4). 게이트: ./gradlew build(23건)·npm run type-check·npm run test:e2e(25건) 전부 통과. ROADMAP_2 Phase 2 체크리스트·DoD 갱신. Phase 2(서비스 추상화 교체) 종료 — Phase 3(인증/인가) 진행 가능.",
       "completedAt": "2026-06-20T17:56:29.901Z"
+    },
+    {
+      "id": "c093f443-fc8c-454e-a6f0-07ab6fb23a02",
+      "name": "P3-1 build.gradle security+jjwt 의존성",
+      "description": "Spring Security와 JWT(jjwt 0.12.6) 라이브러리를 빌드에 추가. spring-security-test도 추가. R1에 따라 SecurityConfig(P3-4) 없이 빌드하면 전경로 인증이 되므로 P3-1~P3-4를 한 흐름으로 구현·검증.",
+      "notes": "JPA는 절대 추가 금지. 의존성만 추가하고 컴파일 확인은 P3-4 후 통합 검증.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:09:15.295Z",
+      "updatedAt": "2026-06-20T18:19:04.819Z",
+      "relatedFiles": [
+        {
+          "path": "backend/build.gradle",
+          "type": "TO_MODIFY",
+          "description": "security+jjwt"
+        }
+      ],
+      "implementationGuide": "backend/build.gradle dependencies에 implementation 'org.springframework.boot:spring-boot-starter-security', implementation 'io.jsonwebtoken:jjwt-api:0.12.6', runtimeOnly jjwt-impl:0.12.6, runtimeOnly jjwt-jackson:0.12.6, testImplementation 'org.springframework.security:spring-security-test' 추가.",
+      "verificationCriteria": "./gradlew compileJava 통과(의존성 해석).",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-1 완료. build.gradle에 spring-boot-starter-security, jjwt-api/impl/jackson 0.12.6, spring-security-test(테스트) 추가. JPA 미추가. SecurityConfig(P3-4)와 함께 BUILD SUCCESSFUL(29건 통과).",
+      "completedAt": "2026-06-20T18:19:04.817Z"
+    },
+    {
+      "id": "1edb26bd-7e66-435c-b305-83ac425acafb",
+      "name": "P3-2 DB password_hash 컬럼 + BCrypt 시드",
+      "description": "users 테이블에 password_hash 컬럼 추가, 시드 4명에 BCrypt('password') 고정 해시 시드.",
+      "notes": "고정 해시 인라인(기동 동적생성 X). salt 달라도 matches로 검증됨. UserMapperTest에서 matches 단정.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:19:09.881Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "password_hash 컬럼"
+        },
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "TO_MODIFY",
+          "description": "BCrypt 시드"
+        }
+      ],
+      "implementationGuide": "schema.sql users에 password_hash VARCHAR(100) NOT NULL 추가. data.sql users INSERT를 (id,email,name,role,password_hash)로 확장, 4명 모두 동일 BCrypt('password') 해시(구현 시 BCryptPasswordEncoder().encode('password')로 1회 생성한 $2a$10$... 문자열 인라인). DROP TABLE 멱등 유지.",
+      "verificationCriteria": "기동 시 spring.sql.init 실패 없음. UserMapperTest에서 password_hash 조회·matches('password') 성공.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-2 완료. schema.sql users에 password_hash VARCHAR(100) NOT NULL 추가(DROP 멱등 유지). data.sql users INSERT를 (id,email,name,role,password_hash)로 확장, 4명 모두 BCrypt('password') 고정 해시($2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq, 임시 테스트로 1회 생성·자체 matches 검증 후 인라인). UserMapperTest.findByEmail_시드_비번해시_조회_matches에서 BCrypt matches('password') 통과. 기동 시 spring.sql.init 실패 없음.",
+      "completedAt": "2026-06-20T18:19:09.877Z"
+    },
+    {
+      "id": "321ef6d0-10d4-4914-88d5-df5c92fc2e11",
+      "name": "P3-3 User.passwordHash + UserMapper.insert",
+      "description": "BE User에 passwordHash 필드 추가, 회원가입용 insert와 비번 포함 findByEmail.",
+      "notes": "passwordHash는 응답 DTO에 절대 미노출. 기존 findAll/findById는 유지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1edb26bd-7e66-435c-b305-83ac425acafb"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:19:24.264Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/domain/User.java",
+          "type": "TO_MODIFY",
+          "description": "passwordHash"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/UserMapper.java",
+          "type": "TO_MODIFY",
+          "description": "insert"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/UserMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "insert+findByEmail"
+        }
+      ],
+      "implementationGuide": "domain/User.java에 private String passwordHash 추가(@Getter/@Builder). UserMapper.java에 int insert(User). UserMapper.xml findByEmail SELECT에 password_hash 컬럼 추가, insert(id,email,name,role,password_hash) 추가. map-underscore-to-camel-case 자동 매핑.",
+      "verificationCriteria": "./gradlew compileJava. UserMapperTest: findByEmail passwordHash 반환, insert 후 재조회 성공.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-3 완료. domain/User.java에 private String passwordHash 추가(@Getter/@Builder/@AllArgsConstructor 포함). UserMapper.java에 int insert(User) 추가, findByEmail 유지. UserMapper.xml findByEmail SELECT에 password_hash 컬럼 추가(map-underscore-to-camel-case로 passwordHash 자동 매핑), insert(id,email,name,role,password_hash) 추가. passwordHash는 UserResponse에 미노출. UserMapperTest 2건(findByEmail matches·insert 후 재조회) 통과.",
+      "completedAt": "2026-06-20T18:19:24.262Z"
+    },
+    {
+      "id": "54ee42e7-bd24-480e-bcf8-e4db68281831",
+      "name": "P3-4 보안 골격 SecurityConfig+JWT 필터+CORS 단일화",
+      "description": "JwtTokenProvider/JwtAuthenticationFilter/SecurityConfig/PasswordEncoder 구성. CORS를 SecurityConfig로 단일화(CorsConfig 제거).",
+      "notes": "R1: permitAll 경로 정합 필수(기존 테스트 회귀). R2: CORS 단일화. allowCredentials=true라 origin 와일드카드 금지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c093f443-fc8c-454e-a6f0-07ab6fb23a02"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:19:32.648Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/security",
+          "type": "CREATE",
+          "description": "JwtTokenProvider/Filter"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "CREATE",
+          "description": "SecurityFilterChain+CORS"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/CorsConfig.java",
+          "type": "TO_MODIFY",
+          "description": "삭제(통합)"
+        },
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "jwt 설정"
+        }
+      ],
+      "implementationGuide": "security/JwtTokenProvider(HS256, jwt.secret/expiration-ms @Value, createToken(user: subject=email, role 클레임)/validate/parse). security/JwtAuthenticationFilter(OncePerRequestFilter, Bearer 파싱→role을 ROLE_ 권한으로 SecurityContext). config/SecurityConfig(SecurityFilterChain: csrf.disable, sessionManagement STATELESS, cors(withDefaults)+CorsConfigurationSource 빈[localhost:3000, Authorization 허용, allowCredentials], authorizeHttpRequests: permitAll=/api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/**, anyRequest authenticated, JwtAuthenticationFilter를 UsernamePasswordAuthenticationFilter 앞에, headers.frameOptions disable). PasswordEncoder=BCryptPasswordEncoder 빈. config/CorsConfig.java 삭제(중복 제거). application.yml에 jwt.secret(충분 길이)·jwt.expiration-ms.",
+      "verificationCriteria": "CatalogApiTest 4건·HealthControllerTest 무인증 통과(회귀). 토큰 없이 보호 경로 401.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-4 완료. 보안 골격 구성. security/JwtTokenProvider(HS256 Keys.hmacShaKeyFor, jwt.secret/expiration-ms @Value, createToken[subject=email, role/name/uid 클레임]/parse). security/JwtAuthenticationFilter(OncePerRequestFilter, Bearer 파싱→ROLE_역할 권한 SecurityContext, 무효 토큰 시 컨텍스트 클리어). config/SecurityConfig(SecurityFilterChain: csrf disable, STATELESS, cors withDefaults+CorsConfigurationSource[localhost:3000, allowedHeaders *(Authorization 포함), allowCredentials], authorizeHttpRequests permitAll=/api/auth/**·/api/health·/api/stores·/api/managers·/api/bays·/api/prices·/h2-console/**, anyRequest authenticated, JwtAuthenticationFilter를 UsernamePasswordAuthenticationFilter 앞, frameOptions disable). config/CorsConfig.java 삭제(CORS 단일화 R2). application.yml jwt.secret(60자+)·expiration-ms 24h. [추가 해결] SecurityFilterChain은 서블릿 웹 컨텍스트 전용이라 비웹(NONE) 매퍼 테스트 컨텍스트가 깨짐 → SecurityConfig에 @ConditionalOnWebApplication(SERVLET) 부여 + PasswordEncoder를 AppBeansConfig(항상 로드)로 분리 + HealthControllerTest(@WebMvcTest)에 addFilters=false. R1 충족: CatalogApiTest 4·HealthControllerTest 무인증 회귀 통과, 전체 29건 0실패.",
+      "completedAt": "2026-06-20T18:19:32.644Z"
+    },
+    {
+      "id": "e87b920d-f837-4653-8987-2ee65f6a776c",
+      "name": "P3-5 로그인 API AuthController+Service+DTO",
+      "description": "POST /api/auth/login — 이메일/비번 검증 후 JWT 발급. UserResponse는 passwordHash 미포함.",
+      "notes": "응답 JSON에 passwordHash 키 부재. /api/auth/** permitAll이라 인증 없이 호출.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "321ef6d0-10d4-4914-88d5-df5c92fc2e11"
+        },
+        {
+          "taskId": "54ee42e7-bd24-480e-bcf8-e4db68281831"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:19:46.935Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AuthController.java",
+          "type": "CREATE",
+          "description": "login"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/AuthService.java",
+          "type": "CREATE",
+          "description": "login 로직"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto",
+          "type": "CREATE",
+          "description": "Login/User Request·Response"
+        }
+      ],
+      "implementationGuide": "dto/LoginRequest(record, @Email @NotBlank email, @NotBlank password), dto/UserResponse(id,email,name,role + from(User)), dto/LoginResponse(String token, UserResponse user). service/AuthService.login: userMapper.findByEmail→null이면 인증예외(401), passwordEncoder.matches 실패시 401, 성공시 JwtTokenProvider.createToken→LoginResponse. controller/AuthController(@RequestMapping /api/auth) @PostMapping /login @Valid. 401은 @ResponseStatus 예외 또는 ResponseStatusException.",
+      "verificationCriteria": "AuthApiTest: 올바른 계정 200+token, 틀린 비번 401, 응답에 passwordHash 부재.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-5 완료. 로그인 API. dto/LoginRequest(record @Email @NotBlank), dto/UserResponse(id,email,name,role + from(User), passwordHash 미포함), dto/LoginResponse(token, UserResponse). service/AuthService.login(@Transactional readOnly): userMapper.findByEmail→null이거나 passwordEncoder.matches 실패 시 ResponseStatusException 401, 성공 시 JwtTokenProvider.createToken→LoginResponse. controller/AuthController(@RequestMapping /api/auth) @PostMapping /login @Valid. AuthApiTest: 올바른 계정 200+token, user.role=USER, 틀린 비번 401, 응답에 user.passwordHash 키 부재(doesNotExist) 통과.",
+      "completedAt": "2026-06-20T18:19:46.931Z"
+    },
+    {
+      "id": "9f71f77d-6127-413d-8fcd-1965698daac2",
+      "name": "P3-6 회원가입 API signup",
+      "description": "POST /api/auth/signup — 중복 검사(409) → USER 영속(BCrypt) → 자동 로그인 토큰 발급.",
+      "notes": "H2 mem 재기동 시 가입 사용자 소실(1차 동일, 수용). 409는 ResponseStatusException.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e87b920d-f837-4653-8987-2ee65f6a776c"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:19:57.866Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto/SignupRequest.java",
+          "type": "CREATE",
+          "description": "가입 요청"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/AuthService.java",
+          "type": "TO_MODIFY",
+          "description": "signup"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AuthController.java",
+          "type": "TO_MODIFY",
+          "description": "signup 엔드포인트"
+        }
+      ],
+      "implementationGuide": "dto/SignupRequest(email,password,name 검증). AuthService.signup: findByEmail 존재시 409(중복), 없으면 id 생성(UUID 기반, 시드 user1.. 충돌 회피), passwordEncoder.encode, role=USER, userMapper.insert→LoginResponse(token+user) 반환. AuthController @PostMapping /signup.",
+      "verificationCriteria": "AuthApiTest 확장: 신규 이메일 200+token, 중복 이메일 409. ./gradlew build 전건 통과.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-6 완료. 회원가입 API. dto/SignupRequest(record @Email/@NotBlank email·password·name). AuthService.signup(@Transactional): findByEmail 존재 시 ResponseStatusException 409, 없으면 id='user-'+UUID(시드 user1.. 충돌 회피), passwordEncoder.encode, role=USER, userMapper.insert → LoginResponse(token+user) 자동 로그인 반환. AuthController @PostMapping /signup @Valid. AuthApiTest 확장: 신규 이메일 200+token·role USER, 중복(user@test.com) 409. ./gradlew build 전건 통과(총 29건 0실패). H2 mem 재기동 시 가입 사용자 소실은 1차 동일 한계로 수용.",
+      "completedAt": "2026-06-20T18:19:57.864Z"
+    },
+    {
+      "id": "915408dd-7f9b-45cc-ad73-91b843a27b4d",
+      "name": "P3-7 FE auth 스토어 토큰 기반 교체",
+      "description": "auth.ts를 useCookie('access_token') + $fetch 호출로 교체, login/signup을 Promise<boolean>로.",
+      "notes": "auth는 캐시 아님 — ROADMAP 명시 교체 지점. currentUser 쿠키는 AppNav 이름 표시·SSR 미들웨어용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e87b920d-f837-4653-8987-2ee65f6a776c"
+        },
+        {
+          "taskId": "9f71f77d-6127-413d-8fcd-1965698daac2"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:20:11.625Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/auth.ts",
+          "type": "TO_MODIFY",
+          "description": "토큰 기반 async 교체"
+        }
+      ],
+      "implementationGuide": "app/stores/auth.ts: token=useCookie<string|null>('access_token'), currentUser=useCookie<User|null>('auth_user'), isLoggedIn=computed(()=>!!token.value). login=async: $fetch<LoginResponse>(`${apiBase}/auth/login`,{method:'POST',body:{email,password}})→token.value=res.token, currentUser.value=res.user, return true; catch return false. signup 동일(/auth/signup). logout: 두 쿠키 null. ~/data/users·credentials import 제거. oxfmt 준수.",
+      "verificationCriteria": "npm run type-check 통과. login/signup Promise<boolean>, 토큰·user 쿠키 저장.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-7 완료. app/stores/auth.ts를 토큰 기반으로 교체. token=useCookie<string|null>('access_token'), currentUser=useCookie<User|null>('auth_user'), isLoggedIn=computed(()=>token.value!==null). login/signup을 async Promise<boolean>로: $fetch<LoginResponse>(`${apiBase}/auth/login|signup`, {method:'POST', body})→token.value=res.token·currentUser.value=res.user·return true, catch return false. logout 두 쿠키 null. ~/data/users·credentials import 제거. oxfmt(세미콜론 없음·작은따옴표) 준수. LoginResponse 인터페이스(token,user) 정의. npm run type-check 통과. auth는 캐시 아닌 ROADMAP 명시 교체 지점(600~601행).",
+      "completedAt": "2026-06-20T18:20:11.620Z"
+    },
+    {
+      "id": "7c6ccd26-f40c-4527-bfa9-61139420cf42",
+      "name": "P3-8 FE 핸들러 async + $fetch 인증 헤더 주입",
+      "description": "login.vue/signup.vue 핸들러 await 전환(마크업 무변경) + Authorization Bearer 주입 기반 플러그인.",
+      "notes": "이벤트 핸들러라 async 안전(라우터 대기 없음). 컴포넌트 구조 변경 0.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "915408dd-7f9b-45cc-ad73-91b843a27b4d"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:20:24.413Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/login.vue",
+          "type": "TO_MODIFY",
+          "description": "onSubmit async"
+        },
+        {
+          "path": "app/pages/signup.vue",
+          "type": "TO_MODIFY",
+          "description": "onSubmit async"
+        },
+        {
+          "path": "app/plugins/auth-fetch.ts",
+          "type": "CREATE",
+          "description": "헤더 주입 기반"
+        }
+      ],
+      "implementationGuide": "login.vue onSubmit→async, if(!(await auth.login(...))). signup.vue 동일 await auth.signup(...). data-testid·에러 문구·마크업 전부 무변경. app/plugins/auth-fetch.ts: $fetch.create({onRequest({options}){ token 쿠키 있으면 options.headers Authorization Bearer 주입 }}) 제공(Phase 4 보호 API 대비 기반).",
+      "verificationCriteria": "npm run type-check 통과. 마크업/문구 무변경.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-8 완료. login.vue onSubmit→async + if(!(await auth.login(...))), signup.vue onSubmit→async + await auth.signup(...). data-testid·에러 문구·마크업 전부 무변경(핸들러 await만 추가). app/plugins/auth-fetch.ts: $fetch.create({onRequest}) — access_token 쿠키 있으면 Headers에 Authorization Bearer 주입, provide.apiFetch로 노출(Phase 4 보호 API 대비 기반, Phase 3 실사용 없음). npm run type-check 통과. 이벤트 핸들러라 async 안전(라우터 대기 없음).",
+      "completedAt": "2026-06-20T18:20:24.412Z"
+    },
+    {
+      "id": "3a74c803-1a03-4d77-b0ad-ae94ba0583ab",
+      "name": "P3-9 게이트 회귀 검증",
+      "description": "BE 빌드·FE 타입체크·E2E(서버 기반 25건, auth.spec 포함) 전건 통과 확인.",
+      "notes": "ROADMAP_2 Phase 3 DoD 충족(이메일인증/상태머신 항목은 이연 명시). 이연 사실 문서화.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9f71f77d-6127-413d-8fcd-1965698daac2"
+        },
+        {
+          "taskId": "7c6ccd26-f40c-4527-bfa9-61139420cf42"
+        }
+      ],
+      "createdAt": "2026-06-20T18:09:15.296Z",
+      "updatedAt": "2026-06-20T18:21:02.126Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/auth.spec.ts",
+          "type": "REFERENCE",
+          "description": "회귀 계약"
+        }
+      ],
+      "implementationGuide": "cd backend && ./gradlew build(기존 23 + AuthApiTest/UserMapperTest, CatalogApiTest·HealthControllerTest 무인증 회귀 유지). npm run type-check. npm run test:e2e(BE 동시기동, auth.spec 로그인 성공 user@test.com/password·실패·가입 자동로그인·중복·게스트가드 포함 25건). 불일치 시 해당 태스크 회귀 수정.",
+      "verificationCriteria": "gradlew build·type-check·test:e2e(25) 전건 통과. Phase 3 핵심 인증 DoD 충족.",
+      "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
+      "summary": "P3-9 게이트 완료. 전건 통과: (1) cd backend && ./gradlew build BUILD SUCCESSFUL — 총 29건 0실패(AuthApiTest 4·UserMapperTest 2 신규 + CatalogApiTest 4·HealthControllerTest 무인증 회귀 유지 + 매퍼/스키마 회귀). (2) npm run type-check 통과. (3) npm run test:e2e — BE+FE 동시 기동 하에 25건 전부 통과(9.8s), auth.spec 8건이 실제 JWT 백엔드 기반으로 통과: 로그인 성공(user@test.com/password→BE JWT), 잘못된 비번 에러, 회원가입 자동로그인(BE insert+token), 중복 이메일 에러(BE 409), 로그아웃 가드, 비번불일치(FE), 게스트 가드. ROADMAP_2 Phase 3 DoD·체크리스트 갱신(이메일 인증/승인 상태머신 항목은 Phase 6/7/9 이연 명시). Phase 3 핵심 인증 DoD 충족 — Phase 4(예약 API+동시성) 진행 가능.",
+      "completedAt": "2026-06-20T18:21:02.123Z"
     }
   ]
 }

@@ -20,10 +20,11 @@ DROP TABLE IF EXISTS users;
 
 -- 사용자 (require 3.1)
 CREATE TABLE IF NOT EXISTS users (
-    id      VARCHAR(64)  PRIMARY KEY,
-    email   VARCHAR(255) NOT NULL,
-    name    VARCHAR(100) NOT NULL,
-    role    VARCHAR(20)  NOT NULL    -- UserRole enum 문자열
+    id             VARCHAR(64)  PRIMARY KEY,
+    email          VARCHAR(255) NOT NULL,
+    name           VARCHAR(100) NOT NULL,
+    role           VARCHAR(20)  NOT NULL,   -- UserRole enum 문자열
+    password_hash  VARCHAR(100) NOT NULL    -- BCrypt 해시 (Phase 3 인증)
 );
 
 -- 매장 (require 5.1)

@@ -9,7 +9,7 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 
-function onSubmit() {
+async function onSubmit() {
   error.value = ''
   // 필수값 검증
   if (!email.value || !password.value) {
@@ -23,7 +23,7 @@ function onSubmit() {
     return
   }
   // 로그인 시도 — 실패 시 계정/비번 구분 없는 통합 문구
-  if (!auth.login(email.value, password.value)) {
+  if (!(await auth.login(email.value, password.value))) {
     error.value = '이메일 또는 비밀번호가 올바르지 않습니다'
     return
   }

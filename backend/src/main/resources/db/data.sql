@@ -36,12 +36,12 @@ INSERT INTO manager_dayoff (manager_id, `date`, dayoff_type) VALUES
  ('mgr1', '2026-06-29', 'FULL_DAY'),
  ('mgr3', '2026-06-23', 'SHIFT_2');
 
--- 사용자 (app/data/users.ts) — 비밀번호 컬럼은 Phase 3(인증)에서 도입
-INSERT INTO users (id, email, name, role) VALUES
- ('user1', 'user@test.com', '홍길동', 'USER'),
- ('user2', 'user2@test.com', '김고객', 'USER'),
- ('manager1', 'manager@test.com', '김매니저', 'MANAGER'),
- ('admin1', 'admin@test.com', '관리자', 'ADMIN');
+-- 사용자 (app/data/users.ts) — Phase 3: password_hash = BCrypt('password') (4명 통일, 1차 더미 비번과 동일)
+INSERT INTO users (id, email, name, role, password_hash) VALUES
+ ('user1', 'user@test.com', '홍길동', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
+ ('user2', 'user2@test.com', '김고객', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
+ ('manager1', 'manager@test.com', '김매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
+ ('admin1', 'admin@test.com', '관리자', 'ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq');
 
 -- 가격 매트릭스 20행 (app/data/prices.ts = require 10.3 확정 단가)
 INSERT INTO price (car_type, service_type, amount) VALUES

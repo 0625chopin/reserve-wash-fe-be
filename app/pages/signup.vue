@@ -12,7 +12,7 @@ const passwordConfirm = ref('')
 const name = ref('')
 const error = ref('')
 
-function onSubmit() {
+async function onSubmit() {
   error.value = ''
   // 필수값 검증
   if (!email.value || !password.value || !passwordConfirm.value || !name.value) {
@@ -31,7 +31,7 @@ function onSubmit() {
     return
   }
   // 이메일 중복 → signup이 false 반환
-  if (!auth.signup({ email: email.value, password: password.value, name: name.value })) {
+  if (!(await auth.signup({ email: email.value, password: password.value, name: name.value }))) {
     error.value = '이미 가입된 이메일입니다'
     return
   }

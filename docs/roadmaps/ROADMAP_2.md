@@ -707,12 +707,14 @@ export const useAuthStore = defineStore('auth', () => {
 })
 ```
 
-#### 완료기준 (DoD)
-- [ ] 올바른 계정 로그인 시 JWT가 발급되고 `useCookie`에 보관된다
-- [ ] 토큰 없이 보호 API 호출 시 401, 권한 부족 시 403을 반환한다(역할 인가)
-- [ ] 일반 사용자 가입은 `EMAIL_VERIFIED → ACTIVE`, 매니저/매장가입은 `PENDING_APPROVAL`로 분기된다(require 4.4)
-- [ ] **1차 로그인 E2E 회귀**(성공/실패/미인증 가드)가 토큰 기반으로 통과한다
-- [ ] `./gradlew build`, `npm run type-check`, `npm run test:e2e` 통과
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(핵심 인증 additive 범위)
+- [x] 올바른 계정 로그인 시 JWT가 발급되고 `useCookie('access_token')`에 보관된다 (AuthApiTest 200+token, FE auth.ts 쿠키 저장)
+- [x] 토큰 없이 보호 API 호출 시 401, 권한 부족 시 403을 반환한다(역할 인가) (SecurityConfig stateless+JWT 필터; 보호 GET은 Phase 4+라 401 골격 검증, 403 역할은 BO API에서 활성)
+- [ ] ~~일반 사용자 가입 `EMAIL_VERIFIED → ACTIVE`, 매니저/매장가입 `PENDING_APPROVAL` 분기(require 4.4)~~ → **이연**(이메일 인증/승인 상태머신·SMTP는 BO/알림 단계 Phase 6/7/9). Phase 3은 USER 즉시 가입(서버 영속·BCrypt)만 구현
+- [x] **1차 로그인 E2E 회귀**(성공/실패/미인증 가드)가 토큰 기반으로 통과한다 (auth.spec 8건 서버 기반 통과)
+- [x] `./gradlew build`(29건), `npm run type-check`, `npm run test:e2e`(25건) 통과
+
+> 📌 **Phase 3 구현 방침**: 사용자 승인에 따라 **핵심 인증 additive**(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격)만 구현. 이메일 인증 토큰/승인 상태머신/SMTP는 **이연**(Phase 6/7/9). BE에 spring-security + jjwt 추가, `SecurityConfig`(@ConditionalOnWebApplication SERVLET·stateless·CORS 단일화), `users.password_hash`(BCrypt 시드). FE는 `auth.ts`를 `useCookie('access_token')` + `$fetch`로 교체(login/signup async, 마크업 무변경). 슬롯/예약 보호 API는 Phase 4.
 
 #### 구현 메모 (📌)
 - 📌 **이메일 발송은 Phase 9 위임**: 본 Phase에서는 인증 토큰 발급·검증·상태 전이까지 구현하고, **실제 메일 발송은 `EmailSender` 인터페이스만 선언**해 Phase 9 SMTP 인프라가 구현하도록 둡니다. 2단계에서는 콘솔 로그 스텁(`LoggingEmailSender`)으로 대체합니다.

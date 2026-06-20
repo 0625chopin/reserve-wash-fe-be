@@ -28,3 +28,8 @@ mybatis:
 
 server:
   port: 8080
+
+# JWT 인증 설정 (Phase 3) — HS256 대칭키(32byte 이상), 만료
+jwt:
+  secret: carwash-dev-secret-key-please-change-in-production-0123456789
+  expiration-ms: 86400000   # 24시간
