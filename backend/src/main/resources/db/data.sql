@@ -36,13 +36,17 @@ INSERT INTO manager_dayoff (manager_id, `date`, dayoff_type) VALUES
  ('mgr1', '2026-06-29', 'FULL_DAY'),
  ('mgr3', '2026-06-23', 'SHIFT_2');
 
--- 사용자 (app/data/users.ts) — Phase 3: password_hash = BCrypt('password') (4명 통일, 1차 더미 비번과 동일)
-INSERT INTO users (id, email, name, role, password_hash) VALUES
- ('user1', 'user@test.com', '홍길동', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
- ('user2', 'user2@test.com', '김고객', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
- ('manager1', 'manager@test.com', '김매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
- ('storeadmin1', 'storeadmin@test.com', '매장관리자', 'STORE_ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq'),
- ('admin1', 'admin@test.com', '관리자', 'ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq');
+-- 사용자 (app/data/users.ts) — password_hash = BCrypt('password') 통일(1차 더미 비번과 동일)
+--   approval_status: 기존 계정은 ACTIVE(로그인 가능). pending* 2명은 매니저 가입 2단계 승인(M7→S3) 검증용 더미.
+INSERT INTO users (id, email, name, role, password_hash, approval_status) VALUES
+ ('user1', 'user@test.com', '홍길동', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE'),
+ ('user2', 'user2@test.com', '김고객', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE'),
+ ('manager1', 'manager@test.com', '김매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE'),
+ ('storeadmin1', 'storeadmin@test.com', '매장관리자', 'STORE_ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE'),
+ ('admin1', 'admin@test.com', '관리자', 'ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE'),
+ -- 매니저 계열 가입 2단계 승인 대기 더미(store1 소속, 1차 승인 대기 PENDING_APPROVAL_L1)
+ ('pending1', 'pending1@test.com', '신입매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1'),
+ ('pending2', 'pending2@test.com', '대기매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1');
 
 -- 가격 매트릭스 20행 (app/data/prices.ts = require 10.3 확정 단가)
 INSERT INTO price (car_type, service_type, amount) VALUES

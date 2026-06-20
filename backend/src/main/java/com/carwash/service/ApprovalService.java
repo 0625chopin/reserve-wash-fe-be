@@ -3,6 +3,7 @@ package com.carwash.service;
 import com.carwash.domain.ManagerDayoff;
 import com.carwash.domain.StoreHoliday;
 import com.carwash.domain.enums.ApprovalStatus;
+import com.carwash.domain.enums.DayoffApprovalStatus;
 import com.carwash.dto.DayoffApprovalResponse;
 import com.carwash.dto.DayoffRequest;
 import com.carwash.dto.HolidayApprovalResponse;
@@ -15,8 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-// 휴일/휴무 결재 워크플로우 (require 8장) — 상태값 변경 방식(워크플로우 엔진 미사용).
-//   휴무: 2단계 승인(L1 최고매니저 → L2 관리자 → CONFIRMED). 휴일: 1단계 승인(관리자 → CONFIRMED).
+// 휴일/휴무 결재 워크플로우 (require v1.7 §8장) — 상태값 변경 방식(워크플로우 엔진 미사용).
+//   휴가/반차: 1단계 승인(매장매니저관리자 STORE_ADMIN → APPROVED 종결, 관리자 개입 없음, require §8.2·§8.3).
+//   매장 휴일: 1단계 승인(관리자 → CONFIRMED). ⚠️ 휴가/반차(1단계)와 가입(2단계)의 단계 수가 다름에 유의.
 //   불가능한 단계 전이는 도메인 메서드가 IllegalStateException(→ GlobalExceptionHandler 409).
 @Service
 public class ApprovalService {
@@ -29,30 +31,25 @@ public class ApprovalService {
         this.holidayMapper = holidayMapper;
     }
 
-    // ── 매니저 휴무 결재 ─────────────────────────────────────────────
+    // ── 매니저 휴가/반차 결재 (1단계, 매장매니저관리자 종결) ──────────────
     @Transactional
     public DayoffApprovalResponse submitDayoff(DayoffRequest req) {
         ManagerDayoff dayoff = ManagerDayoff.builder()
                 .managerId(req.managerId())
                 .date(req.date())
                 .type(req.type())
-                .status(ApprovalStatus.SUBMITTED)
+                .status(DayoffApprovalStatus.SUBMITTED)
                 .build();
         dayoffMapper.insert(dayoff);   // useGeneratedKeys → id 채워짐
         return DayoffApprovalResponse.from(dayoff);
     }
 
+    // 휴가/반차 1단계 승인 — 매장매니저관리자(STORE_ADMIN)가 SUBMITTED → APPROVED로 종결(M8).
+    //   APPROVED 시 카탈로그(Manager.dayoffs)에 노출되어 슬롯 비활성 반영(require §6.1). 관리자 개입 없음.
     @Transactional
-    public void approveDayoffL1(Long id) {
+    public void approveDayoff(Long id) {
         ManagerDayoff dayoff = loadDayoff(id);
-        dayoff.approveL1();   // SUBMITTED → APPROVED_L1 (불가 전이 시 예외)
-        dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
-    }
-
-    @Transactional
-    public void approveDayoffL2(Long id) {
-        ManagerDayoff dayoff = loadDayoff(id);
-        dayoff.approveL2();   // APPROVED_L1 → CONFIRMED → 카탈로그(Manager.dayoffs)에 노출되어 슬롯 비활성 반영
+        dayoff.approve();   // SUBMITTED → APPROVED (불가 전이 시 예외)
         dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
     }
 

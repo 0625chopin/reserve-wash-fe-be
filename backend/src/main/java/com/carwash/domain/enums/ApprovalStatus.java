@@ -1,10 +1,9 @@
 package com.carwash.domain.enums;
 
-// 결재 상태 (require 8.3) — 휴무 2단계(SUBMITTED→APPROVED_L1→CONFIRMED)·휴일 1단계(SUBMITTED→CONFIRMED)
-//   L2 승인은 곧장 CONFIRMED로 확정(require 8.3 APPROVED_L2는 확정 직전 단계 → 본 구현은 확정으로 collapse).
+// 매장 휴일 결재 상태 (require v1.7 §8.1) — 1단계 승인(SUBMITTED → CONFIRMED / REJECTED).
+//   ⚠️ 휴가/반차(휴무)는 v1.7에서 DayoffApprovalStatus(1단계, STORE_ADMIN 종결)로 분리됨 → 본 enum은 휴일 전용.
 public enum ApprovalStatus {
     SUBMITTED,
-    APPROVED_L1,
     CONFIRMED,
     REJECTED
 }

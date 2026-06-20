@@ -1,13 +1,21 @@
 # 자동차 세차 예약 서비스 (MVP) 개발 로드맵 — 2차 백엔드 진화(Spring Boot) + BO 전체
 
-> **문서 버전**: v2.1 (백엔드 진화 2·3단계 + BO 전체 착수, **DB 접근 MyBatis 확정**)
-> **작성일**: 2026-06-20
+> **문서 버전**: v2.2 (require_v1.md **v1.7** 정합 — 4역할·가입 2단계 승인·휴가/반차 1단계 승인·역할별 BO 페이지 분리)
+> **작성일**: 2026-06-20 (최종 수정: 2026-06-21)
 > **작성자**: PM/PL
+>
+> **🔄 v2.2 변경(require v1.7 정합 — 결재 단계 수 재정립)**: require_v1.md가 **v1.7**로 갱신되어, v1.6의 "3역할 단순화·승인 제거"가 **번복**되고 역할이 **4역할(`USER`/`MANAGER`/`STORE_ADMIN`/`ADMIN`)** 로 세분화, **매장매니저관리자(`STORE_ADMIN`)** 가 부활했습니다. 본 로드맵을 v1.7에 정합하도록 다음을 정정합니다:
+> - **가입 승인 = 2단계**(매장매니저관리자 1차 M7 → 관리자 2차 S3, `ACTIVE` 전 로그인 불가, 상태 `PENDING_APPROVAL_L1 → L2`). Phase 3 가입 상태머신·Phase 7 가입 승인 흐름에 반영.
+> - **휴가/반차(매니저 휴무) 승인 = 1단계**(매장매니저관리자 `STORE_ADMIN`가 `SUBMITTED → APPROVED`로 **종결**, **관리자 개입 없음**). **기존 Phase 7의 "2단계 결재(최고매니저 → 관리자, `APPROVED_L1 → APPROVED_L2 → CONFIRMED`)"는 v1.7과 충돌하므로 1단계로 전면 정정**합니다(require v1.7 §8.2·§8.3). ⚠️ 가입 승인(2단계)과 휴가/반차 승인(1단계)의 **단계 수가 다름**에 유의.
+> - **프로세스 코드 재정의(require v1.7 §11.1)**: M6=휴가/반차 신청, M7=일반매장매니저 가입 1차 승인(매장매니저관리자), **M8=휴가/반차 승인(신설, 매장매니저관리자 1단계 종결)**, S3=매니저 가입 2차 최종 승인(관리자), **S9=매장별 매니저 근무상태 확인(신설)**. 구 "M6=예약승인" 표기 제거.
+> - **역할별 BO 페이지 4그룹 분리**(require v1.7 §12.4): 일반매장매니저/매장매니저관리자/관리자별 화면 경로를 Phase 6~8에 반영.
+>
+> ✅ **구현 현황(2026-06-21 v1.7 재정합 완료)**: 기존 BE 구현의 v1.6/구 v2.1 가정(휴무 2단계 결재 `APPROVED_L1→L2`)을 **v1.7로 재정합 완료**했습니다 — 휴가/반차 1단계 collapse(`DayoffApprovalStatus`, STORE_ADMIN 종결), 가입 2단계 승인(M7→S3, `UserApprovalStatus`, `ACTIVE`만 로그인), 역할별 BO 페이지 4그룹 분리(§12.4, `/store-admin/*`·`/admin/manager-approvals` 신설), 로그인/AppNav 역할 정합. BE `./gradlew build`·FE `type-check`·`lint`·`test:e2e`(33건) 전건 통과(Phase 7 구현 메모 참조).
 >
 > **🔧 v2.1 변경(DB 접근 기술 확정)**: require_v1.md **v1.5** 결정에 따라 백엔드 영속 계층을 **MyBatis**(`mybatis-spring-boot-starter`, 매퍼 인터페이스 + XML SQL)로 확정한다. **JPA/Hibernate는 사용하지 않는다.** 이에 따라 본 로드맵의 패키지 구조(`entity/`→`domain/`, `repository/`(JpaRepository)→`mapper/`(`@Mapper`+XML)), 동시성 락(`@Version`→version 컬럼 비교 UPDATE, `@Lock(PESSIMISTIC_WRITE)`→매퍼 `SELECT ... FOR UPDATE` SQL), 스키마 관리(`ddl-auto`→`schema.sql`/Flyway 직접 관리)를 MyBatis 기준으로 기술한다.
 > **대상 독자**: 주니어 ~ 시니어 **백엔드·풀스택** 개발자
-> **연계 문서**: [`docs/require_v1.md`](../require_v1.md) (요구사항 정의서 **v1.4** 기준), [`docs/예약_규칙_명세_v1.md`](../예약_규칙_명세_v1.md) (예약 규칙 보강 명세 — 8장 미해결 질문 Q1~Q8), [`docs/roadmaps/ROADMAP_1.md`](./ROADMAP_1.md) (1차 FO + 프론트 더미)
-> **범위**: 데이터 진화 **2단계(Spring Boot 인메모리 더미)** + **3단계(MySQL)** + **BO 전체(매니저·관리자 프로세스 M3~M7·S3~S8, 결재 워크플로우, SMTP/알림 인프라)** 집중 상세화. 1차(FO + 프론트 더미)는 [ROADMAP_1.md](./ROADMAP_1.md)에서 완료된 자산으로 전제한다.
+> **연계 문서**: [`docs/require_v1.md`](../require_v1.md) (요구사항 정의서 **v1.7** 기준), [`docs/예약_규칙_명세_v1.md`](../예약_규칙_명세_v1.md) (예약 규칙 보강 명세 — 8장 미해결 질문 Q1~Q8), [`docs/roadmaps/ROADMAP_1.md`](./ROADMAP_1.md) (1차 FO + 프론트 더미)
+> **범위**: 데이터 진화 **2단계(Spring Boot 인메모리 더미)** + **3단계(MySQL)** + **BO 전체(일반매장매니저·매장매니저관리자·관리자 프로세스 M3~M8·S3~S9, 가입 2단계 승인·휴가/반차 1단계 승인 워크플로우, SMTP/알림 인프라)** 집중 상세화. 1차(FO + 프론트 더미)는 [ROADMAP_1.md](./ROADMAP_1.md)에서 완료된 자산으로 전제한다.
 >
 > **🔄 v2.0 신설 배경**: 1차([ROADMAP_1.md](./ROADMAP_1.md), Nuxt 4 FO + 프론트엔드 더미 데이터)가 Phase 8(E2E 마무리)까지 완료되었습니다. 이제 **실제 백엔드(Spring Boot)** 를 도입하여 동시성·인증·영속화를 서버/DB 레벨로 끌어올리고, 1차에서 **문서화만** 했던 **BO(매니저·관리자) 기능 전체**(require 2.2)를 구현합니다.
 >
@@ -32,7 +40,7 @@
 
 각 Phase 머리말에 `> require_v1.md 참조: N장` 형식으로 근거 섹션을, 프로세스 코드(`M#`/`S#`)를 함께 표기했습니다. 구현 중 "왜 이렇게 해야 하지?"가 생기면 해당 요구사항 섹션을 펼쳐 보세요. 전체 추적 매핑은 **8장 부록**에 정리되어 있습니다.
 
-> 💡 **BO 범위 근거**: 1차에서 "2차 과제(문서화만)"로 분류했던 BO 기능(require 2.2)을 본 로드맵에서 구현합니다. BO M3~M7(대행·세차완료·취소·예약승인·매니저가입승인)은 require **11.1·3.2**, BO S3~S8(가입승인·예약자관리·사용자관리·후기확인·회원정보·매출)은 require **11.1·3.2**가 출처입니다.
+> 💡 **BO 범위 근거**: 1차에서 "2차 과제(문서화만)"로 분류했던 BO 기능(require 2.2)을 본 로드맵에서 구현합니다. *(require v1.7 프로세스)* BO M3~M8(대행·세차완료 보조·취소 보조·**휴가/반차 신청(M6)**·**가입 1차 승인(M7)**·**휴가/반차 승인(M8)**)은 require **11.1·3.2**, BO S3~S9(**가입 2차 최종 승인(S3)**·예약상태 확인(S4)·후기 확인(S6)·매출(S8)·**매니저 근무상태 확인(S9)**)은 require **11.1·3.2**가 출처입니다. **가입 승인은 2단계(M7→S3), 휴가/반차 승인은 1단계(M8)** 로 단계 수가 다릅니다(require §4.4·§8.3).
 
 ### 0.3 주니어 진행 원칙 (3원칙)
 
@@ -51,7 +59,7 @@
 | **4** | 예약 API + 동시성 2단계 | 슬롯 `UNIQUE` + 낙관적(version 컬럼)/비관적(`FOR UPDATE`) 락, 충돌 409 | 6·7장 / FW5 | 3.5 | 15.0 |
 | **5** | 예약 상태 전이 API(완료/취소/승인) | M4·M5·M6 서버화, 상태 가드 | 11.3 / FW6·FW7·M6 | 2.5 | 17.5 |
 | **6** | BO — 예약 대행 + 매장 관리 | M3 대행예약, S4 예약자관리·S5 사용자관리 | 3.2·11.1 / M3·S4·S5 | 3.5 | 21.0 |
-| **7** | 휴일/휴무 결재 워크플로우 | 상태머신(SUBMITTED→APPROVED_L1→APPROVED_L2→CONFIRMED/REJECTED), M7·8.1 2단계 승인 | 8장 / M5·M7·S3 | 3.5 | 24.5 |
+| **7** | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 | 휴가/반차 1단계(`SUBMITTED→APPROVED/REJECTED`, M6→M8 매장매니저관리자 종결) + 가입 2단계(M7→S3, `PENDING_APPROVAL_L1→L2`) + 매장휴일 | 4·8장 / M6·M7·M8·S3 | 3.5 | 24.5 |
 | **8** | 후기/평점 API + BO 확인·매출 | S6 후기확인, S8 매출집계 | 9장·11.1 / S6·S8 | 2.5 | 27.0 |
 | **9** | 알림 — SMTP 인프라 + 정책 | 발송 인프라, 메일/푸시 정책 | 13.2 항목 6·7 | 2.5 | 29.5 |
 | **10** | 데이터 3단계 — MySQL 이행 | 트랜잭션 + 유니크 인덱스, Flyway 마이그레이션, 운영 영속화 | 7·12장 | 3.5 | 33.0 |
@@ -589,13 +597,13 @@ export function getBaysForCar(storeId: string, carType: CarType): Promise<Bay[]>
 > **공수: 3.5일** · **선행조건: Phase 2** · **require_v1.md 참조: 4장(인증·승인 분리), 3.2(권한 매트릭스)**
 
 #### 목표
-1차의 더미 로그인을 **JWT 기반 실제 인증**으로 교체하고, **역할(USER/MANAGER/STORE_ADMIN/ADMIN) 기반 인가 가드**와 **이메일 인증(SMTP 연계, Phase 9 인프라와 결합)** 을 도입한다. require 4.2의 **인증/승인 분리** 원칙을 서버에 반영한다.
+1차의 더미 로그인을 **JWT 기반 실제 인증**으로 교체하고, **역할(USER/MANAGER/STORE_ADMIN/ADMIN) 기반 인가 가드**와 **이메일 인증(SMTP 연계, Phase 9 인프라와 결합)** 을 도입한다. require 4.2의 **인증/승인 분리** 원칙을 서버에 반영한다. *(require v1.7)* **오직 `ACTIVE` 상태만 로그인 가능**하며, 매니저 계열(`MANAGER`·`STORE_ADMIN`)은 2단계 가입 승인을 통과해 `ACTIVE`가 되기 전에는 로그인이 거부되어야 한다.
 
 #### 태스크 체크리스트
-- [ ] `POST /api/auth/login` — 이메일/비밀번호 검증 → JWT 발급
+- [ ] `POST /api/auth/login` — 이메일/비밀번호 검증 → JWT 발급. **`ACTIVE`가 아닌 계정(미인증·승인 대기·반려)은 로그인 거부**(require v1.7 §4.4)
 - [ ] `security/JwtAuthenticationFilter` + `SecurityConfig`(역할별 경로 인가)
 - [ ] 비밀번호 해시(`BCryptPasswordEncoder`)
-- [ ] 회원가입 상태 머신(require 4.4): `REQUESTED → EMAIL_VERIFIED → PENDING_APPROVAL/ACTIVE`
+- [ ] 회원가입 상태 머신(require v1.7 §4.4): `REQUESTED → EMAIL_VERIFIED → ` **{ `USER`: `ACTIVE` 직행 }** / **{ `MANAGER`·`STORE_ADMIN`: `PENDING_APPROVAL_L1 → PENDING_APPROVAL_L2 → ACTIVE` 2단계 승인 }**, + `REJECTED`. 승인 단계 전이(L1·L2)는 Phase 7 가입 승인 흐름과 연계
 - [ ] 이메일 인증 토큰 발급/검증(`POST /api/auth/verify-email`) — 발송은 Phase 9 SMTP에 위임(인터페이스만 선언)
 - [ ] FE `app/stores/auth.ts`의 `login`을 `$fetch('/auth/login')` + 토큰 보관(`useCookie`)으로 교체
 - [ ] FE 미들웨어 `auth.ts`·역할 가드를 토큰 기반으로 교체(ROADMAP_1 Phase 3 자산 위에 증분)
@@ -656,18 +664,18 @@ public record LoginRequest(
 
 `service/AuthService.java` (인증/승인 분리 — require 4.2)
 ```java
-// 인증(이메일 본인확인)과 승인(역할/매장가입 검토)은 별개 (require 4.2)
-// 승인 불필요한 일반 사용자: EMAIL_VERIFIED → ACTIVE 자동 전이 (require 4.4)
-// 매니저/매장가입: EMAIL_VERIFIED → PENDING_APPROVAL (Phase 7 결재 연계)
+// 인증(이메일 본인확인)과 승인(매니저 가입 검토)은 별개 (require 4.2)
+// USER: EMAIL_VERIFIED → ACTIVE 자동 전이(승인 분기 없음, require v1.7 §4.4)
+// MANAGER·STORE_ADMIN: EMAIL_VERIFIED → PENDING_APPROVAL_L1 (2단계 승인 진입, Phase 7 가입 승인 연계)
 @Transactional
 public void verifyEmail(String token) {
     User user = userRepository.findByEmailVerifyToken(token)
         .orElseThrow(() -> new DomainException("유효하지 않은 인증 토큰입니다."));
     user.markEmailVerified();
     if (user.requiresApproval()) {
-        user.toPendingApproval();   // 매니저/매장가입 → 승인 대기
+        user.toPendingApprovalL1();  // 매니저 계열 → 1차 승인 대기(PENDING_APPROVAL_L1, require v1.7 §4.4)
     } else {
-        user.activate();            // 일반 사용자 → 즉시 활성
+        user.activate();             // USER → 즉시 활성(ACTIVE 직행)
     }
 }
 ```
@@ -710,7 +718,7 @@ export const useAuthStore = defineStore('auth', () => {
 #### 완료기준 (DoD) — ✅ 2026-06-21 충족(핵심 인증 additive 범위)
 - [x] 올바른 계정 로그인 시 JWT가 발급되고 `useCookie('access_token')`에 보관된다 (AuthApiTest 200+token, FE auth.ts 쿠키 저장)
 - [x] 토큰 없이 보호 API 호출 시 401, 권한 부족 시 403을 반환한다(역할 인가) (SecurityConfig stateless+JWT 필터; 보호 GET은 Phase 4+라 401 골격 검증, 403 역할은 BO API에서 활성)
-- [ ] ~~일반 사용자 가입 `EMAIL_VERIFIED → ACTIVE`, 매니저/매장가입 `PENDING_APPROVAL` 분기(require 4.4)~~ → **이연**(이메일 인증/승인 상태머신·SMTP는 BO/알림 단계 Phase 6/7/9). Phase 3은 USER 즉시 가입(서버 영속·BCrypt)만 구현
+- [ ] ~~`USER` 가입 `EMAIL_VERIFIED → ACTIVE` 직행, 매니저 계열 `PENDING_APPROVAL_L1 → L2` 2단계 승인 분기(require v1.7 §4.4)~~ → **이연**(이메일 인증/2단계 승인 상태머신·SMTP는 BO/알림 단계 Phase 7/9). Phase 3은 USER 즉시 가입(서버 영속·BCrypt)만 구현
 - [x] **1차 로그인 E2E 회귀**(성공/실패/미인증 가드)가 토큰 기반으로 통과한다 (auth.spec 8건 서버 기반 통과)
 - [x] `./gradlew build`(29건), `npm run type-check`, `npm run test:e2e`(25건) 통과
 
@@ -889,17 +897,19 @@ export async function confirmReservation(payload: Reservation): Promise<boolean>
 
 ---
 
-### Phase 5 — 예약 상태 전이 API (완료/취소/승인)
+### Phase 5 — 예약 상태 전이 API (완료/취소)
 
-> **공수: 2.5일** · **선행조건: Phase 4** · **require_v1.md 참조: 11.3(프로세스) / FW6·FW7·M4·M5·M6**
+> **공수: 2.5일** · **선행조건: Phase 4** · **require_v1.md 참조: 11.3(프로세스) / FW6·FW7·M4·M5** *(v2.2: 예약 승인 단계 없음 — M6은 휴가/반차 신청으로 재정의)*
+
+> ⚠️ **v1.7 정정**: 구 v2.1은 "예약 승인(M6)"을 언급했으나, require **v1.7**에서 **M6은 "휴가/반차 신청"으로 재정의**되었고 별도의 "예약 승인" 프로세스는 존재하지 않는다(MVP는 `confirm` 직후 즉시 `RESERVED`). 따라서 본 Phase에서 "예약 승인" 개념은 도입하지 않으며, 휴가/반차 신청(M6)·승인(M8)은 **Phase 7**에서 다룬다.
 
 #### 목표
-1차의 클라이언트 상태 전이(ROADMAP_1 Phase 6)를 **서버 API**로 교체하고, **세차완료(FW6/M4)·예약취소(FW7/M5)** 에 더해 1차에 없던 **예약 승인(M6)** 을 도입한다. 상태 가드(불가능한 전이 차단)를 서버에서 강제한다.
+1차의 클라이언트 상태 전이(ROADMAP_1 Phase 6)를 **서버 API**로 교체하고, **세차완료(FW6/M4)·예약취소(FW7/M5)** 를 서버화한다. 상태 가드(불가능한 전이 차단)를 서버에서 강제한다. (별도 "예약 승인" 단계는 v1.7에 없으므로 도입하지 않는다.)
 
 #### 태스크 체크리스트
 - [x] `PATCH /api/reservations/{id}/complete` — RESERVED → COMPLETED (FW6/M4) *(P5-4, 204·404·409)*
 - [x] `PATCH /api/reservations/{id}/cancel` — RESERVED/HOLDING → CANCELED + 슬롯 release (FW7/M5) *(P5-4)*
-- [x] ~~`PATCH /api/reservations/{id}/approve` — 예약 승인 (M6)~~ → **Phase 0 결정에 따라 미도입(이연)**. 1차 parity(confirm→즉시 RESERVED, PENDING 상태 미신설)·Phase 3 승인 상태머신 이연과 정합. M6 승인은 **Phase 6(BO 대행)** 에서 BO 전용 흐름으로 도입
+- [x] **"예약 승인" 단계 미도입 (v1.7 정합)** — require v1.7에 별도 예약 승인 프로세스가 없음. 1차 parity(confirm→즉시 RESERVED, PENDING 상태 미신설)와 정합. ~~구 표기 "예약 승인(M6)"은 폐기(M6은 v1.7에서 휴가/반차 신청으로 재정의)~~
 - [x] 상태 전이 가드: 도메인 메서드(`Reservation.complete()`/`cancel()`)에서 불가능 전이 시 `IllegalStateException` → **409 `INVALID_TRANSITION`** *(P5-1·P5-3)*
 - [x] 취소 시 슬롯 release(AVAILABLE) — 그리드 재방문 시 반영 *(P5-3, `releaseOrComplete`)*
 - [x] FE `app/stores/reservation`(`completeReservation`/`cancelReservation` async PATCH 위임) — `reservations.vue` 마크업은 무변경(additive)
@@ -911,9 +921,8 @@ export async function confirmReservation(payload: Reservation): Promise<boolean>
 
 | 현재 상태 | 액션(프로세스) | 다음 상태 | 슬롯 처리 | 비고 |
 |---|---|---|---|---|
-| `HOLDING` | 취소(FW7) | `CANCELED` | `AVAILABLE` release | 승인 전 취소(11.3 c) |
-| `RESERVED` | 승인(M6) | `RESERVED` | — | 승인 도입 시(require 3.2) |
-| `RESERVED` | 취소(FW7/M5) | `CANCELED` | `AVAILABLE` release | 승인 후 취소(11.3 b) |
+| `HOLDING` | 취소(FW7) | `CANCELED` | `AVAILABLE` release | 확정 전 취소(11.3 c) |
+| `RESERVED` | 취소(FW7/M5) | `CANCELED` | `AVAILABLE` release | 확정 후 취소(11.3 b) |
 | `RESERVED` | 세차완료(FW6/M4) | `COMPLETED` | `COMPLETED` 고정 | 후기 작성 자격 부여 |
 | `COMPLETED` | (불가) | — | — | 전이 차단(400/409) |
 
@@ -968,7 +977,7 @@ public void cancel(Long reservationId) {
 - [x] `./gradlew build`(BE 39건 0실패, 전이 5건 포함), `npm run test:e2e`(25건) 통과
 
 #### 구현 메모 (📌)
-- 📌 **승인(M6) 미도입 확정(Phase 0 정합)**: 1차 MVP는 승인 단계가 없어 `confirm`이 곧장 RESERVED를 만들었고(ROADMAP_1 Phase 6), Phase 3에서 승인 상태머신도 이연됨. M6 도입 시 `PENDING` 중간 상태가 생겨 `confirm` 직후 RESERVED를 기대하는 reservations.spec 회귀가 깨지므로 **Phase 5에서는 미도입**. M6 예약 승인은 **Phase 6(BO 대행)** 에서 BO 전용 흐름으로 도입한다(approve 엔드포인트도 그때 추가).
+- 📌 **"예약 승인" 단계 부재 확정(v1.7 정합)**: require v1.7에는 별도의 예약 승인 프로세스가 없으며, MVP는 `confirm`이 곧장 RESERVED를 만든다(ROADMAP_1 Phase 6). 따라서 예약에 `PENDING` 중간 상태를 두지 않는다(reservations.spec 회귀 보존). ~~구 표기 "예약 승인(M6)"은 폐기~~ — v1.7에서 **M6은 휴가/반차 신청**으로 재정의되어 **Phase 7**에서 다룬다(예약 흐름과 무관).
 - 📌 **id 분리(serverId)**: BE `confirm`은 서버가 부여한 예약 id(`rsv-<UUID>`)를 `ReservationResponse`로 반환한다. FE는 로컬 표시 id(`rsv-N`, 결정적 시퀀스 — testid용)는 유지하되, 응답 id를 `Reservation.serverId`(옵셔널)로 캡처해 전이 PATCH `…/{serverId}/complete|cancel`에 사용한다. 표시 id와 서버 id를 분리해 1차 E2E testid 정합과 서버 전이를 동시에 만족.
 - 📌 **전이 가드 위치**: 불가능 전이 차단은 도메인 메서드(`Reservation.complete()`/`cancel()`)가 `IllegalStateException`을 던지고, `GlobalExceptionHandler`가 이를 **409 `INVALID_TRANSITION`** 으로 매핑. 소유자 불일치/미존재는 서비스에서 `ResponseStatusException(404)`. 취소 시 슬롯은 `releaseOrComplete`가 `findByKey→release→updateStatusWithVersion(AVAILABLE)`로 release.
 
@@ -1049,101 +1058,131 @@ public class ManagerReservationController {
 
 ---
 
-### Phase 7 — 휴일/휴무 결재 워크플로우
+### Phase 7 — 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일
 
-> **공수: 3.5일** · **선행조건: Phase 6** · **require_v1.md 참조: 8장(결재), 5.5(교대조 휴무), 4.3(가입승인) / M5·M7·S3·8.1**
+> **공수: 3.5일** · **선행조건: Phase 6** · **require_v1.md 참조: 8장(휴가/반차 1단계 결재), 5.5(교대조 휴무), 4.4·11.2(가입 2단계 승인) / M6·M7·M8·S3·8.1**
+
+> ⚠️ **v1.7 정정 (단계 수 분리 — 매우 중요)**: 본 Phase는 require **v1.7**에 맞춰 **두 종류의 승인 워크플로우를 단계 수를 구분**하여 구현한다.
+> - **휴가/반차(매니저 휴무) = 1단계 승인**: 일반매장매니저(`MANAGER`)가 신청(M6) → **매장매니저관리자(`STORE_ADMIN`)가 `SUBMITTED → APPROVED`로 종결**(M8). **관리자(`ADMIN`)는 개입하지 않는다**(require §8.2·§8.3).
+> - **매니저 가입 = 2단계 승인**: `EMAIL_VERIFIED → ` 매장매니저관리자 1차(M7) → 관리자 2차(S3) → `ACTIVE`(require §4.4·§11.2).
+> - 즉 **휴가/반차는 1단계, 가입은 2단계**로 단계 수가 다르다. ~~구 v2.1의 "휴무 2단계 결재(`SUBMITTED→APPROVED_L1→APPROVED_L2→CONFIRMED`, 최고매니저→관리자)"는 v1.7과 충돌하므로 폐기~~.
 
 #### 목표
-require 8장의 **결재 상태머신**(SUBMITTED → APPROVED_L1 → APPROVED_L2 → CONFIRMED / REJECTED)을 구현하고, **매니저 휴무(M7 흐름의 2단계 승인: 최고매니저 → 관리자)** 와 **매장 휴일(8.1: 매니저 신청 → 관리자 승인)** 을 처리한다. 휴무 유형(FULL_DAY/SHIFT_n, require 5.5)은 전일/교대조 구분 없이 동일 흐름을 따른다(require 8.2). 매니저 가입 승인(M7)·가입 승인(S3)도 동일 승인 패턴을 재사용한다.
+require v1.7의 **두 승인 워크플로우**를 구현한다.
+1. **휴가/반차 1단계 결재 상태머신**(`SUBMITTED → APPROVED / REJECTED`)을 구현하고, 일반매장매니저 신청(M6) → 매장매니저관리자 승인(M8)으로 **종결**한다(관리자 미개입). 휴무 유형(FULL_DAY/SHIFT_n, require 5.5)은 전일/교대조 구분 없이 동일 1단계 흐름을 따른다(require §8.2).
+2. **가입 2단계 승인**(M7 매장매니저관리자 1차 → S3 관리자 2차)을 구현하여 매니저 계열 가입자를 `PENDING_APPROVAL_L1 → PENDING_APPROVAL_L2 → ACTIVE`로 전이한다(require §4.4). 두 워크플로우는 "신청 → 검토자 승인" 패턴을 공유하되 **단계 수가 다르다**.
+3. **매장 휴일(8.1)**: 등록 주체는 require v1.7에서 추후 확정(관리자 또는 매장매니저관리자 운영 가정, §13.2). 본 로드맵은 매니저 신청 → 관리자 승인의 단일 승인으로 처리한다.
 
-#### 태스크 체크리스트
-- [x] 도메인별(`ManagerDayoff`·`StoreHoliday`)에 `ApprovalStatus` enum(SUBMITTED/APPROVED_L1/CONFIRMED/REJECTED, require 8.3) *(P7-1)*
-- [x] `POST /api/manager/dayoffs` — 매니저 휴무 결재 상신(SUBMITTED), 휴무유형 포함(require 5.5) *(P7-5)*
-- [x] `PATCH /api/manager/dayoffs/{id}/approve-l1` — 최고매니저 1차 승인(SUBMITTED → APPROVED_L1) *(STORE_ADMIN 세분 인가)*
-- [x] `PATCH /api/admin/dayoffs/{id}/approve-l2` — 관리자 최종 승인(APPROVED_L1 → CONFIRMED) *(APPROVED_L2는 확정으로 collapse)*
-- [x] `PATCH .../reject` + `/resubmit` — 반려(→ REJECTED) 후 재신청(→ SUBMITTED)
-- [x] 매장 휴일(8.1): 매니저 신청(`POST /api/manager/holidays`) → 관리자 단일 승인(`PATCH /api/admin/holidays/{id}/approve`)
-- [ ] ~~M7(매니저 가입 승인)·S3(가입 승인)~~ → **이연**. 동일 승인 패턴(상태 enum+도메인 전이+역할 인가)을 `ApprovalService`가 시연하나, User 가입 상태머신은 Phase 3에서 이연된 SMTP/인증 흐름과 묶임 — 후속 단계에서 재사용
-- [x] CONFIRMED 시 슬롯 비활성 반영: FULL_DAY=그날 전체, SHIFT_n=해당 교대 시간대만(require 5.5·6.1) *(확정 휴무→카탈로그 노출→isManagerOffAt 게이팅, P7-6 BE 테스트로 실증)*
-- [x] 역할 인가: L1=STORE_ADMIN, L2=ADMIN (require 3.2·8.3)
+#### 태스크 체크리스트 — ✅ 2026-06-21 완료(v1.7 재정합)
+- [x] `ManagerDayoff`에 **휴가/반차 1단계** `DayoffApprovalStatus` enum(`SUBMITTED/APPROVED/REJECTED`, require §8.3) — 구 `APPROVED_L1/L2` 2단계 enum을 1단계로 정정(공용 `ApprovalStatus`는 휴일 전용 잔존)
+- [x] `POST /api/manager/dayoffs` — 일반매장매니저 휴가/반차 신청(M6, `SUBMITTED`), 휴무유형 포함(require 5.5)
+- [x] `PATCH /api/store-admin/dayoffs/{id}/approve` — **매장매니저관리자 1단계 승인(M8, `SUBMITTED → APPROVED`로 종결)** — 구 `approve-l1`/`approve-l2`를 단일 `approve`로 정정, 관리자 `approve-l2` 제거(StoreAdminDayoffController 신설)
+- [x] `PATCH .../reject` + `/resubmit` — 반려(→ `REJECTED`) 후 재신청(→ `SUBMITTED`)
+- [x] **가입 2단계 승인(M7→S3)**: `User`에 `UserApprovalStatus(PENDING_APPROVAL_L1/L2/ACTIVE/REJECTED)` + `PATCH /api/store-admin/manager-signups/{id}/approve`(1차, `L1→L2`) + `PATCH /api/admin/manager-approvals/{id}/confirm`(2차, `L2→ACTIVE`) + 반려(`REJECTED`). 로그인은 `ACTIVE`만 허용(403 게이팅)
+- [x] 매장 휴일(8.1): 매니저 신청(`POST /api/manager/holidays`) → 관리자 단일 승인(`PATCH /api/admin/holidays/{id}/approve`) — 기존 구현 유지
+- [x] `APPROVED`(휴가/반차) 시 슬롯 비활성 반영: FULL_DAY=그날 전체, SHIFT_n=해당 교대 시간대만(require 5.5·6.1) — 카탈로그 노출(`status='APPROVED'`만)→`isManagerOffAt` 게이팅
+- [x] 역할 인가: **휴가/반차 승인(M8)=STORE_ADMIN 종결**, **가입 1차(M7)=STORE_ADMIN·2차(S3)=ADMIN** (require 3.2·§4.4·§8.3) — SecurityConfig `/api/store-admin/**`=STORE_ADMIN, `/api/admin/**`=ADMIN
+
+> ✅ **현행 코드 재정합 완료(2026-06-21)**: 기존 Phase 7 BE 구현(휴무 2단계 `approve-l1`/`approve-l2`)을 v1.7 1단계로 재정합 완료. ① `ManagerDayoff` 상태 enum을 `DayoffApprovalStatus(SUBMITTED/APPROVED/REJECTED)`로 축소, ② `approve-l2`(관리자 휴무 승인) 엔드포인트·인가·테스트 제거, ③ `approve-l1`을 `/api/store-admin/dayoffs/{id}/approve`(STORE_ADMIN 종결)로 변경, ④ 카탈로그 노출 필터 `status='CONFIRMED'` → `'APPROVED'`. 가입 2단계 승인(M7→S3)은 신규 도입(역할별 BO 페이지 §12.4 분리: `/store-admin/*`·`/admin/manager-approvals` 신설). 역할별 AppNav 메뉴·로그인 STORE_ADMIN 빠른버튼 정합 완료.
 
 #### 생성·수정 파일
-`domain/ManagerDayoff.java`(승인상태·휴무유형), `domain/StoreHoliday.java`(승인상태), `mapper/ManagerDayoffMapper.java`·`mapper/StoreHolidayMapper.java` + XML, `controller/DayoffController.java`, `controller/StoreHolidayController.java`, `service/ApprovalService.java`, `dto/DayoffRequest.java`, `dto/ApprovalResponse.java`, FE `app/pages/manager/dayoffs.vue`·`app/pages/admin/approvals.vue`(신규)
+`domain/ManagerDayoff.java`(휴가/반차 1단계 승인상태·휴무유형), `domain/StoreHoliday.java`(승인상태), `domain/User.java`(가입 2단계 승인상태 `PENDING_APPROVAL_L1/L2`), `mapper/ManagerDayoffMapper.java`·`mapper/StoreHolidayMapper.java`·`mapper/UserMapper.java` + XML, `controller/DayoffController.java`, `controller/StoreHolidayController.java`, `controller/ManagerSignupController.java`(가입 1차 승인), `controller/AdminApprovalController.java`(가입 2차 승인), `service/DayoffApprovalService.java`(휴가/반차 1단계), `service/SignupApprovalService.java`(가입 2단계), `dto/DayoffRequest.java`, `dto/ApprovalResponse.java`, FE `app/pages/manager/dayoffs.vue`(휴가/반차 신청 M6)·`app/pages/store-admin/dayoff-approvals.vue`(휴가/반차 승인 M8)·`app/pages/store-admin/manager-signups.vue`(가입 1차 승인 M7)·`app/pages/admin/manager-approvals.vue`(가입 2차 승인 S3)(신규)
 
-#### 결재 상태 머신 (require 8.3)
+#### 휴가/반차 1단계 결재 상태 머신 (require §8.3)
 
 | 상태 | 설명 | 다음 상태 | 전이 주체 |
 |---|---|---|---|
-| `SUBMITTED` | 결재 상신 | `APPROVED_L1` / `REJECTED` | 신청자 → 검토자 |
-| `APPROVED_L1` | 1차 승인 | `APPROVED_L2` / `REJECTED` | 매장 최고매니저(STORE_ADMIN) |
-| `APPROVED_L2` | 2차 승인(확정 직전) | `CONFIRMED` | 관리자(ADMIN) |
-| `CONFIRMED` | 휴일/휴무 확정 반영 | — | (시스템) |
-| `REJECTED` | 어느 단계든 거부 | `SUBMITTED`(재신청) | 검토자 |
+| `SUBMITTED` | 휴가/반차 신청 상신(M6) | `APPROVED` / `REJECTED` | 신청자(일반매장매니저) |
+| `APPROVED` | 승인/확정 → 휴무 확정·슬롯 반영(§6.1) | — | **매장매니저관리자(`STORE_ADMIN`) — 1단계 종결(M8)** |
+| `REJECTED` | 매장매니저관리자 거부 | `SUBMITTED`(재신청) | 매장매니저관리자(`STORE_ADMIN`) |
 
-> **매장 휴일(8.1)** 은 매니저 신청 → 관리자 승인의 **단일 승인**으로 단순화(L1 생략). **매니저 휴무**는 위 2단계(최고매니저 → 관리자) 흐름을 따른다(require 8.2·8.3).
+> ⚠️ **휴가/반차는 1단계**(`SUBMITTED → APPROVED`, 매장매니저관리자 종결). **관리자(`ADMIN`)는 개입하지 않는다**(require §8.2·§8.3). 구 2단계(`APPROVED_L1 → APPROVED_L2 → CONFIRMED`) 모델은 폐기.
 
-#### 구현 예시 — 결재 승인 서비스(2단계 승인 + 휴무 유형)
+#### 가입 2단계 승인 상태 머신 (require §4.4)
 
-`service/ApprovalService.java`
+| 상태 | 설명 | 다음 상태 | 전이 주체 |
+|---|---|---|---|
+| `PENDING_APPROVAL_L1` | 1차 승인 대기 | `PENDING_APPROVAL_L2` / `REJECTED` | **매장매니저관리자(`STORE_ADMIN`) — 1차(M7)** |
+| `PENDING_APPROVAL_L2` | 2차 승인 대기 | `ACTIVE` / `REJECTED` | **관리자(`ADMIN`) — 2차 최종(S3)** |
+| `ACTIVE` | 활성 — 로그인 가능 유일 상태 | — | (시스템) |
+| `REJECTED` | 어느 단계든 거부 | `REQUESTED`(재신청) | 검토자(STORE_ADMIN/ADMIN) |
+
+> **매장 휴일(8.1)** 은 매니저 신청 → 관리자 승인의 **단일 승인**으로 처리(등록 주체는 require §13.2에서 추후 확정).
+
+> 📌 **단계 수 비교(중요, require §8.3)**: 휴가/반차 승인 = **1단계**(매장매니저관리자 종결). 가입 승인 = **2단계**(매장매니저관리자 1차 → 관리자 2차). 두 흐름을 혼동하지 않는다.
+
+#### 구현 예시 — 휴가/반차 1단계 승인 서비스 + 가입 2단계 승인
+
+`service/DayoffApprovalService.java` (휴가/반차 1단계 — 매장매니저관리자 종결)
 ```java
-// 매니저 휴무 2단계 승인 (require 8.2·8.3)
-// L1: 최고매니저, L2: 관리자 → CONFIRMED 시 슬롯 비활성 반영
+// 휴가/반차 1단계 승인 — 매장매니저관리자(STORE_ADMIN)가 종결 (require §8.2·§8.3)
+// 관리자(ADMIN) 개입 없음. APPROVED 시 슬롯 비활성 반영
 @Transactional
-public void approveL1(Long dayoffId) {
+public void approve(Long dayoffId) {
     ManagerDayoff dayoff = dayoffMapper.findById(dayoffId);
     if (dayoff == null) {
-        throw new DomainException("휴무 신청을 찾을 수 없습니다.");
+        throw new DomainException("휴가/반차 신청을 찾을 수 없습니다.")
     }
-    dayoff.approveL1();   // SUBMITTED → APPROVED_L1 (불가 전이 시 예외)
-    dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
-}
-
-@Transactional
-public void approveL2(Long dayoffId) {
-    ManagerDayoff dayoff = dayoffMapper.findById(dayoffId);
-    if (dayoff == null) {
-        throw new DomainException("휴무 신청을 찾을 수 없습니다.");
-    }
-    dayoff.approveL2();   // APPROVED_L1 → APPROVED_L2 → CONFIRMED
+    dayoff.approve();   // SUBMITTED → APPROVED (불가 전이 시 예외)
     dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
 
-    // CONFIRMED 시 슬롯 비활성 반영 (require 5.5·6.1)
+    // APPROVED 시 슬롯 비활성 반영 (require 5.5·6.1)
     // FULL_DAY: 그날 전체 슬롯 / SHIFT_n: 해당 교대 시간대 슬롯만
     slotDeactivationService.deactivate(dayoff.getManagerId(), dayoff.getDate(), dayoff.getType());
 }
 ```
 
-`domain/ManagerDayoff.java` (전이 메서드 발췌)
+`domain/ManagerDayoff.java` (휴가/반차 1단계 전이 메서드)
 ```java
-// 결재 전이 — 불가능한 단계 건너뛰기 차단 (require 8.3)
-public void approveL1() {
-    if (this.status != ApprovalStatus.SUBMITTED) {
-        throw new IllegalStateException("1차 승인 불가 상태: " + this.status);
+// 휴가/반차 결재 전이 — 1단계(매장매니저관리자 종결) (require §8.3)
+public void approve() {
+    if (this.status != DayoffApprovalStatus.SUBMITTED) {
+        throw new IllegalStateException("승인 불가 상태: " + this.status)
     }
-    this.status = ApprovalStatus.APPROVED_L1;
+    this.status = DayoffApprovalStatus.APPROVED   // 1단계 종결 = 확정
 }
 
-public void approveL2() {
-    if (this.status != ApprovalStatus.APPROVED_L1) {
-        throw new IllegalStateException("2차 승인 불가 상태: " + this.status);
+public void reject() {
+    if (this.status != DayoffApprovalStatus.SUBMITTED) {
+        throw new IllegalStateException("반려 불가 상태: " + this.status)
     }
-    this.status = ApprovalStatus.CONFIRMED; // L2=확정
+    this.status = DayoffApprovalStatus.REJECTED
 }
 ```
 
-#### 완료기준 (DoD)
-- [x] 매니저 휴무가 **2단계 승인**(최고매니저 → 관리자)을 거쳐 CONFIRMED된다(require 8.2) *(ApprovalApiTest·결재 E2E 2단계 데모)*
-- [x] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 CONFIRMED된다(require 8.1) *(`휴일_1단계_승인`)*
-- [x] CONFIRMED 시 FULL_DAY는 그날 전체, SHIFT_n은 해당 교대 시간대만 슬롯이 비활성된다(require 5.5·6.1) *(`확정_FULL_DAY…대행 차단`·`확정_SHIFT1…오전만 차단/오후 허용`)*
-- [x] 어느 단계든 반려(REJECTED) 후 재신청(SUBMITTED)이 가능하다 *(`반려_후_재신청`)*
-- [x] 단계 건너뛰기·권한 외 승인이 차단된다(상태 가드 + 역할 인가) *(`단계_건너뛰기…409`·`MANAGER approve-l1 403`·`USER 403`)*
-- [x] `./gradlew build`(결재 7건 포함 전건 green) + 결재 상태머신 통합테스트 통과 + `type-check`·`test:e2e`(31건) 통과
+`service/SignupApprovalService.java` (매니저 가입 2단계 승인 — M7→S3)
+```java
+// 가입 1차 승인(M7) — 매장매니저관리자(STORE_ADMIN) (require §4.4)
+@Transactional
+public void approveL1(Long userId) {
+    User user = userMapper.findById(userId);
+    user.approveSignupL1();   // PENDING_APPROVAL_L1 → PENDING_APPROVAL_L2
+    userMapper.updateApprovalStatus(user.getId(), user.getApprovalStatus().name());
+}
+
+// 가입 2차 최종 승인(S3) — 관리자(ADMIN) → ACTIVE (require §4.4)
+@Transactional
+public void confirmL2(Long userId) {
+    User user = userMapper.findById(userId);
+    user.confirmSignupL2();   // PENDING_APPROVAL_L2 → ACTIVE (로그인 가능)
+    userMapper.updateApprovalStatus(user.getId(), user.getApprovalStatus().name());
+}
+```
+
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(v1.7 재정합 완료)
+- [x] 휴가/반차가 **1단계 승인**(매장매니저관리자 `SUBMITTED → APPROVED`)으로 **종결**되며, **관리자 승인 단계가 없다**(require §8.2) — ApprovalApiTest: STORE_ADMIN approve 종결·ADMIN 휴무승인 권한없음 403
+- [x] 매니저 가입이 **2단계 승인**(매장매니저관리자 1차 M7 → 관리자 2차 S3)을 거쳐 `ACTIVE`가 되고, `ACTIVE` 전에는 로그인 불가다(require §4.4) — SignupApprovalApiTest + e2e 가입 2단계
+- [x] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 확정된다(require §8.1) — 기존 구현 회귀 통과
+- [x] 휴가/반차 `APPROVED` 시 FULL_DAY는 그날 전체, SHIFT_n은 해당 교대 시간대만 슬롯이 비활성된다(require 5.5·6.1) — ApprovalApiTest 대행 차단/허용
+- [x] 어느 단계든 반려(REJECTED) 후 재신청이 가능하다
+- [x] 권한 외 승인이 차단된다(휴가/반차 승인=STORE_ADMIN, 가입 1차=STORE_ADMIN·2차=ADMIN) (require 3.2·§4.4·§8.3)
+- [x] `./gradlew build` + 두 워크플로우(휴가/반차 1단계·가입 2단계) 통합테스트 통과 + `type-check`·`test:e2e`(33건) 회귀 통과
 
 #### 구현 메모 (📌)
-- 📌 **워크플로우 엔진 미사용**: require 8.2대로 별도 엔진 없이 **상태값 변경 방식**으로 구현. `ApprovalStatus` enum + 도메인 전이 메서드(`approveL1`/`approveL2`/`reject`/`resubmit`) + 경로 기반 역할 인가의 조합. `APPROVED_L2`는 별도 저장 상태 없이 L2 승인 시 곧장 `CONFIRMED`로 collapse(require 8.3 예시 정합).
-- 📌 **슬롯 비활성 = 확정 휴무의 카탈로그 반영**: 희소 슬롯 행을 변형하지 않는다. 워크플로우 휴무는 카탈로그와 **동일 `manager_dayoff` 테이블**을 쓰고, 카탈로그 쿼리는 `status='CONFIRMED'`만 노출(`ManagerMapper` LEFT JOIN 필터). 확정된 휴무는 `Manager.dayoffs`에 나타나 기존 `isManagerOffAt`(FULL_DAY 전일/SHIFT_n 해당 교대) 게이팅으로 **FE 슬롯/시간 선택 비활성 + 서버 대행 예약 차단(400)** 을 동시에 실현. 기존 시드 휴무는 `status DEFAULT 'CONFIRMED'`로 회귀 안전(ManagerMapperTest/CatalogApiTest 유지).
-- 📌 **역할 세분 인가**: `approve-l1`만 STORE_ADMIN 한정 매처(`HttpMethod.PATCH /api/manager/dayoffs/*/approve-l1`)를 일반 `/api/manager/**`(MANAGER·STORE_ADMIN) 매처보다 **먼저** 평가. L2·반려·휴일 승인은 `/api/admin/**`=ADMIN. STORE_ADMIN 데모용 시드 유저(`storeadmin@test.com`) 추가.
-- 📌 **M7/S3 이연**: 가입 승인은 본질적으로 같은 "신청 → 검토자 승인" 패턴이나 User 가입 상태머신은 Phase 3에서 이연된 이메일 인증/SMTP 흐름과 결합 — `ApprovalService` 전이 골격을 재사용해 후속 단계에서 도입.
+- 📌 **워크플로우 엔진 미사용**: require §8.2대로 별도 엔진 없이 **상태값 변경 방식**으로 구현. 휴가/반차는 `DayoffApprovalStatus`(`SUBMITTED/APPROVED/REJECTED`) + 도메인 전이 메서드(`approve`/`reject`/`resubmit`), 가입은 `ApprovalStatus`(`PENDING_APPROVAL_L1/L2/ACTIVE/REJECTED`) + 경로 기반 역할 인가의 조합.
+- 📌 **슬롯 비활성 = 승인된 휴무의 카탈로그 반영**: 희소 슬롯 행을 변형하지 않는다. 휴무는 카탈로그와 **동일 `manager_dayoff` 테이블**을 쓰고, 카탈로그 쿼리는 `status='APPROVED'`만 노출(`ManagerMapper` LEFT JOIN 필터). 승인된 휴무는 `Manager.dayoffs`에 나타나 기존 `isManagerOffAt`(FULL_DAY 전일/SHIFT_n 해당 교대) 게이팅으로 **FE 슬롯/시간 선택 비활성 + 서버 대행 예약 차단(400)** 을 동시에 실현. 기존 시드 휴무는 `status DEFAULT 'APPROVED'`로 회귀 안전.
+- 📌 **역할 세분 인가**: 휴가/반차 승인(M8)은 `PATCH /api/store-admin/dayoffs/*/approve` → `hasRole('STORE_ADMIN')` 종결(관리자 매처 없음). 가입 1차(M7)는 `PATCH /api/store-admin/manager-signups/*/approve` → STORE_ADMIN, 가입 2차(S3)는 `PATCH /api/admin/manager-approvals/*/confirm` → ADMIN. STORE_ADMIN 데모용 시드 유저(`storeadmin@test.com`) 추가.
+- 📌 ⚠️ **현행 코드 재정합 필요(v1.7 충돌)**: 본 저장소의 기존 Phase 7 BE 구현은 휴무를 **2단계(`approve-l1`/`approve-l2`, `ApprovalStatus.APPROVED_L1→CONFIRMED`)** 로 작성되어 있어 v1.7(휴가/반차 1단계 종결)과 **충돌**한다. 재정합 작업: ① `ManagerDayoff` enum을 `SUBMITTED/APPROVED/REJECTED` 1단계로 축소, ② 관리자 휴무 승인(`approve-l2`) 엔드포인트·인가·테스트 제거, ③ `approve-l1`을 `approve`(STORE_ADMIN 종결)로 변경, ④ 카탈로그 노출 필터 `CONFIRMED → APPROVED`, ⑤ 가입 2단계 승인(M7→S3)을 신규 도입. 위 DoD는 이 재정합 기준으로 갱신(체크 해제 = 재정합 미완료).
 
 ---
 
@@ -1247,7 +1286,7 @@ require 13.2가 2차 과제로 이관한 **SMTP 발송 인프라 선정(항목 6
 |---|---|---|---|
 | 이메일 인증 링크 | 가입(REQUESTED) | 메일 | require 4.4 |
 | 예약 확정 안내 | 예약 RESERVED | 메일(추후 푸시) | require 6장 |
-| 결재 결과 통지 | 휴무/휴일 CONFIRMED/REJECTED | 메일 | require 8장 |
+| 승인 결과 통지 | 휴가/반차 APPROVED/REJECTED(1단계)·가입 승인 단계 전이(L1→L2→ACTIVE/REJECTED)·휴일 승인 | 메일 | require 4·8장 |
 
 #### 구현 예시 — SMTP 발송 & 비동기
 
@@ -1547,21 +1586,23 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 | Phase 0 | 명세 확정(Q1~Q8)·BE 부트스트랩·FE↔BE 계약 | 12장 / 명세 8장 | — |
 | Phase 1 | 백엔드 도메인 모델·DB 스키마·슬롯 UNIQUE | 5장(5.2·5.5)·10장 | — |
 | Phase 2 | 서비스 추상화 교체(FE↔BE 연동) | 12.3 | — |
-| Phase 3 | 인증/인가(JWT·이메일 인증·승인 분리) | 4장(4.2·4.4)·3.2 | **FW2, M2, S2 / M7·S3(가입승인 연계)** |
+| Phase 3 | 인증/인가(JWT·이메일 인증·승인 분리, 가입 2단계 상태머신) | 4장(4.2·4.4)·3.2 | **FW2, M2, S2 / M7·S3(가입 2단계 승인 연계)** |
 | Phase 4 | 예약 API + 동시성 2단계(낙관/비관 락) | 6장·7장(7.3) | **FW5** |
-| Phase 5 | 예약 상태 전이(완료/취소/승인) | 11.3 | **FW6, FW7 / M4, M5, M6** |
+| Phase 5 | 예약 상태 전이(완료/취소) | 11.3 | **FW6, FW7 / M4, M5** |
 | Phase 6 | BO 예약 대행 + 매장 관리 | 3.2·11.1 | **M3 / S4, S5** |
-| Phase 7 | 휴일/휴무 결재 워크플로우(2단계 승인) | 8장(8.1·8.2·8.3)·5.5·4.3 | **M5, M7 / S3 / 8.1(매장휴일)** |
+| Phase 7 | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 | 4장(4.4)·8장(8.1·8.2·8.3)·5.5 | **M6·M8(휴가/반차 1단계) / M7·S3(가입 2단계) / 8.1(매장휴일)** |
 | Phase 8 | 후기/평점 API + BO 확인·매출 | 9장·11.1 | **S6, S8** |
 | Phase 9 | 알림 — SMTP 인프라 + 정책 | 13.2 항목 6·7 | — |
 | Phase 10 | 데이터 3단계 — MySQL 이행 | 7장·12장(12.3) | — |
 
-> **BO 범위 근거**: 1차에서 require 2.2에 따라 "2차 과제(문서화만)"였던 BO 프로세스(M3~M7, S3~S8)를 본 2차 로드맵에서 **실제 구현**합니다. 권한 인가는 require 3.2 매트릭스를 정본으로 강제합니다.
+> **BO 범위 근거**: 1차에서 require 2.2에 따라 "2차 과제(문서화만)"였던 BO 프로세스(M3~M8, S3~S9)를 본 2차 로드맵에서 **실제 구현**합니다. *(require v1.7)* BO는 **일반매장매니저(`MANAGER`)·매장매니저관리자(`STORE_ADMIN`)·관리자(`ADMIN`) 3역할별 화면으로 분리**(require §12.4)하며, **가입 승인은 2단계(M7→S3), 휴가/반차 승인은 1단계(M8 매장매니저관리자 종결)** 입니다. 권한 인가는 require 3.2 매트릭스를 정본으로 강제합니다.
 
 > ℹ️ **require_v1.md 12장(스택) 참조 시 주의**: require 12.1(FE)은 Nuxt 4 확정, 12.2(BE)는 "Java(LTS) + Spring Boot(최신 무료), 2단계에서 도입"입니다. 본 로드맵 BE 스택(Java 21 + Spring Boot 3.x + H2→MySQL)은 12.2를 정본으로 따릅니다.
+
+> ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로**: ① 일반매장매니저 — `/manager/reserve`(대행)·`/manager/reservations`(취소·완료 보조)·`/manager/dayoffs`(휴가/반차 신청 M6). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8). ③ 관리자 — `/admin/manager-approvals`(가입 2차 최종 승인 S3)·`/admin/sales`(매출 S8)·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9). 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
 
 > ℹ️ **명세 Q1~Q8 참조 시 주의**: 예약_규칙_명세_v1.md 8장의 미해결 질문은 **Phase 0 결정표에서 확정**되며, 그 결과가 Phase 1(도메인·스키마)·Phase 4(베이 노출)에 반영됩니다. 명세 문서 자체는 읽기 전용입니다.
 
 ---
 
-> **문서 끝.** 본 로드맵(v2.0)은 require_v1.md v1.4와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(매니저·관리자 프로세스·결재 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다.
+> **문서 끝.** 본 로드맵(**v2.2**)은 require_v1.md **v1.7**와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(4역할 기반 매니저·관리자 프로세스·승인 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. v1.7 정합으로 **가입 승인은 2단계(매장매니저관리자 1차 → 관리자 2차), 휴가/반차 승인은 1단계(매장매니저관리자 종결)** 로 단계 수를 구분하며, 역할별 BO 페이지를 4그룹으로 분리합니다(§12.4). 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다. ⚠️ 기존 BE 구현의 휴무 2단계 결재는 v1.7(1단계)과 충돌하므로 Phase 7 구현 메모의 재정합 과제를 따릅니다.

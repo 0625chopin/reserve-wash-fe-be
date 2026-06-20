@@ -2493,6 +2493,334 @@
       "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
       "summary": "P8-7 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — ReviewApiTest 8건 포함 전건 0실패(17클래스). (2) npm run type-check 0 에러. (3) npm run test:e2e 전건 31건 통과 — review.spec 2건(자격 가드·평점 제출·avg-overall)이 서버 POST 위임(serverId) 후에도 로컬 미러 표시로 회귀 그린, BO/결재/예약 전건 통과. (4) ROADMAP_2 Phase 8 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(후기=예약 serverId, 서버 자격검증 404/400/409, 로컬 미러 유지 이유, 매출/평균 기존 findByStore/findByManager Java 집계) 기록.",
       "completedAt": "2026-06-20T19:44:01.893Z"
+    },
+    {
+      "id": "32d54ca9-6dd6-470d-af87-19ae57ba6556",
+      "name": "P9-1 휴무 1단계 collapse — BE 도메인/enum/서비스/매퍼/스키마/시드",
+      "description": "휴무(휴가/반차) 결재를 2단계에서 1단계로 collapse한다(require v1.7 §8.2·§8.3, STORE_ADMIN 종결, ADMIN 개입 없음). 신규 enum DayoffApprovalStatus={SUBMITTED,APPROVED,REJECTED}를 도입하고 ManagerDayoff·ApprovalService(휴무 부분)·ManagerMapper·schema/data.sql을 일괄 전환한다. 공용 ApprovalStatus는 StoreHoliday 전용으로 잔존(휴일 1단계 무변경). 컴파일 깨짐 최소화를 위해 휴무 컨트롤러/보안/테스트는 P9-2에서 이어 수정한다(이 태스크 단독으로는 일시적으로 빌드가 깨질 수 있으며 P9-2 완료 시 정상화).",
+      "notes": "enum 물리 분리로 단계 혼동 차단. ManagerDayoffMapper.updateStatus는 enum.name() 문자열 바인딩이므로 매퍼 SQL 무변경. 휴일(StoreHoliday/ApprovalStatus)은 절대 건드리지 않음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:00:23.048Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/domain/enums/ApprovalStatus.java",
+          "type": "REFERENCE",
+          "description": "공용 enum(휴일 잔존). 현재 SUBMITTED/APPROVED_L1/CONFIRMED/REJECTED"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain/ManagerDayoff.java",
+          "type": "TO_MODIFY",
+          "description": "휴무 도메인 전이 메서드 1단계화"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ApprovalService.java",
+          "type": "TO_MODIFY",
+          "description": "휴무 승인 L1/L2→단일 approveDayoff"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ManagerMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "카탈로그 dayoff status 필터 CONFIRMED→APPROVED 3곳"
+        },
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "manager_dayoff.status DEFAULT"
+        },
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "REFERENCE",
+          "description": "시드 휴무 status 미지정 확인"
+        }
+      ],
+      "implementationGuide": "1) 신규 domain/enums/DayoffApprovalStatus.java={SUBMITTED,APPROVED,REJECTED}. 2) ManagerDayoff: status 타입을 DayoffApprovalStatus로 교체, approveL1()/approveL2() 제거→approve()(SUBMITTED→APPROVED, 아니면 IllegalStateException)·reject()(SUBMITTED→REJECTED)·resubmit()(REJECTED→SUBMITTED). 주석 프로세스코드 정정(M6 신청·M8 승인). 3) ApprovalService: approveDayoffL1/approveDayoffL2 제거→approveDayoff(id)(load→approve→dayoffMapper.updateStatus). submitDayoff·listDayoffs·rejectDayoff·resubmitDayoff는 상태값만 DayoffApprovalStatus로 정합. 휴일 메서드 무변경. 4) ManagerMapper.xml findAll/findByStore/findById 3곳 LEFT JOIN ...AND md.status='CONFIRMED' → 'APPROVED'. 5) schema.sql manager_dayoff.status DEFAULT 'CONFIRMED'→'APPROVED'. data.sql 기존 시드 휴무는 status 미지정(DEFAULT) 유지 → 자동 APPROVED.",
+      "verificationCriteria": "DayoffApprovalStatus 신설·ManagerDayoff.approve() 1단계 전이 구현. ManagerMapper.xml 3곳 APPROVED 필터. schema DEFAULT APPROVED. 휴일(ApprovalStatus/StoreHoliday) 무변경 확인. (빌드 정상화는 P9-2에서)",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-1 완료. 휴가/반차 결재를 1단계로 collapse하는 BE 데이터/도메인 계층 전환 완료. (1) DayoffApprovalStatus enum 신설(SUBMITTED/APPROVED/REJECTED, 주석에 가입 2단계·휴일 1단계와 물리 분리 명시). (2) ManagerDayoff: status 타입 DayoffApprovalStatus로 교체, approveL1()/approveL2() 제거→approve()(SUBMITTED→APPROVED 종결)·reject(SUBMITTED→REJECTED)·resubmit(REJECTED→SUBMITTED). 주석 M6 신청·M8 승인 정정. (3) DayoffApprovalResponse status 타입 DayoffApprovalStatus로 변경. (4) ApprovalService 휴무 부분: approveDayoffL1/L2 제거→approveDayoff(id) 단일(SUBMITTED→APPROVED), submitDayoff SUBMITTED 상태값 정합, 클래스 주석 1단계/2단계 구분 명시. 휴일 메서드 무변경. (5) ManagerMapper.xml 카탈로그 LEFT JOIN 필터 status='CONFIRMED'→'APPROVED' 3곳(+주석). (6) schema.sql manager_dayoff.status DEFAULT 'CONFIRMED'→'APPROVED'(기존 시드 회귀 안전). data.sql 시드 휴무는 status 미지정→DEFAULT APPROVED 자동. 휴일(ApprovalStatus/StoreHoliday) 무변경 확인. 빌드 정상화(컨트롤러 approveDayoffL1/L2 호출부 정리)는 P9-2에서 수행 예정(태스크 설계상 의도된 분할).",
+      "completedAt": "2026-06-20T22:00:23.046Z"
+    },
+    {
+      "id": "e3959e04-461b-4102-8656-447bdabcef23",
+      "name": "P9-2 휴무 1단계 — 컨트롤러 경로 재배치 + SecurityConfig + BE 테스트",
+      "description": "휴무 승인 엔드포인트를 /api/manager/dayoffs/*/approve-l1 및 /api/admin/dayoffs/*/approve-l2에서 /api/store-admin/dayoffs/{id}/approve(+reject·resubmit, STORE_ADMIN 종결)로 이전한다. AdminApprovalController의 휴무 approve-l2를 제거(휴일 approve는 유지). SecurityConfig에 /api/store-admin/** = STORE_ADMIN 인가 추가. ApprovalApiTest 휴무 케이스를 1단계로 수정. 이 태스크 완료 시 BE 빌드가 정상화되어야 한다.",
+      "notes": "경로 이전이 핵심 — FE(P9-5)·E2E(P9-8)도 동일 경로로 맞춰야 함. AdminApprovalController는 가입 2차(P9-4)에서 다시 확장되므로 충돌 주의(머지 가능).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "32d54ca9-6dd6-470d-af87-19ae57ba6556"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:04:25.653Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/DayoffController.java",
+          "type": "TO_MODIFY",
+          "description": "approve-l1 제거, 신청/목록만"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminApprovalController.java",
+          "type": "TO_MODIFY",
+          "description": "휴무 approve-l2 제거, 휴일 approve 유지"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "TO_MODIFY",
+          "description": "/api/store-admin/** STORE_ADMIN 인가"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/approval/ApprovalApiTest.java",
+          "type": "TO_MODIFY",
+          "description": "휴무 1단계로 테스트 수정"
+        }
+      ],
+      "implementationGuide": "1) DayoffController(/api/manager/dayoffs): 신청 POST·목록 GET 유지, approve-l1 제거. 휴무 승인은 신규 StoreAdminDayoffController(@RequestMapping('/api/store-admin/dayoffs')) PATCH /{id}/approve→approvalService.approveDayoff, /{id}/reject, /{id}/resubmit (모두 204). 2) AdminApprovalController: 휴무 approve-l2 매핑·서비스 호출 제거. 휴일 approve 유지. 3) SecurityConfig: .requestMatchers('/api/store-admin/**').hasRole('STORE_ADMIN') 추가, 기존 PATCH /api/manager/dayoffs/*/approve-l1 매처 및 휴무 admin l2 흐름 정리. /api/manager/**=hasAnyRole(MANAGER,STORE_ADMIN) 유지. 4) ApprovalApiTest: 휴무 2단계 테스트→1단계(MANAGER submit→STORE_ADMIN approve 종결, ADMIN은 휴무 승인 권한 없음 확인, USER 403, 반려/재신청, 확정(APPROVED) 휴무가 대행 차단). 단계건너뛰기 케이스는 삭제(1단계엔 무의미).",
+      "verificationCriteria": "cd backend && ./gradlew build 전건 통과. PATCH /api/store-admin/dayoffs/{id}/approve가 STORE_ADMIN으로 SUBMITTED→APPROVED 종결, ADMIN 휴무 승인 권한 없음, USER 403, 확정 휴무 대행 차단 검증.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-2 완료. 휴가/반차 승인 엔드포인트를 STORE_ADMIN 1단계 종결로 이전하고 BE 빌드 정상화. (1) StoreAdminDayoffController 신설(/api/store-admin/dayoffs: GET 검토목록·PATCH /{id}/approve(SUBMITTED→APPROVED 종결)·/{id}/reject). (2) DayoffController(/api/manager/dayoffs): approve-l1 제거, 신청(POST)·현황조회(GET)·재신청(PATCH resubmit)만 유지. (3) AdminApprovalController: 휴무 dayoffs 목록·approve-l2·rejectDayoff 제거, 매장 휴일 승인/반려만 유지(미사용 import 정리, 주석에 휴무 1단계 이전 명시). (4) SecurityConfig: /api/store-admin/**=STORE_ADMIN 인가 추가, 구 approve-l1 세분 매처 제거, 미사용 HttpMethod import 제거. (5) ApprovalStatus enum을 휴일 전용으로 정리(미사용 APPROVED_L1 제거). (6) ApprovalApiTest 휴무 케이스 1단계로 재작성: STORE_ADMIN approve 종결·MANAGER 403·ADMIN 휴무승인 권한없음 403·이미승인 재승인 409(INVALID_TRANSITION)·반려후재신청·FULL_DAY/SHIFT_1 승인 후 대행 슬롯 비활성. 검증: cd backend && ./gradlew build BUILD SUCCESSFUL, ./gradlew test --rerun-tasks 전건 0실패(ApprovalApiTest 포함). JAVA_HOME=Temurin 21로 실행.",
+      "completedAt": "2026-06-20T22:04:25.650Z"
+    },
+    {
+      "id": "9cd19e62-74b8-4322-8083-4525a74a3548",
+      "name": "P9-3 가입 2단계 — BE 도메인/enum/스키마/시드/로그인 게이팅/매퍼",
+      "description": "매니저 계열 가입 2단계 승인을 위한 데이터·인증 기반을 구축한다(require v1.7 §4.4). UserApprovalStatus enum 신설, User에 approvalStatus 필드·전이 메서드 추가, schema/data.sql 정합, 로그인 시 ACTIVE만 허용, UserMapper 보강. 이메일 인증 단계는 이연(PENDING_APPROVAL_L1부터).",
+      "notes": "단계 건너뛰기 가드는 도메인 전이 메서드가 담당(409 매핑은 GlobalExceptionHandler IllegalStateException→409 기존 재사용). 매니저 PENDING 시드는 manager 테이블이 아닌 users 테이블(role MANAGER)에 넣음 — 가입 승인 주체는 User.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:07:18.803Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/domain/User.java",
+          "type": "TO_MODIFY",
+          "description": "approvalStatus 필드+전이 메서드"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/AuthService.java",
+          "type": "TO_MODIFY",
+          "description": "login ACTIVE 게이팅"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/UserMapper.java",
+          "type": "TO_MODIFY",
+          "description": "updateApprovalStatus·findByApprovalStatus"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/UserMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "approval_status 컬럼 매핑+신규 쿼리"
+        },
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "users.approval_status 컬럼"
+        },
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "TO_MODIFY",
+          "description": "기존 유저 ACTIVE + PENDING 매니저 2명"
+        }
+      ],
+      "implementationGuide": "1) 신규 domain/enums/UserApprovalStatus.java={PENDING_APPROVAL_L1,PENDING_APPROVAL_L2,ACTIVE,REJECTED}. 2) User: approvalStatus 필드 추가 + approveSignupL1()(L1→L2)·confirmSignupL2()(L2→ACTIVE)·rejectSignup()(L1/L2→REJECTED) 전이 메서드(불가전이 IllegalStateException). @Builder/@AllArgsConstructor 정합. 3) schema.sql users에 approval_status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE'. 4) data.sql 기존 5명 approval_status='ACTIVE' 명시 + PENDING_APPROVAL_L1 매니저 더미 2명 신규(role MANAGER, store1 소속, BCrypt 'password'). 5) AuthService.login: 비번 검증 후 user.approvalStatus!=ACTIVE면 403(ResponseStatusException, '승인 대기 중입니다'). signup은 USER→ACTIVE 유지(User.builder에 approvalStatus(ACTIVE)). 6) UserMapper(+XML): insert/findByEmail/findById에 approval_status 컬럼 반영, updateApprovalStatus(id,status), findByApprovalStatus(status) 추가.",
+      "verificationCriteria": "UserApprovalStatus 신설·User 전이 메서드 구현. login이 PENDING 계정 403, ACTIVE 계정 성공. UserMapper 신규 쿼리 동작. 기존 시드 5명 ACTIVE로 로그인 회귀 통과.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-3 완료. 가입 2단계 승인의 데이터·인증 기반 구축. (1) UserApprovalStatus enum 신설(PENDING_APPROVAL_L1/L2/ACTIVE/REJECTED, 가입=2단계·휴가반차=1단계 구분 주석). (2) User에 approvalStatus 필드 + approveSignupL1()(L1→L2)·confirmSignupL2()(L2→ACTIVE)·rejectSignup()(L1/L2→REJECTED) 전이 메서드(불가전이 IllegalStateException→409). (3) schema.sql users.approval_status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE'. (4) data.sql 기존 5명 ACTIVE 명시 + PENDING_APPROVAL_L1 매니저 더미 2명(pending1/pending2, store1, role MANAGER) 신규 시드. (5) AuthService.login: 비번 일치해도 approvalStatus!=ACTIVE면 403('승인 대기 중'), signup은 USER ACTIVE 직행 설정. (6) UserMapper(+XML): findAll/findById/findByEmail/insert에 approval_status 반영, updateApprovalStatus·findByApprovalStatus 신규. UserMapperTest insert에 approvalStatus 추가. 검증: ./gradlew build BUILD SUCCESSFUL 전건 0실패(기존 AuthApiTest 로그인 회귀 통과 — 시드 전원 ACTIVE).",
+      "completedAt": "2026-06-20T22:07:18.800Z"
+    },
+    {
+      "id": "9e07bbcd-2f77-4476-bfaf-d54f628fd945",
+      "name": "P9-4 가입 2단계 — 승인 서비스/컨트롤러/DTO/SecurityConfig + BE 테스트",
+      "description": "가입 2단계 승인 워크플로우(M7 STORE_ADMIN 1차 → S3 ADMIN 2차 → ACTIVE)를 서비스·컨트롤러로 구현하고 인가·통합테스트를 추가한다. 이 태스크 완료 시 BE 빌드가 정상화되어야 한다.",
+      "notes": "AdminApprovalController는 P9-2에서 휴무 l2 제거됨 — 가입 manager-approvals 추가는 휴일 approve와 공존. 경로 책임: store-admin=1차, admin=2차.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9cd19e62-74b8-4322-8083-4525a74a3548"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:09:53.426Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/SignupApprovalService.java",
+          "type": "CREATE",
+          "description": "가입 2단계 승인 서비스"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ManagerSignupResponse.java",
+          "type": "CREATE",
+          "description": "가입 승인 응답 DTO(record)"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/StoreAdminSignupController.java",
+          "type": "CREATE",
+          "description": "M7 1차 승인 컨트롤러"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminApprovalController.java",
+          "type": "TO_MODIFY",
+          "description": "S3 2차 manager-approvals 추가"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/approval/SignupApprovalApiTest.java",
+          "type": "CREATE",
+          "description": "가입 2단계 통합테스트"
+        }
+      ],
+      "implementationGuide": "1) SignupApprovalService 신설: approveL1(userId)(load→approveSignupL1→userMapper.updateApprovalStatus), confirmL2(userId)(confirmSignupL2), reject(userId)(rejectSignup), listL1Pending()=findByApprovalStatus('PENDING_APPROVAL_L1'), listL2Pending()=findByApprovalStatus('PENDING_APPROVAL_L2'). 2) DTO ManagerSignupResponse(record: id,email,name,role,approvalStatus; passwordHash 제외; from(User)). 3) 컨트롤러: StoreAdminSignupController(@RequestMapping('/api/store-admin/manager-signups')) GET(목록 L1)·PATCH /{id}/approve(L1→L2)·/{id}/reject. AdminApprovalController 확장 GET /manager-approvals(목록 L2)·PATCH /manager-approvals/{id}/confirm(L2→ACTIVE)·/manager-approvals/{id}/reject. 4) SecurityConfig: /api/store-admin/**(이미 STORE_ADMIN, P9-2)·/api/admin/**(이미 ADMIN) 커버 확인. 5) BE 통합테스트 신규 SignupApprovalApiTest: STORE_ADMIN approve(L1→L2)→ADMIN confirm(L2→ACTIVE)→해당 계정 로그인 성공, 권한 외(MANAGER/USER) 403, PENDING 계정 로그인 거부 403, 단계 건너뛰기(L1에서 confirm 직접) 409, 반려 후 상태.",
+      "verificationCriteria": "cd backend && ./gradlew build 전건 통과. L1(STORE_ADMIN)→L2(ADMIN)→ACTIVE 흐름·로그인 성공, 권한 외 403, PENDING 로그인 거부, 단계 건너뛰기 409 검증.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-4 완료. 가입 2단계 승인 워크플로우(M7→S3) 서비스/컨트롤러/DTO/테스트 구현. (1) SignupApprovalService 신설: approveL1(L1→L2)·confirmL2(L2→ACTIVE)·reject·listPendingL1/L2(findByApprovalStatus). (2) ManagerSignupResponse record(id,email,name,role,approvalStatus; passwordHash 제외). (3) StoreAdminSignupController(/api/store-admin/manager-signups: GET 1차대기목록·PATCH /{id}/approve·/{id}/reject). (4) AdminApprovalController 확장(/api/admin/manager-approvals: GET 2차대기목록·PATCH /{id}/confirm·/{id}/reject) — 휴일 승인과 공존, SignupApprovalService 주입 추가. (5) SecurityConfig는 P9-2의 /api/store-admin/**=STORE_ADMIN·/api/admin/**=ADMIN로 이미 커버. (6) SignupApprovalApiTest 4건: 2단계 승인 후 로그인 성공·PENDING 로그인 거부(403)·권한외 1차/2차 차단(403)·단계건너뛰기 409(INVALID_TRANSITION)·반려후 로그인거부. 테스트 격리는 각 케이스가 userMapper.insert로 고유 PENDING 매니저 생성. 검증: ./gradlew build BUILD SUCCESSFUL 전건 0실패. 작업 B(가입 2단계) BE 완료.",
+      "completedAt": "2026-06-20T22:09:53.421Z"
+    },
+    {
+      "id": "37ec9d76-4178-41b9-a3c7-5da069cb9570",
+      "name": "P9-5 FE 휴무 승인 페이지 분리(store-admin/dayoff-approvals) + manager/dayoffs 축소",
+      "description": "역할별 BO 페이지 분리(§12.4)의 휴무 부분. 휴무 승인(M8) 로직을 manager/dayoffs.vue에서 신규 store-admin/dayoff-approvals.vue로 이동하고, manager/dayoffs.vue를 신청(M6) 전용으로 축소한다. 승인 호출 경로를 신규 /api/store-admin/dayoffs/{id}/approve로 맞춘다. admin/approvals.vue에서 휴무 2차 승인 부분을 제거(휴일 승인만 잔존).",
+      "notes": "경로 P9-2와 일치 필수. AppNav 메뉴는 P9-7. E2E는 P9-8에서 신규 경로로 수정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e3959e04-461b-4102-8656-447bdabcef23"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:11:45.746Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/store-admin/dayoff-approvals.vue",
+          "type": "CREATE",
+          "description": "M8 휴무 승인 페이지(STORE_ADMIN)"
+        },
+        {
+          "path": "app/pages/manager/dayoffs.vue",
+          "type": "TO_MODIFY",
+          "description": "신청 전용 축소"
+        },
+        {
+          "path": "app/pages/admin/approvals.vue",
+          "type": "TO_MODIFY",
+          "description": "휴무 2차 제거"
+        },
+        {
+          "path": "app/middleware/role-guard.ts",
+          "type": "REFERENCE",
+          "description": "meta.roles 가드 패턴"
+        }
+      ],
+      "implementationGuide": "1) 신규 app/pages/store-admin/dayoff-approvals.vue: definePageMeta({middleware:['auth','role-guard'],roles:['STORE_ADMIN']}). SUBMITTED 휴무 목록 GET·승인 PATCH /api/store-admin/dayoffs/{id}/approve·반려 PATCH .../reject. manager/dayoffs.vue의 승인 UI/로직 이식. data-testid 부여(dayoff-approval-row·dayoff-approve-btn 등). 2) manager/dayoffs.vue: 승인(isStoreAdmin 분기·approve-l1 호출) 제거, 휴무/휴일 신청(M6)만 유지. roles는 ['MANAGER','STORE_ADMIN'] 유지. 3) admin/approvals.vue: 휴무 2차(approve-l2) UI/호출 제거, 휴일 승인만 유지(또는 휴일도 정리). 4) FE services: 휴무 승인/목록 API 함수 추가 또는 페이지 내 $apiFetch 직접 호출(기존 패턴 따름).",
+      "verificationCriteria": "npm run type-check 통과. STORE_ADMIN으로 /store-admin/dayoff-approvals 접근·휴무 단일 승인 동작. manager/dayoffs는 신청 전용. admin/approvals에 휴무 2차 없음.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-5 완료. 휴가/반차 승인 FE를 역할별로 분리(§12.4). (1) store-admin/dayoff-approvals.vue 신설(roles STORE_ADMIN): GET /api/store-admin/dayoffs 검토목록 + SUBMITTED 행에 승인(PATCH /approve)·반려(/reject) 버튼, STATUS_LABEL 1단계(SUBMITTED/APPROVED/REJECTED), data-testid(dayoff-approval-row/approve/reject/status/message). (2) manager/dayoffs.vue 신청(M6) 전용 축소: approveL1·isStoreAdmin·1차승인 버튼 제거, 신청+재신청(resubmit)만 유지, 경로는 /api/manager/dayoffs 유지, STATUS_LABEL 1단계로 정정, 헤더 문구 정정. (3) admin/approvals.vue 휴무 부분 전면 제거(휴일 단일 승인/반려만 유지), 휴무→store-admin·가입2차→admin/manager-approvals 안내 주석. 검증: npm run type-check 통과(EXIT=0).",
+      "completedAt": "2026-06-20T22:11:45.741Z"
+    },
+    {
+      "id": "d195b5a9-c65c-41d4-a121-0f581306feb4",
+      "name": "P9-6 FE 가입 승인 페이지 2종(store-admin/manager-signups, admin/manager-approvals)",
+      "description": "가입 2단계 승인 BO 화면 신설. M7 1차 승인(STORE_ADMIN)·S3 2차 최종 승인(ADMIN) 페이지를 만들고 BE 엔드포인트와 연동한다.",
+      "notes": "P9-4 BE 경로와 정확히 일치. 빈 목록 상태 안내 표시.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9e07bbcd-2f77-4476-bfaf-d54f628fd945"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:12:38.130Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/store-admin/manager-signups.vue",
+          "type": "CREATE",
+          "description": "M7 가입 1차 승인(STORE_ADMIN)"
+        },
+        {
+          "path": "app/pages/admin/manager-approvals.vue",
+          "type": "CREATE",
+          "description": "S3 가입 2차 최종 승인(ADMIN)"
+        },
+        {
+          "path": "app/pages/admin/sales.vue",
+          "type": "REFERENCE",
+          "description": "기존 admin 페이지 패턴"
+        }
+      ],
+      "implementationGuide": "1) 신규 app/pages/store-admin/manager-signups.vue: definePageMeta roles ['STORE_ADMIN']. GET /api/store-admin/manager-signups 목록(PENDING_APPROVAL_L1)·승인 PATCH /{id}/approve(L1→L2)·반려 /{id}/reject. 2) 신규 app/pages/admin/manager-approvals.vue: roles ['ADMIN']. GET /api/admin/manager-approvals 목록(PENDING_APPROVAL_L2)·확정 PATCH /manager-approvals/{id}/confirm(L2→ACTIVE)·반려 /{id}/reject. 3) data-testid 부여(signup-row·signup-approve-btn·signup-confirm-btn 등). 4) FE services에 가입 승인 API 함수 추가 또는 페이지 내 $apiFetch(기존 admin/sales.vue·admin/stores 패턴 따름). 목록 갱신은 액션 후 재조회.",
+      "verificationCriteria": "npm run type-check 통과. STORE_ADMIN으로 1차 승인(L1→L2), ADMIN으로 2차 확정(L2→ACTIVE) UI 동작, 승인 후 해당 매니저 로그인 가능.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-6 완료. 가입 2단계 승인 BO 화면 2종 신설. (1) store-admin/manager-signups.vue(roles STORE_ADMIN): GET /api/store-admin/manager-signups(PENDING_APPROVAL_L1) 목록 + 1차 승인(PATCH /{id}/approve)·반려(/reject), 빈 상태 안내, data-testid(signup-row/approve/reject/empty/message). (2) admin/manager-approvals.vue(roles ADMIN): GET /api/admin/manager-approvals(PENDING_APPROVAL_L2) 목록 + 최종 확정(PATCH /{id}/confirm)·반려, data-testid(manager-approval-row/manager-confirm/manager-reject/empty/message). 기존 admin/sales.vue의 $apiFetch·role-guard·bo-input 패턴 재사용, 액션 후 재조회. P9-4 BE 경로와 정확히 일치. 검증: npm run type-check 통과(EXIT=0).",
+      "completedAt": "2026-06-20T22:12:38.125Z"
+    },
+    {
+      "id": "ddf7341a-cf1b-4ae8-84b3-ecfbf5192b6b",
+      "name": "P9-7 FE 로그인/AppNav 역할 정합 + 프로세스코드 주석",
+      "description": "로그인 dev 빠른 로그인에 STORE_ADMIN 버튼 추가, AppNav에 역할별 BO 메뉴 노출 분기 추가. 변경 파일들의 프로세스코드 주석을 v1.7로 정정(F).",
+      "notes": "oxfmt 스타일 유지. AppNav는 v-if 역할 분기. dev 빠른버튼은 import.meta.dev 가드 기존 유지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "37ec9d76-4178-41b9-a3c7-5da069cb9570"
+        },
+        {
+          "taskId": "d195b5a9-c65c-41d4-a121-0f581306feb4"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:13:43.913Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/login.vue",
+          "type": "TO_MODIFY",
+          "description": "STORE_ADMIN 빠른 로그인 버튼"
+        },
+        {
+          "path": "app/components/AppNav.vue",
+          "type": "TO_MODIFY",
+          "description": "역할별 BO 메뉴 분기"
+        }
+      ],
+      "implementationGuide": "1) app/pages/login.vue: quickAccounts 배열에 {key:'storeadmin',label:'매장관리자',email:'storeadmin@test.com'} 추가(현재 user/manager/admin 3종). 2) app/components/AppNav.vue: auth.currentUser?.role 기반 역할별 BO 링크 분기 — MANAGER/STORE_ADMIN: /manager/reserve·/manager/dayoffs; STORE_ADMIN: +/store-admin/dayoff-approvals·/store-admin/manager-signups; ADMIN: /admin/manager-approvals·/admin/sales·/admin/stores 등. data-testid(nav-store-admin·nav-admin 등) 부여. 기존 USER 메뉴(예약/예약목록) 유지. 3) 변경 파일 주석의 프로세스코드 정정: M6=휴가/반차 신청, M7=가입 1차 승인, M8=휴가/반차 승인, S3=가입 2차 승인.",
+      "verificationCriteria": "npm run type-check·lint 통과. 로그인 화면에 4역할 빠른 버튼. 역할별로 AppNav BO 메뉴가 다르게 노출.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-7 완료. 로그인/AppNav 역할 정합. (1) login.vue quickAccounts에 STORE_ADMIN(매장매니저관리자, storeadmin@test.com) 추가 — 4역할 빠른 로그인, 그리드 2열로 변경, manager 라벨을 '일반매장매니저'로 정정. import.meta.dev 가드 유지. (2) AppNav.vue 역할별 BO 메뉴 분기 추가(computed isManagerGroup/isStoreAdmin/isAdmin): 일반매장매니저·매장매니저관리자=대행예약·휴가/반차 신청, 매장매니저관리자=+휴가/반차 승인·가입 1차 승인, 관리자=가입 최종 승인·휴일 결재·매출. data-testid(nav-manager-*·nav-store-admin-*·nav-admin-*) 부여, 기존 USER 메뉴(예약/예약목록) 유지. 프로세스코드 주석 v1.7 정합(M6/M7/M8/S3). 검증: npm run type-check(EXIT=0)·npm run lint(EXIT=0) 통과.",
+      "completedAt": "2026-06-20T22:13:43.907Z"
+    },
+    {
+      "id": "2b4d4f7e-3738-461c-bd06-6e074356540b",
+      "name": "P9-8 E2E 갱신 + 종합 게이트(build·type-check·test:e2e)",
+      "description": "E2E를 v1.7로 갱신하고 전체 검증 게이트를 통과시킨다. 휴무 1단계·가입 2단계·PENDING 로그인 차단 시나리오 반영, 기존 25건 회귀 보존. ROADMAP_2 Phase 7 관련 DoD/체크 표기 갱신.",
+      "notes": "BE+FE 동시 기동(playwright webServer 기존 배열 구성 재사용). 실패 시 원인 태스크로 회귀 수정. 수동 확인 항목(4역할 로그인·승인 흐름·슬롯 비활성)도 점검.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "ddf7341a-cf1b-4ae8-84b3-ecfbf5192b6b"
+        }
+      ],
+      "createdAt": "2026-06-20T21:57:53.218Z",
+      "updatedAt": "2026-06-20T22:17:15.340Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/approval.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "휴무 1단계+가입 2단계+PENDING 차단"
+        },
+        {
+          "path": "e2e/bo.spec.ts",
+          "type": "REFERENCE",
+          "description": "BO 역할 가드 패턴"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 7 DoD 갱신"
+        }
+      ],
+      "implementationGuide": "1) e2e/approval.spec.ts: 휴무 흐름을 SUBMITTED→APPROVED_L1→CONFIRMED(2단계)에서 SUBMITTED→APPROVED(STORE_ADMIN 종결, /store-admin/dayoff-approvals 경로)로 수정. 가입 2단계 시나리오 추가(STORE_ADMIN 1차 manager-signups→ADMIN 2차 manager-approvals→해당 매니저 로그인 성공). PENDING 매니저 로그인 차단(401/403→로그인 실패) 케이스 추가. 역할 가드(USER→/store-admin·/admin 리다이렉트). 2) 신규 페이지 경로/​data-testid에 맞춰 셀렉터 수정. 3) 종합 게이트: cd backend && ./gradlew build(전건), npm run type-check, npm run lint, BE+FE 동시 기동 npm run test:e2e(회귀 25건+신규) 전건 통과. 4) docs/roadmaps/ROADMAP_2.md Phase 7 휴가/반차 1단계·가입 2단계 DoD 체크 갱신(구현 완료 반영).",
+      "verificationCriteria": "./gradlew build·npm run type-check·npm run lint·npm run test:e2e(회귀+신규) 전건 통과. 휴무 1단계·가입 2단계·PENDING 로그인 차단 E2E 통과.",
+      "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
+      "summary": "P9-8 완료. E2E v1.7 갱신 + 종합 게이트 전건 통과. (1) e2e/approval.spec.ts 재작성: 휴가/반차 1단계 승인(매니저 상신→/store-admin/dayoff-approvals STORE_ADMIN 승인 종결, dayoff-approve-* 셀렉터), 가입 2단계 승인(storeadmin 1차 manager-signups→admin 2차 manager-approvals→pending1 로그인 성공), PENDING 매니저(pending2) 로그인 차단(login-error·/login 잔류), 역할 가드(USER→/manager·/store-admin·/admin 리다이렉트). (2) 종합 게이트: BE ./gradlew build 통과(P9-1~4 통합테스트 포함), npm run type-check(EXIT=0), npm run lint(EXIT=0), npm run test:e2e BE+FE 동시 기동 33건 전건 통과(기존 회귀 25+ 신규 8). (3) ROADMAP_2.md Phase 7 태스크 체크리스트·DoD 전부 [x] 갱신, 상단 구현현황 주석·재정합 과제 주석을 완료(✅)로 갱신. JAVA_HOME=Temurin 21 export로 실행. 작업 A·B·C·E·F 전부 v1.7 정합 완료.",
+      "completedAt": "2026-06-20T22:17:15.335Z"
     }
   ]
 }

@@ -37,7 +37,8 @@ async function onSubmit() {
 const isDev = import.meta.dev
 const quickAccounts = [
   { key: 'user', label: '일반사용자', email: 'user@test.com' },
-  { key: 'manager', label: '매니저', email: 'manager@test.com' },
+  { key: 'manager', label: '일반매장매니저', email: 'manager@test.com' },
+  { key: 'storeadmin', label: '매장매니저관리자', email: 'storeadmin@test.com' },
   { key: 'admin', label: '관리자', email: 'admin@test.com' },
 ] as const
 
@@ -124,7 +125,7 @@ async function quickLogin(loginEmail: string) {
       <!-- 개발용 빠른 로그인 (dev 전용) — 역할별 시드 계정 즉시 로그인 -->
       <div v-if="isDev" class="mt-6 border-t border-[--color-line-soft] pt-5">
         <p class="mb-3 text-center text-xs text-[--color-content-muted]">개발용 빠른 로그인</p>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-2 gap-2">
           <button
             v-for="acc in quickAccounts"
             :key="acc.key"

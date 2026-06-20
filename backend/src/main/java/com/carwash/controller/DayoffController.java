@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// 매니저 휴무 결재 — 신청/조회/1차 승인/재신청 (require 8.2).
-//   /api/manager/** 는 MANAGER·STORE_ADMIN. 단, approve-l1은 SecurityConfig 세분 매처로 STORE_ADMIN 한정.
+// 매니저 휴가/반차 신청(M6) — 신청/조회/재신청 (require v1.7 §8.2).
+//   /api/manager/** 는 MANAGER·STORE_ADMIN 접근. 승인(M8)은 STORE_ADMIN 전용 StoreAdminDayoffController가 담당.
 @RestController
 @RequestMapping("/api/manager/dayoffs")
 public class DayoffController {
@@ -28,26 +28,19 @@ public class DayoffController {
         this.approvalService = approvalService;
     }
 
-    // 휴무 결재 상신 → SUBMITTED
+    // 휴가/반차 신청 상신(M6) → SUBMITTED
     @PostMapping
     public DayoffApprovalResponse submit(@Valid @RequestBody DayoffRequest req) {
         return approvalService.submitDayoff(req);
     }
 
-    // 매장 매니저들의 휴무 신청 목록(L1 검토용)
+    // 매장 매니저들의 휴가/반차 신청 목록(신청 현황 조회)
     @GetMapping
     public List<DayoffApprovalResponse> list(@RequestParam String storeId) {
         return approvalService.listDayoffsByStore(storeId);
     }
 
-    // 1차 승인(최고매니저 STORE_ADMIN) — SUBMITTED → APPROVED_L1
-    @PatchMapping("/{id}/approve-l1")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void approveL1(@PathVariable Long id) {
-        approvalService.approveDayoffL1(id);
-    }
-
-    // 반려 후 재신청 — REJECTED → SUBMITTED
+    // 반려 후 재신청(신청자) — REJECTED → SUBMITTED
     @PatchMapping("/{id}/resubmit")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resubmit(@PathVariable Long id) {

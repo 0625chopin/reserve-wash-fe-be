@@ -3,6 +3,7 @@ package com.carwash.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.carwash.domain.User;
+import com.carwash.domain.enums.UserApprovalStatus;
 import com.carwash.domain.enums.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ class UserMapperTest {
                 .name("삽입유저")
                 .role(UserRole.USER)
                 .passwordHash("$2a$10$dummdummdummdummdummduOeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+                .approvalStatus(UserApprovalStatus.ACTIVE)
                 .build();
 
         int affected = userMapper.insert(created);

@@ -17,12 +17,12 @@
     </resultMap>
 
     <!-- 카탈로그 캐시용 전체 조회(Phase 2) — dayoffs collection 동일 재사용.
-         결재 확정(CONFIRMED) 휴무만 노출(Phase 7): 신청 중(SUBMITTED 등)인 휴무는 슬롯 비활성에 반영 안 함. -->
+         결재 승인(APPROVED) 휴가/반차만 노출(require v1.7 §8.3 1단계 종결): 신청 중(SUBMITTED)·반려(REJECTED)는 슬롯 비활성에 반영 안 함. -->
     <select id="findAll" resultMap="managerWithDayoffs">
         SELECT m.id, m.store_id, m.name, m.is_store_admin,
                md.`date` AS dayoff_date, md.dayoff_type
         FROM manager m
-        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'CONFIRMED'
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'APPROVED'
         ORDER BY m.id, md.`date`
     </select>
 
@@ -30,7 +30,7 @@
         SELECT m.id, m.store_id, m.name, m.is_store_admin,
                md.`date` AS dayoff_date, md.dayoff_type
         FROM manager m
-        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'CONFIRMED'
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'APPROVED'
         WHERE m.store_id = #{storeId}
         ORDER BY m.id, md.`date`
     </select>
@@ -39,7 +39,7 @@
         SELECT m.id, m.store_id, m.name, m.is_store_admin,
                md.`date` AS dayoff_date, md.dayoff_type
         FROM manager m
-        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'CONFIRMED'
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id AND md.status = 'APPROVED'
         WHERE m.id = #{id}
         ORDER BY md.`date`
     </select>

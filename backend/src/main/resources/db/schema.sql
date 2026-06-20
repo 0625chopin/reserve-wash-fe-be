@@ -18,13 +18,15 @@ DROP TABLE IF EXISTS bay;
 DROP TABLE IF EXISTS store;
 DROP TABLE IF EXISTS users;
 
--- 사용자 (require 3.1)
+-- 사용자 (require 3.1) + 가입 승인 상태(require v1.7 §4.4)
+--   approval_status DEFAULT 'ACTIVE' — 기존 시드/USER 즉시 가입은 활성. 매니저 계열 가입은 'PENDING_APPROVAL_L1'로 시작.
 CREATE TABLE IF NOT EXISTS users (
-    id             VARCHAR(64)  PRIMARY KEY,
-    email          VARCHAR(255) NOT NULL,
-    name           VARCHAR(100) NOT NULL,
-    role           VARCHAR(20)  NOT NULL,   -- UserRole enum 문자열
-    password_hash  VARCHAR(100) NOT NULL    -- BCrypt 해시 (Phase 3 인증)
+    id               VARCHAR(64)  PRIMARY KEY,
+    email            VARCHAR(255) NOT NULL,
+    name             VARCHAR(100) NOT NULL,
+    role             VARCHAR(20)  NOT NULL,   -- UserRole enum 문자열
+    password_hash    VARCHAR(100) NOT NULL,   -- BCrypt 해시 (Phase 3 인증)
+    approval_status  VARCHAR(30)  NOT NULL DEFAULT 'ACTIVE'   -- UserApprovalStatus enum (ACTIVE만 로그인 가능)
 );
 
 -- 매장 (require 5.1)
@@ -51,14 +53,14 @@ CREATE TABLE IF NOT EXISTS manager (
     is_store_admin  BOOLEAN      NOT NULL   -- 매장 최고권한 매니저 여부
 );
 
--- 매니저 휴무 = (매니저, 날짜, 휴무 유형) (require 5.4·5.5) + 결재 상태(Phase 7)
---   status DEFAULT 'CONFIRMED' — 기존 시드 휴무는 확정으로 간주(카탈로그 노출 유지). 신규 신청은 'SUBMITTED'로 INSERT.
+-- 매니저 휴가/반차 = (매니저, 날짜, 휴무 유형) (require 5.4·5.5) + 1단계 결재 상태(require v1.7 §8.3)
+--   status DEFAULT 'APPROVED' — 기존 시드 휴무는 승인 확정으로 간주(카탈로그 노출 유지). 신규 신청은 'SUBMITTED'로 INSERT.
 CREATE TABLE IF NOT EXISTS manager_dayoff (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,   -- 내부 surrogate
     manager_id   VARCHAR(64) NOT NULL,
     `date`       VARCHAR(10) NOT NULL,                -- 'YYYY-MM-DD'
     dayoff_type  VARCHAR(20) NOT NULL,                -- DayoffType enum: FULL_DAY/SHIFT_1~3
-    status       VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'   -- ApprovalStatus enum (Phase 7 결재)
+    status       VARCHAR(20) NOT NULL DEFAULT 'APPROVED'   -- DayoffApprovalStatus enum: SUBMITTED/APPROVED/REJECTED
 );
 
 -- 슬롯 = (매장, 베이, 날짜, 30분 시간단위), 시스템 전체 UNIQUE (require 5.2·7.3 최종 방어선)

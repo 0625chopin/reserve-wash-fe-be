@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// BO 매니저 휴무/휴일 결재 신청 + 1차 승인(STORE_ADMIN) — require 8장.
+// BO 일반매장매니저 휴가/반차·매장휴일 신청(M6) — require v1.7 §8.2.
+//   승인(M8)은 매장매니저관리자 전용 /store-admin/dayoff-approvals 에서 처리(역할별 페이지 분리 §12.4).
 import { computed, ref, watch } from 'vue'
 import { getApprovedStores, getManagersByStore } from '~/services/storeService'
 import type { DayoffType } from '~/types/enums'
 
 definePageMeta({ middleware: ['auth', 'role-guard'], roles: ['MANAGER', 'STORE_ADMIN'] })
 
-const auth = useAuthStore()
 const stores = getApprovedStores()
 
 // BE DayoffApprovalResponse와 일치
@@ -24,10 +24,10 @@ const DAYOFF_TYPES: { code: DayoffType; label: string }[] = [
   { code: 'SHIFT_2', label: '오후조(14–22시)' },
   { code: 'SHIFT_3', label: '야간조(22–06시)' },
 ]
+// 휴가/반차 1단계 결재 상태(require v1.7 §8.3)
 const STATUS_LABEL: Record<string, string> = {
   SUBMITTED: '상신',
-  APPROVED_L1: '1차 승인',
-  CONFIRMED: '확정',
+  APPROVED: '승인(확정)',
   REJECTED: '반려',
 }
 
@@ -40,13 +40,12 @@ const rows = ref<DayoffApproval[]>([])
 const message = ref('')
 
 const managerOptions = computed(() => (storeId.value ? getManagersByStore(storeId.value) : []))
-const isStoreAdmin = computed(() => auth.currentUser?.role === 'STORE_ADMIN')
 
 function base() {
   return useRuntimeConfig().public.apiBase
 }
 
-// 선택 매장의 휴무 신청 목록 로드(L1 검토용)
+// 선택 매장의 휴가/반차 신청 현황 로드
 async function loadDayoffs() {
   if (!storeId.value) {
     rows.value = []
@@ -99,17 +98,11 @@ async function submitHoliday() {
   }
 }
 
-// 1차 승인(STORE_ADMIN) / 재신청
-async function approveL1(id: number) {
-  await patch(`${base()}/manager/dayoffs/${id}/approve-l1`)
-}
+// 반려된 신청 재신청(신청자) — REJECTED → SUBMITTED
 async function resubmit(id: number) {
-  await patch(`${base()}/manager/dayoffs/${id}/resubmit`)
-}
-async function patch(url: string) {
   const { $apiFetch } = useNuxtApp()
   try {
-    await $apiFetch(url, { method: 'PATCH' })
+    await $apiFetch(`${base()}/manager/dayoffs/${id}/resubmit`, { method: 'PATCH' })
     await loadDayoffs()
   } catch {
     message.value = '처리에 실패했습니다.'
@@ -120,10 +113,10 @@ async function patch(url: string) {
 <template>
   <section data-testid="page-manager-dayoffs" class="mx-auto max-w-2xl">
     <header class="mb-8">
-      <span class="badge-accent mb-3">백오피스 · 결재</span>
-      <h1 class="text-3xl font-bold">휴무 · 휴일 결재 신청</h1>
+      <span class="badge-accent mb-3">백오피스 · 신청</span>
+      <h1 class="text-3xl font-bold">휴가/반차 · 휴일 신청</h1>
       <p class="mt-2 text-sm text-[--color-content-muted]">
-        매니저 휴무는 최고매니저(1차)→관리자(2차) 승인을 거쳐 확정됩니다.
+        휴가/반차는 매장매니저관리자 승인(1단계)으로 확정됩니다. 매장 휴일은 관리자 승인으로 확정됩니다.
       </p>
     </header>
 
@@ -217,15 +210,6 @@ async function patch(url: string) {
           <span :data-testid="`dayoff-status-${r.id}`" class="text-xs font-medium">
             {{ STATUS_LABEL[r.status] ?? r.status }}
           </span>
-          <button
-            v-if="isStoreAdmin && r.status === 'SUBMITTED'"
-            :data-testid="`dayoff-approve-l1-${r.id}`"
-            type="button"
-            class="btn btn-ghost"
-            @click="approveL1(r.id)"
-          >
-            1차 승인
-          </button>
           <button
             v-if="r.status === 'REJECTED'"
             :data-testid="`dayoff-resubmit-${r.id}`"

@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 결재 상태머신 통합 테스트 (Phase 7 하드 DoD) — 2단계 휴무·1단계 휴일·반려/재신청·단계가드·역할·슬롯 비활성
+// 결재 상태머신 통합 테스트 (require v1.7 §8) — 휴가/반차 1단계(STORE_ADMIN 종결)·휴일 1단계·반려/재신청·역할·슬롯 비활성
 @SpringBootTest
 @AutoConfigureMockMvc
 class ApprovalApiTest {
@@ -61,30 +61,35 @@ class ApprovalApiTest {
     }
 
     @Test
-    void 휴무_2단계_승인_SUBMITTED에서_CONFIRMED까지() throws Exception {
+    void 휴가반차_1단계_승인_SUBMITTED에서_APPROVED_종결() throws Exception {
         long id = submitDayoff("mgr4", "2026-11-01", "FULL_DAY");
 
-        // MANAGER는 L1 승인 불가(STORE_ADMIN 한정) → 403
-        mvc.perform(patch("/api/manager/dayoffs/{id}/approve-l1", id)
+        // MANAGER는 승인 불가(STORE_ADMIN 한정) → 403
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
                         .header("Authorization", token("manager1", UserRole.MANAGER)))
                 .andExpect(status().isForbidden());
 
-        // 최고매니저(STORE_ADMIN) L1 승인 → 204
-        mvc.perform(patch("/api/manager/dayoffs/{id}/approve-l1", id)
-                        .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
-                .andExpect(status().isNoContent());
-
-        // 관리자 L2 승인 → CONFIRMED
-        mvc.perform(patch("/api/admin/dayoffs/{id}/approve-l2", id)
+        // 관리자(ADMIN)도 휴가/반차 승인 권한 없음(v1.7: 관리자 미개입) → 403
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
                         .header("Authorization", token("admin1", UserRole.ADMIN)))
+                .andExpect(status().isForbidden());
+
+        // 매장매니저관리자(STORE_ADMIN) 승인 → APPROVED 종결(204)
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
+                        .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    void 단계_건너뛰기_SUBMITTED에서_L2_직접은_409() throws Exception {
+    void 이미_승인된_휴가반차_재승인은_409() throws Exception {
         long id = submitDayoff("mgr4", "2026-11-02", "FULL_DAY");
-        mvc.perform(patch("/api/admin/dayoffs/{id}/approve-l2", id)
-                        .header("Authorization", token("admin1", UserRole.ADMIN)))
+        // 1단계 승인 종결
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
+                        .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
+                .andExpect(status().isNoContent());
+        // APPROVED 상태에서 재승인 시도 → 불가 전이(409)
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
+                        .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_TRANSITION"));
     }
@@ -92,9 +97,9 @@ class ApprovalApiTest {
     @Test
     void 반려_후_재신청() throws Exception {
         long id = submitDayoff("mgr4", "2026-11-03", "FULL_DAY");
-        // 관리자 반려 → REJECTED
-        mvc.perform(patch("/api/admin/dayoffs/{id}/reject", id)
-                        .header("Authorization", token("admin1", UserRole.ADMIN)))
+        // 매장매니저관리자 반려 → REJECTED
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/reject", id)
+                        .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
                 .andExpect(status().isNoContent());
         // 매니저 재신청 → SUBMITTED
         mvc.perform(patch("/api/manager/dayoffs/{id}/resubmit", id)
@@ -129,16 +134,13 @@ class ApprovalApiTest {
 
     @Test
     void 확정_FULL_DAY_휴무는_그날_대행을_차단한다() throws Exception {
-        // mgr2(store1) FULL_DAY 2026-12-01 신청 → L1 → L2 CONFIRMED
+        // mgr4(store3) FULL_DAY 2026-12-01 신청 → STORE_ADMIN 1단계 승인 APPROVED 종결
         long id = submitDayoff("mgr4", "2026-12-01", "FULL_DAY");
-        mvc.perform(patch("/api/manager/dayoffs/{id}/approve-l1", id)
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
                         .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
                 .andExpect(status().isNoContent());
-        mvc.perform(patch("/api/admin/dayoffs/{id}/approve-l2", id)
-                        .header("Authorization", token("admin1", UserRole.ADMIN)))
-                .andExpect(status().isNoContent());
 
-        // 확정 휴무가 카탈로그에 반영 → mgr2 대행이 그날 전체 차단(400)
+        // 승인된 휴무가 카탈로그에 반영 → mgr4 대행이 그날 전체 차단(400)
         mvc.perform(post("/api/manager/reservations")
                         .header("Authorization", token("manager1", UserRole.MANAGER))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,13 +150,10 @@ class ApprovalApiTest {
 
     @Test
     void 확정_SHIFT1_휴무는_오전조만_차단하고_오후는_허용한다() throws Exception {
-        // mgr2(store1) SHIFT_1(06:00~14:00) 2026-12-02 확정
+        // mgr4(store3) SHIFT_1(06:00~14:00) 2026-12-02 → STORE_ADMIN 1단계 승인 APPROVED 종결
         long id = submitDayoff("mgr4", "2026-12-02", "SHIFT_1");
-        mvc.perform(patch("/api/manager/dayoffs/{id}/approve-l1", id)
+        mvc.perform(patch("/api/store-admin/dayoffs/{id}/approve", id)
                         .header("Authorization", token("storeadmin1", UserRole.STORE_ADMIN)))
-                .andExpect(status().isNoContent());
-        mvc.perform(patch("/api/admin/dayoffs/{id}/approve-l2", id)
-                        .header("Authorization", token("admin1", UserRole.ADMIN)))
                 .andExpect(status().isNoContent());
 
         // 오전(09:00) 대행 → 차단(400)
