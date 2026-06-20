@@ -1,7 +1,7 @@
 # services 계층 규칙
 
 > 본 문서는 `app/services/`의 운영 규칙(정본)이다. 폴더 전체 구조 설명은 중복하지 않으며,
-> 아키텍처 표는 [`docs/ROADMAP.md`](../../docs/ROADMAP.md) 2.1·2.2, 운영 규칙은
+> 아키텍처 표는 [`docs/roadmaps/ROADMAP_1.md`](../../docs/roadmaps/ROADMAP_1.md) 2.1·2.2, 운영 규칙은
 > 루트 [`shrimp-rules.md`](../../shrimp-rules.md)를 참조한다.
 
 ## 역할

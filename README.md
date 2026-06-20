@@ -75,7 +75,8 @@ npm run test:e2e:ui     # UI 모드
 | 문서 | 내용 |
 |---|---|
 | [`docs/require_v1.md`](docs/require_v1.md) | 요구사항 정의서(정본) |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | 개발 로드맵(Phase별 · 정본) |
+| [`docs/roadmaps/ROADMAP_1.md`](docs/roadmaps/ROADMAP_1.md) | 개발 로드맵 1차(FO + 프론트 더미 · Phase별 · 정본) |
+| [`docs/roadmaps/ROADMAP_2.md`](docs/roadmaps/ROADMAP_2.md) | 개발 로드맵 2차(Spring Boot 백엔드 진화 + BO · Phase별) |
 | [`docs/예약_규칙_명세_v1.md`](docs/예약_규칙_명세_v1.md) | 예약 순서·차종↔베이 규칙 보강 명세 |
 | [`shrimp-rules.md`](shrimp-rules.md) | AI Agent 작업 규칙 |
 | [`CLAUDE.md`](CLAUDE.md) | 프로젝트 가이드(언어·스택·린트 파이프라인) |

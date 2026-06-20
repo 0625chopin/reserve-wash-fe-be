@@ -31,7 +31,7 @@
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
-- Phase 1·2가 구현 진행됨: `app/types`·`app/data`(`enums`·`domain`·`prices`·`stores`·`carTypes`·`managers`·`users`)·`app/composables`(`useSlots`)·`app/services`(`priceService`·`storeService`)가 채워졌고, **인증 흐름(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)과 레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)가 완료**됐다. 예약 흐름(`app/pages/reserve.vue`·`reservations.vue`·`review/[reservationId].vue`)과 입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`)도 구현됨. 남은 작업·DoD는 `docs/ROADMAP.md`를 정본으로 따르라.
+- Phase 1·2가 구현 진행됨: `app/types`·`app/data`(`enums`·`domain`·`prices`·`stores`·`carTypes`·`managers`·`users`)·`app/composables`(`useSlots`)·`app/services`(`priceService`·`storeService`)가 채워졌고, **인증 흐름(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)과 레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)가 완료**됐다. 예약 흐름(`app/pages/reserve.vue`·`reservations.vue`·`review/[reservationId].vue`)과 입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`)도 구현됨. 남은 작업·DoD는 `docs/roadmaps/ROADMAP_1.md`를 정본으로 따르라.
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
@@ -133,9 +133,10 @@ export default defineNuxtRouteMiddleware((to) => {
 ## 도메인/문서 정합성 규칙 (정본 우선순위)
 
 - **도메인 모델·가격·enum의 정본은 `docs/require_v1.md`다.** `app/types/enums.ts`·`app/types/domain.ts`·`app/data/prices.ts`를 작성·수정할 때 값은 require_v1.md의 5장(도메인)·10장(가격 매트릭스)·11장(프로세스 코드 `FW/M/S`)과 **정확히 일치**시켜라. 불일치 시 require_v1.md를 따르라.
-- **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/ROADMAP.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 ROADMAP.md를 따르라.
+- **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/roadmaps/ROADMAP_1.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 `roadmaps/ROADMAP_1.md`를 따르라.
+- **2차(백엔드 진화 + BO) 작업의 정본은 `docs/roadmaps/ROADMAP_2.md`(v2.0)다.** Spring Boot 백엔드·동시성 2·3단계(슬롯 UNIQUE·낙관/비관 락)·BO 프로세스(M3~M7·S3~S8)·휴일/휴무 결재·SMTP/알림·MySQL 이행은 이 문서를 정본으로 따르라. 1차 FO 자산은 그대로 유지하고 `app/services/*` 내부만 `$fetch` API로 교체하는 additive 원칙을 지켜라.
 - **예약 화면 동작(순차 선택·차종별 베이 노출·휠 날짜/시간 선택 등)의 정본은 `docs/예약_규칙_명세_v1.md`다.** `app/pages/reserve.vue`·예약 관련 컴포넌트를 수정할 때 이 명세와 일치시켜라.
-- 화면/스토어/서비스를 구현하면 해당 `docs/ROADMAP.md` Phase의 체크리스트·DoD를 함께 갱신하라.
+- 화면/스토어/서비스를 구현하면 해당 `docs/roadmaps/ROADMAP_1.md` Phase의 체크리스트·DoD를 함께 갱신하라.
 
 ## 테스트(Playwright) 규칙
 
