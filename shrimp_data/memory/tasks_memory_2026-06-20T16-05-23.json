@@ -1,0 +1,177 @@
+{
+  "tasks": [
+    {
+      "id": "6f1a400d-3ba6-46c0-837e-0283ad23c495",
+      "name": "storeService (승인 매장 + 매장별 매니저 조회)",
+      "description": "app/services/storeService.ts를 생성해 매장/매니저 데이터 접근을 추상화한다(README 단방향 계약, ~/data·~/types만 의존). getApprovedStores(): Store[]는 stores에서 approved === true 매장만 반환한다(미승인 판교점 제외). getManagersByStore(storeId: string): Manager[]는 해당 매장 매니저만 반환한다. getManager(id: string): Manager | undefined는 매니저를 id로 조회한다(선택 매니저 휴무 조회용). 컴포넌트/페이지가 app/data를 직접 import하지 않도록 하는 단일 진입점이며, 2단계에서 $fetch로 교체할 시그니처를 확립한다.",
+      "notes": "단방향 의존(services→data·types). 컴포넌트/스토어의 data 직접 import 금지 규칙 충족. getManager는 reserve의 dayoff 컨텍스트용. 도메인 값 변경 없음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:33:17.508Z",
+      "updatedAt": "2026-06-19T17:33:39.413Z",
+      "relatedFiles": [
+        {
+          "path": "app/services/README.md",
+          "type": "REFERENCE",
+          "description": "단방향 의존 계약",
+          "lineStart": 1,
+          "lineEnd": 55
+        },
+        {
+          "path": "app/services/priceService.ts",
+          "type": "REFERENCE",
+          "description": "서비스 함수 패턴",
+          "lineStart": 1,
+          "lineEnd": 13
+        },
+        {
+          "path": "app/data/stores.ts",
+          "type": "REFERENCE",
+          "description": "stores(approved 포함)",
+          "lineStart": 1,
+          "lineEnd": 24
+        },
+        {
+          "path": "app/data/managers.ts",
+          "type": "REFERENCE",
+          "description": "managers(storeId·dayoff)",
+          "lineStart": 1,
+          "lineEnd": 34
+        },
+        {
+          "path": "app/services/storeService.ts",
+          "type": "CREATE",
+          "description": "매장/매니저 조회 서비스"
+        }
+      ],
+      "implementationGuide": "1) 'import type { Manager, Store } from ~/types/domain'; 'import { stores } from ~/data/stores'; 'import { managers } from ~/data/managers'. 2) export function getApprovedStores(): Store[] { return stores.filter((s) => s.approved) }. 3) export function getManagersByStore(storeId: string): Manager[] { return managers.filter((m) => m.storeId === storeId) }. 4) export function getManager(id: string): Manager | undefined { return managers.find((m) => m.id === id) }. priceService.ts 패턴(export function, ~/ 별칭, import type) 준수. 주석 한국어 + require 6.1/6.3 추적. oxfmt.",
+      "verificationCriteria": "storeService.ts가 getApprovedStores(approved만)·getManagersByStore(storeId 일치)·getManager(id 조회)를 export한다. ~/data·~/types만 import(단방향). import type 사용. type-check 통과·세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 4 \"매장/매니저 선택 + 검색 UX(FW3/FW4)\" 구현. 제네릭 SearchableSelect(select+텍스트 실시간 필터+defineModel+키보드), storeService(승인매장/매장별매니저 조회), reserve.vue 연동(매장 선택→매니저 선택, 매장 변경 시 매니저 초기화, 선택 매니저 dayoffDates를 Phase 5용 computed로 노출)를 구축한다. 제약: 단방향 의존(컴포넌트/페이지는 app/data 직접 import 금지·storeService 경유, storeService는 ~/data·~/types만 의존 — README 계약), SearchableSelect 제네릭 SFC(generic=T)+defineModel+testid prop 네임스페이스, 자동임포트(SearchableSelect/매크로 import 금지)·ref/computed vue import·Store/Manager import type·storeService 명시 import, oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(표준 DOM 이벤트), reserve.vue definePageMeta middleware:'auth' 유지, data-testid(store-select-*/manager-select-*)로 e2e 안정화. 데이터 사실: stores(store1 강남점 approved bayCount3, store2 홍대점 approved bayCount2, store3 판교점 미승인), managers(mgr1·mgr2 store1, mgr3 store2, mgr4 store3, mgr1·mgr3 dayoff). 정본 ROADMAP/require 변경 금지. DoD: 텍스트 입력 시 실시간 필터, approved:false(판교점) 제외, 매장 선택 후 해당 매장 매니저만 노출, npm run type-check·lint·format·test:e2e 통과. 기존 home.spec 3종+auth.spec 3종 무변경 그린 유지. 범위 경계: 슬롯/날짜/예약확정/가격(Phase5)·예약목록(Phase6) 제외. 키보드는 화살표/Enter/Esc 기본만(완전 ARIA combobox 과범위).",
+      "summary": "app/services/storeService.ts를 생성해 매장/매니저 데이터 접근을 추상화했다. getApprovedStores(): Store[]는 stores.filter((s) => s.approved)로 승인 매장만 반환(미승인 판교점 제외), getManagersByStore(storeId): Manager[]는 storeId 일치 매니저만 반환, getManager(id): Manager|undefined는 id로 매니저 조회(선택 매니저 dayoffDates 컨텍스트용)다. import type { Manager, Store } from ~/types/domain와 ~/data/stores·~/data/managers만 import해 README 단방향 계약(services→data·types)을 준수하며, 컴포넌트/페이지가 data를 직접 import하지 않도록 하는 단일 진입점이다. priceService.ts 패턴(export function, ~/ 별칭, import type)을 따랐고 2단계 $fetch 교체 지점을 TODO로 명시했다. require 6.1/6.3 추적 주석, oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:33:39.410Z"
+    },
+    {
+      "id": "60af4fc3-7a2b-486b-82dd-f21cfdc57a32",
+      "name": "SearchableSelect 제네릭 컴포넌트 (필터+defineModel+키보드)",
+      "description": "app/components/SearchableSelect.vue를 제네릭 SFC로 생성한다. <script setup lang=ts generic=T>로 props {options:T[], labelKey:keyof T, valueKey:keyof T, placeholder?:string, testid?:string}와 defineModel<T[keyof T]|null>()을 선언한다. 텍스트 입력(keyword) 시 labelKey 기준 대소문자 무시 실시간 필터링(filtered computed)하고, 옵션 클릭/Enter 시 model을 valueKey 값으로 설정·keyword를 labelKey 표시값으로 설정·목록 닫기(select). 키보드 접근성(가능 범위): ArrowDown/ArrowUp으로 하이라이트 이동(filtered 범위 clamp), Enter로 하이라이트 옵션 선택, Escape로 닫기. testid prop으로 input/options/option의 data-testid를 네임스페이스화(`${testid}-input`/`${testid}-options`/`${testid}-option`, 기본 'searchable'). 표준 DOM 이벤트만 사용(SSR 안전). 완전 ARIA combobox는 과범위로 제외.",
+      "notes": "제네릭 SFC+defineModel은 vue ^3.5 지원. @mousedown.prevent로 input blur 전에 select 처리. testid 네임스페이스로 두 인스턴스 충돌 방지. 도메인 비의존(매장/매니저/향후 차종·서비스 재사용).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:33:17.508Z",
+      "updatedAt": "2026-06-19T17:34:12.225Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "SearchableSelect 구현 예시",
+          "lineStart": 524,
+          "lineEnd": 573
+        },
+        {
+          "path": "app/components/SearchableSelect.vue",
+          "type": "CREATE",
+          "description": "제네릭 검색 select 컴포넌트"
+        }
+      ],
+      "implementationGuide": "1) <script setup lang=ts generic=T>: 'import { computed, ref } from vue'. const props = defineProps<{ options: T[]; labelKey: keyof T; valueKey: keyof T; placeholder?: string; testid?: string }>(). const model = defineModel<T[keyof T] | null>(). const keyword = ref(''); const open = ref(false); const highlighted = ref(0). const filtered = computed(() => props.options.filter((o) => String(o[props.labelKey]).toLowerCase().includes(keyword.value.toLowerCase()))). function select(o: T) { model.value = o[props.valueKey]; keyword.value = String(o[props.labelKey]); open.value = false }. function onKeydown(e) { ArrowDown→highlighted=min(len-1,+1); ArrowUp→max(0,-1); Enter→if filtered[highlighted] select; Escape→open=false }. const tid = computed(() => props.testid ?? 'searchable'). 2) <template><div class=searchable-select><input v-model=keyword :placeholder=placeholder :data-testid=`${tid}-input` @focus='open=true' @input='open=true; highlighted=0' @keydown=onKeydown/><ul v-if='open && filtered.length' :data-testid=`${tid}-options`><li v-for='(o,i) in filtered' :key='String(o[valueKey])' :data-testid=`${tid}-option` :class='{ active: i===highlighted }' @mousedown.prevent='select(o)'>{{ o[labelKey] }}</li></ul></div>. oxfmt. ROADMAP 524~573줄 예시 확장.",
+      "verificationCriteria": "SearchableSelect가 제네릭(generic=T)+defineModel로 동작하고 keyword 입력 시 labelKey 기준 실시간 필터링한다. 옵션 선택 시 model=valueKey·keyword=labelKey·닫힘. ArrowUp/Down/Enter/Escape 키보드 동작. testid prop으로 input/options/option testid 네임스페이스. 자동임포트(import 미작성 대상)·ref/computed vue import. type-check·lint 통과·세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 4 \"매장/매니저 선택 + 검색 UX(FW3/FW4)\" 구현. 제네릭 SearchableSelect(select+텍스트 실시간 필터+defineModel+키보드), storeService(승인매장/매장별매니저 조회), reserve.vue 연동(매장 선택→매니저 선택, 매장 변경 시 매니저 초기화, 선택 매니저 dayoffDates를 Phase 5용 computed로 노출)를 구축한다. 제약: 단방향 의존(컴포넌트/페이지는 app/data 직접 import 금지·storeService 경유, storeService는 ~/data·~/types만 의존 — README 계약), SearchableSelect 제네릭 SFC(generic=T)+defineModel+testid prop 네임스페이스, 자동임포트(SearchableSelect/매크로 import 금지)·ref/computed vue import·Store/Manager import type·storeService 명시 import, oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(표준 DOM 이벤트), reserve.vue definePageMeta middleware:'auth' 유지, data-testid(store-select-*/manager-select-*)로 e2e 안정화. 데이터 사실: stores(store1 강남점 approved bayCount3, store2 홍대점 approved bayCount2, store3 판교점 미승인), managers(mgr1·mgr2 store1, mgr3 store2, mgr4 store3, mgr1·mgr3 dayoff). 정본 ROADMAP/require 변경 금지. DoD: 텍스트 입력 시 실시간 필터, approved:false(판교점) 제외, 매장 선택 후 해당 매장 매니저만 노출, npm run type-check·lint·format·test:e2e 통과. 기존 home.spec 3종+auth.spec 3종 무변경 그린 유지. 범위 경계: 슬롯/날짜/예약확정/가격(Phase5)·예약목록(Phase6) 제외. 키보드는 화살표/Enter/Esc 기본만(완전 ARIA combobox 과범위).",
+      "summary": "app/components/SearchableSelect.vue를 제네릭 SFC(<script setup lang=ts generic=T>)로 생성했다. props {options:T[], labelKey:keyof T, valueKey:keyof T, placeholder?, testid?}와 defineModel<T[keyof T]|null>()을 선언하고, keyword 입력 시 labelKey 기준 대소문자 무시 실시간 필터링(filtered computed)한다. select(option)은 model을 valueKey 값으로·keyword를 labelKey 표시값으로 설정하고 목록을 닫는다(@mousedown.prevent로 input blur 전에 처리). 키보드 접근성: ArrowDown/ArrowUp으로 highlighted 이동(Math.min/max로 filtered 범위 clamp, preventDefault), Enter로 하이라이트 옵션 선택, Escape로 닫기. testid prop으로 input(`${tid}-input`)·ul(`${tid}-options`)·li(`${tid}-option`)의 data-testid를 네임스페이스화(기본 'searchable')해 두 인스턴스 충돌을 방지한다. computed/ref만 vue에서 import하고 도메인 비의존(매장/매니저/향후 차종·서비스 재사용 가능). 표준 DOM 이벤트만 사용해 SSR 안전하며 완전 ARIA combobox는 과범위로 제외했다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check/lint는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:34:12.220Z"
+    },
+    {
+      "id": "8137fc72-8bfc-4943-9129-4a8d0c356f3b",
+      "name": "reserve.vue 매장→매니저 선택 연동",
+      "description": "app/pages/reserve.vue에 매장 선택(FW3)→매니저 선택(FW4) 흐름을 연동한다. storeService.getApprovedStores()로 승인 매장만 SearchableSelect(testid=store-select)에 노출한다. selectedStoreId 선택 시 getManagersByStore로 해당 매장 매니저만 매니저 SearchableSelect(testid=manager-select, v-if selectedStoreId)에 노출한다. 매장 변경 시 watch로 selectedManagerId를 null로 초기화한다. 선택 매니저(getManager)의 dayoffDates를 computed(selectedManagerDayoffs)로 노출해 Phase 5 슬롯 비활성에 사용할 컨텍스트를 준비하고, 가시화를 위해 data-testid=manager-dayoffs로 표시한다. definePageMeta({ middleware: 'auth' })는 유지한다. 컴포넌트는 app/data를 직접 import하지 않고 storeService만 사용한다.",
+      "notes": "단방향(reserve→storeService→data). 매장 변경 시 watch 초기화로 매니저 잔류 방지. selectedManagerDayoffs는 Phase5 SlotGrid 비활성 입력. label-key/value-key는 kebab-case props 바인딩. SSR 안전.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "6f1a400d-3ba6-46c0-837e-0283ad23c495"
+        },
+        {
+          "taskId": "60af4fc3-7a2b-486b-82dd-f21cfdc57a32"
+        }
+      ],
+      "createdAt": "2026-06-19T17:33:17.508Z",
+      "updatedAt": "2026-06-19T17:34:38.655Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "Phase 4 reserve 연동 체크리스트",
+          "lineStart": 507,
+          "lineEnd": 523
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "TO_MODIFY",
+          "description": "빈 골격 → 매장/매니저 선택 연동",
+          "lineStart": 1,
+          "lineEnd": 11
+        },
+        {
+          "path": "app/services/storeService.ts",
+          "type": "DEPENDENCY",
+          "description": "getApprovedStores/getManagersByStore/getManager"
+        },
+        {
+          "path": "app/components/SearchableSelect.vue",
+          "type": "DEPENDENCY",
+          "description": "매장/매니저 select"
+        }
+      ],
+      "implementationGuide": "1) <script setup lang=ts>: definePageMeta({ middleware: 'auth' }). 'import { computed, ref, watch } from vue'; 'import { getApprovedStores, getManagersByStore, getManager } from ~/services/storeService'. const approvedStores = getApprovedStores(). const selectedStoreId = ref<string | null>(null); const selectedManagerId = ref<string | null>(null). const storeManagers = computed(() => (selectedStoreId.value ? getManagersByStore(selectedStoreId.value) : [])). watch(selectedStoreId, () => { selectedManagerId.value = null }). const selectedManager = computed(() => (selectedManagerId.value ? getManager(selectedManagerId.value) : undefined)). const selectedManagerDayoffs = computed(() => selectedManager.value?.dayoffDates ?? []). 2) <template><section data-testid=page-reserve><h1>예약</h1><SearchableSelect testid=store-select :options=approvedStores label-key=name value-key=id placeholder=매장 검색 v-model=selectedStoreId/><SearchableSelect v-if=selectedStoreId testid=manager-select :options=storeManagers label-key=name value-key=id placeholder=매니저 검색 v-model=selectedManagerId/><p v-if=selectedManager data-testid=manager-dayoffs>휴무: {{ selectedManagerDayoffs.join(', ') || '없음' }}</p></section>. SearchableSelect 자동임포트. oxfmt.",
+      "verificationCriteria": "reserve.vue가 승인 매장만(store-select) 노출하고, 매장 선택 시 해당 매장 매니저만(manager-select) 노출한다. 매장 변경 시 매니저 선택이 초기화된다. selectedManagerDayoffs computed가 선택 매니저 휴무를 노출(manager-dayoffs). definePageMeta auth 유지·data 직접 import 없음·자동임포트. type-check 통과·세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 4 \"매장/매니저 선택 + 검색 UX(FW3/FW4)\" 구현. 제네릭 SearchableSelect(select+텍스트 실시간 필터+defineModel+키보드), storeService(승인매장/매장별매니저 조회), reserve.vue 연동(매장 선택→매니저 선택, 매장 변경 시 매니저 초기화, 선택 매니저 dayoffDates를 Phase 5용 computed로 노출)를 구축한다. 제약: 단방향 의존(컴포넌트/페이지는 app/data 직접 import 금지·storeService 경유, storeService는 ~/data·~/types만 의존 — README 계약), SearchableSelect 제네릭 SFC(generic=T)+defineModel+testid prop 네임스페이스, 자동임포트(SearchableSelect/매크로 import 금지)·ref/computed vue import·Store/Manager import type·storeService 명시 import, oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(표준 DOM 이벤트), reserve.vue definePageMeta middleware:'auth' 유지, data-testid(store-select-*/manager-select-*)로 e2e 안정화. 데이터 사실: stores(store1 강남점 approved bayCount3, store2 홍대점 approved bayCount2, store3 판교점 미승인), managers(mgr1·mgr2 store1, mgr3 store2, mgr4 store3, mgr1·mgr3 dayoff). 정본 ROADMAP/require 변경 금지. DoD: 텍스트 입력 시 실시간 필터, approved:false(판교점) 제외, 매장 선택 후 해당 매장 매니저만 노출, npm run type-check·lint·format·test:e2e 통과. 기존 home.spec 3종+auth.spec 3종 무변경 그린 유지. 범위 경계: 슬롯/날짜/예약확정/가격(Phase5)·예약목록(Phase6) 제외. 키보드는 화살표/Enter/Esc 기본만(완전 ARIA combobox 과범위).",
+      "summary": "app/pages/reserve.vue에 매장 선택(FW3)→매니저 선택(FW4) 흐름을 연동했다. getApprovedStores()로 승인 매장만 SearchableSelect(testid=store-select)에 노출하고, selectedStoreId 선택 시 getManagersByStore 기반 storeManagers computed로 해당 매장 매니저만 매니저 SearchableSelect(testid=manager-select, v-if selectedStoreId)에 노출한다. watch(selectedStoreId)로 매장 변경 시 selectedManagerId를 null로 초기화해 매니저 잔류를 방지한다. selectedManager(getManager) computed와 selectedManagerDayoffs computed로 선택 매니저 휴무를 노출(data-testid=manager-dayoffs, '휴무: ...' 표시)해 Phase 5 슬롯 비활성 컨텍스트를 준비했다. definePageMeta({ middleware: 'auth' })를 유지하고, app/data를 직접 import하지 않고 storeService만 명시 import했으며 SearchableSelect는 자동임포트(import 미작성)다. computed/ref/watch는 vue에서 import, label-key/value-key kebab-case props 바인딩, SSR 안전. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check/lint/e2e는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:34:38.654Z"
+    },
+    {
+      "id": "e15dba70-2f0f-4a32-b87c-c598a85a5643",
+      "name": "e2e reserve 시나리오 + 통합 검증 게이트",
+      "description": "Phase 4 검색/선택 동작을 검증하는 e2e/reserve.spec.ts를 추가하고 전체 검증 게이트를 통과시킨다. 로그인(networkidle 대기) 후 /reserve에서: (a)store-select-input 포커스 시 store-select-options에 강남점·홍대점 노출, 판교점(미승인) 미노출, (b)store-select-input에 '강남' 입력 시 옵션이 강남점으로 필터, (c)강남점 선택 후 manager-select가 노출되고 manager-select-options에 store1 매니저(김매니저/이매니저)만 노출. 폼/하이드레이션 레이스 회피 위해 waitUntil networkidle 패턴 적용. 기존 home.spec 3종+auth.spec 3종은 무변경 그린 유지됨을 확인한다. 이후 npm run type-check, npm run lint, npm run format, npm run test:e2e를 순차 통과시키고 DoD 4종을 확인한다. ROADMAP/require 정본 변경 금지.",
+      "notes": "T1~T3 완료 후 수행. data-testid 셀렉터. 로그인 헬퍼 재사용. networkidle로 하이드레이션 대기(폼 입력/선택). 판교점/박매니저는 미노출 단정으로 필터·매장한정 검증. 갱신 스위트(home3+auth3+reserve3) 그린이어야 Phase 4 완료.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "6f1a400d-3ba6-46c0-837e-0283ad23c495"
+        },
+        {
+          "taskId": "60af4fc3-7a2b-486b-82dd-f21cfdc57a32"
+        },
+        {
+          "taskId": "8137fc72-8bfc-4943-9129-4a8d0c356f3b"
+        }
+      ],
+      "createdAt": "2026-06-19T17:33:17.508Z",
+      "updatedAt": "2026-06-19T17:38:21.782Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "CREATE",
+          "description": "매장 필터·미승인 제외·매니저 한정 시나리오"
+        },
+        {
+          "path": "e2e/auth.spec.ts",
+          "type": "REFERENCE",
+          "description": "로그인 헬퍼/networkidle 패턴 참고",
+          "lineStart": 1,
+          "lineEnd": 45
+        },
+        {
+          "path": "package.json",
+          "type": "REFERENCE",
+          "description": "type-check/lint/format/test:e2e",
+          "lineStart": 6,
+          "lineEnd": 19
+        }
+      ],
+      "implementationGuide": "1) e2e/reserve.spec.ts: 헬퍼 login(page){ goto('/login',{waitUntil:'networkidle'}); fill login-email user@test.com·login-password password; click login-submit; expect URL /reserve }. test(a): login; click store-select-input; const opts=getByTestId('store-select-options'); await expect(opts).toContainText('강남점'); await expect(opts).toContainText('홍대점'); await expect(opts).not.toContainText('판교점'). test(b): login; fill store-select-input '강남'; await expect(getByTestId('store-select-options')).toContainText('강남점'); not.toContainText('홍대점'). test(c): login; click store-select-input; click 강남점 option(getByTestId('store-select-option').filter hasText 강남점); await expect(getByTestId('manager-select-input')).toBeVisible(); click manager-select-input; await expect(getByTestId('manager-select-options')).toContainText('김매니저'); not.toContainText('박매니저'). 2) 'npm run type-check'→'lint'→'format'→'test:e2e'. 3) 실패 시 하이드레이션/testid/단방향 점검. 4) git diff로 ROADMAP/require·home/auth.spec 무변경 확인.",
+      "verificationCriteria": "e2e/reserve.spec.ts가 (a)승인매장 노출·판교점 제외, (b)검색 필터, (c)매장 선택 후 해당 매장 매니저만 노출을 검증한다. home.spec·auth.spec 무변경 그린. npm run type-check·lint·format·test:e2e 전부 통과(home3+auth3+reserve3). DoD 4종 충족. ROADMAP.md/require_v1.md 무변경.",
+      "analysisResult": "ROADMAP Phase 4 \"매장/매니저 선택 + 검색 UX(FW3/FW4)\" 구현. 제네릭 SearchableSelect(select+텍스트 실시간 필터+defineModel+키보드), storeService(승인매장/매장별매니저 조회), reserve.vue 연동(매장 선택→매니저 선택, 매장 변경 시 매니저 초기화, 선택 매니저 dayoffDates를 Phase 5용 computed로 노출)를 구축한다. 제약: 단방향 의존(컴포넌트/페이지는 app/data 직접 import 금지·storeService 경유, storeService는 ~/data·~/types만 의존 — README 계약), SearchableSelect 제네릭 SFC(generic=T)+defineModel+testid prop 네임스페이스, 자동임포트(SearchableSelect/매크로 import 금지)·ref/computed vue import·Store/Manager import type·storeService 명시 import, oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(표준 DOM 이벤트), reserve.vue definePageMeta middleware:'auth' 유지, data-testid(store-select-*/manager-select-*)로 e2e 안정화. 데이터 사실: stores(store1 강남점 approved bayCount3, store2 홍대점 approved bayCount2, store3 판교점 미승인), managers(mgr1·mgr2 store1, mgr3 store2, mgr4 store3, mgr1·mgr3 dayoff). 정본 ROADMAP/require 변경 금지. DoD: 텍스트 입력 시 실시간 필터, approved:false(판교점) 제외, 매장 선택 후 해당 매장 매니저만 노출, npm run type-check·lint·format·test:e2e 통과. 기존 home.spec 3종+auth.spec 3종 무변경 그린 유지. 범위 경계: 슬롯/날짜/예약확정/가격(Phase5)·예약목록(Phase6) 제외. 키보드는 화살표/Enter/Esc 기본만(완전 ARIA combobox 과범위).",
+      "summary": "Phase 4 검색/선택 동작 e2e/reserve.spec.ts(3종)를 추가하고 전체 검증 게이트를 통과시켰다. 로그인 헬퍼(networkidle 대기)로 /reserve 진입 후: (a)store-select-options에 강남점·홍대점 노출·판교점(미승인) 미노출, (b)'강남' 입력 시 강남점만 필터(홍대점 미노출), (c)강남점 선택 후 manager-select 노출+store1 매니저(김매니저·이매니저)만 노출, 박매니저(store2) 미노출. 통합 게이트: npm run type-check(타입 오류 0)·lint(위반 0)·format(oxfmt 33파일)·test:e2e(9/9: home3+auth3+reserve3) 통과. DoD 4종 충족(실시간 필터·판교점 제외·매장별 매니저 한정·게이트). git diff로 docs/ROADMAP.md·require_v1.md·home.spec.ts·auth.spec.ts 무변경 확인. 도전과 해결: (1)이전 실행의 잔여 Nuxt dev 서버(PID 35380)가 포트 3000을 점유해 taskkill로 정리, (2)oxfmt가 SearchableSelect의 @input 인라인 복수 문장을 줄바꿈 분리하면서 Vue 템플릿 표현식 파서가 깨진 문제를, 해당 로직을 onInput() 메서드로 추출해 해결(인라인 복수 문장 회피). 재실행에서 9/9 그린 확인.",
+      "completedAt": "2026-06-19T17:38:21.778Z"
+    }
+  ]
+}

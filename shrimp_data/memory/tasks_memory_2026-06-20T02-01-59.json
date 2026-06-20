@@ -1,0 +1,155 @@
+{
+  "tasks": [
+    {
+      "id": "d451dd14-c068-4147-a1ba-f0b9d457a0d7",
+      "name": "디렉터리 골격 생성 및 services 추상화 계약 문서화",
+      "description": "ROADMAP 2.1 표가 명시한 Nuxt 4 신규 디렉터리를 실제로 생성하고 git 추적을 보장한다. app/types, app/data, app/composables, app/middleware 4개 폴더에 .gitkeep을 두어 빈 폴더를 추적 가능하게 한다(빈 .ts 미생성으로 oxlint/eslint 위반 회피). app/services 폴더에는 .gitkeep 대신 한국어 README.md를 생성하여 ROADMAP 2.2의 가장 비자명한 핵심 컨벤션인 'component/store → services → data' 단방향 의존 계약과 2단계(Spring Boot $fetch/useFetch)·3단계(MySQL) 교체 시 UI 무변경 보장 원칙, 그리고 컴포넌트/스토어에서 app/data 직접 import 금지 규칙을 문서화한다. 도메인 타입/가격/enum 등 실제 값은 정의하지 않는다(Phase 1 범위). 산출물 용도 설명 중복을 피하기 위해 폴더별 README는 services 한 곳으로 한정하고 나머지는 ROADMAP/shrimp-rules 정본을 참조한다.",
+      "notes": "빈 .ts 생성 금지(린트 위반). README는 문서이므로 타입검사/린트 무관. ~/ 별칭·세미콜론 없음·작은따옴표 규칙을 문서 예시에도 적용. ROADMAP 2.1/2.2 및 shrimp-rules.md 아키텍처 표와 1:1 추적되도록 용어 일치.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T16:46:21.224Z",
+      "updatedAt": "2026-06-19T16:51:35.025Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "2.1 폴더 구조 표 및 2.2 services 추상화 의도",
+          "lineStart": 105,
+          "lineEnd": 142
+        },
+        {
+          "path": "shrimp-rules.md",
+          "type": "REFERENCE",
+          "description": "아키텍처 표·자동/명시 import 구분·services 경유 규칙",
+          "lineStart": 14,
+          "lineEnd": 45
+        },
+        {
+          "path": "app/services/README.md",
+          "type": "CREATE",
+          "description": "services 단방향 의존 계약 및 2단계 교체 지점 문서"
+        },
+        {
+          "path": "app/types/.gitkeep",
+          "type": "CREATE",
+          "description": "types 폴더 추적용 빈 파일"
+        },
+        {
+          "path": "app/data/.gitkeep",
+          "type": "CREATE",
+          "description": "data 폴더 추적용 빈 파일"
+        },
+        {
+          "path": "app/composables/.gitkeep",
+          "type": "CREATE",
+          "description": "composables 폴더 추적용 빈 파일"
+        },
+        {
+          "path": "app/middleware/.gitkeep",
+          "type": "CREATE",
+          "description": "middleware 폴더 추적용 빈 파일"
+        }
+      ],
+      "implementationGuide": "1) 폴더 생성+추적: app/types/.gitkeep, app/data/.gitkeep, app/composables/.gitkeep, app/middleware/.gitkeep (빈 파일). 2) app/services/README.md(한국어) 작성, 구조 예: 제목 '## services 계층 규칙' → 단방향 의존 'component/store -> services -> data' → 'app/data 직접 import 금지(컴포넌트/스토어는 반드시 services 경유)' → '2단계: data import를 $fetch/useFetch 호출로 교체, 시그니처 유지로 호출부 무변경' → 'export function 형태, ~/ 별칭, 세미콜론 없음, 작은따옴표'. 도메인 함수 본문은 작성하지 말고 계약/패턴만 기술. 3) 어떤 .ts 코드도 생성하지 않아 type-check 영향 없음.",
+      "verificationCriteria": "app/types·app/data·app/composables·app/middleware에 .gitkeep이 존재하고 git status에 추적된다. app/services/README.md가 한국어로 단방향 의존 계약·data 직접 import 금지·2단계 교체 지점을 명시한다. 신규 .ts 파일이 없어 npm run type-check가 영향받지 않는다. README 예시 코드에 세미콜론이 없고 작은따옴표를 사용한다.",
+      "analysisResult": "ROADMAP 2장 \"아키텍처 & 컨벤션 가이드\"를 비파괴적 기반 작업으로 확립한다. Nuxt 4 app/ 신규 디렉터리 골격(types/data/services/composables/middleware/layouts)과 'component/store → services → data' 단방향 의존 계약, 휴면 default.vue 레이아웃 컨벤션을 도메인 값 선확정 없이 도입한다. 제약: oxfmt 절대 준수(세미콜론 금지·작은따옴표), ~/ 별칭 우선, 자동/명시 import 구분, Pinia setup 스토어 패턴, 한국어 주석·문서/영어 식별자, SSR 가드. 비파괴 핵심: app/app.vue를 변경하지 않아 default.vue가 휴면 상태로 유지되고 기존 e2e 스모크('You did it!'/About 링크)가 그린을 유지한다. 검증 게이트: npm run type-check → npm run lint → npm run format. 정본: 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md, 도메인=docs/require_v1.md. 범위 경계: Phase 1(도메인 타입·더미데이터 실제 정의)·Phase 2(실제 라우트·인증 미들웨어 로직)는 범위 밖이며 빈 골격/계약/문서까지만 수행한다.",
+      "summary": "검증 기준 4개 모두 충족. app/types·app/data·app/composables·app/middleware에 빈 .gitkeep을 생성해 빈 폴더를 git 추적 가능하게 했고(git status에서 5개 신규 디렉터리 untracked로 인식), app/services/README.md를 한국어로 작성해 'component/page/store → services → data' 단방향 의존 계약, app/data 직접 import 금지 규칙, 2단계(Spring Boot $fetch/useFetch)·3단계(MySQL) 교체 시 시그니처 유지로 호출부 무변경 보장 원칙을 명시했다. 신규 .ts/.vue 파일을 생성하지 않아 npm run type-check 영향이 없으며(find 결과 0건), README 패턴 예시 코드는 oxfmt 규칙대로 세미콜론 없이 작은따옴표를 사용한다. 도메인 타입/가격/enum 등 실제 값은 Phase 1 범위로 남겨 범위 경계를 준수했다. 폴더 용도 설명 중복을 피해 README는 services 한 곳으로 한정하고 나머지는 ROADMAP/shrimp-rules 정본을 참조하도록 링크했다.",
+      "completedAt": "2026-06-19T16:51:35.021Z"
+    },
+    {
+      "id": "9623cd21-f372-4bea-9318-96f408e5c744",
+      "name": "휴면 default.vue 레이아웃 컨벤션 도입(비파괴)",
+      "description": "ROADMAP 2.1/2.2가 명시한 app/layouts/ 레이아웃 컨벤션을 구체화하되, 현재 통과 중인 E2E 스모크 테스트를 깨지 않도록 비파괴적으로 도입한다. app/layouts/default.vue를 최소 래퍼(<template>에 <slot/>만)로 생성한다. app/app.vue는 절대 변경하지 않는다 — 현재 app.vue가 <NuxtLayout>을 사용하지 않으므로 default.vue는 렌더에 영향을 주지 않는 휴면 상태로 존재하며, app.vue의 header/HelloWorld('You did it!')/About 링크/<NuxtPage/> 구조가 그대로 유지되어 e2e/home.spec.ts가 그린을 유지한다. app.vue를 <NuxtLayout><NuxtPage/></NuxtLayout>로 전환하고 AppNav를 도입하는 작업은 Phase 2(라우팅/네비게이션)로 명시 이관한다. default.vue 파일명은 eslint app/layouts/** vue/multi-word-component-names off 대상이라 단어 1개 파일명이 허용된다.",
+      "notes": "핵심은 '생성하되 활성화하지 않음'. app.vue 무변경이 비파괴의 전제. default.vue에 nav/AppNav를 넣지 말 것(Phase 2). SSR 안전: 브라우저 API 미사용. oxfmt: 세미콜론 없음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T16:46:21.224Z",
+      "updatedAt": "2026-06-19T16:53:44.886Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "2.2 app.vue 예시 및 layouts 컨벤션, Phase 2 레이아웃 작업",
+          "lineStart": 120,
+          "lineEnd": 142
+        },
+        {
+          "path": "app/app.vue",
+          "type": "REFERENCE",
+          "description": "변경 금지 — 휴면 유지를 위한 현재 구조 확인 대상",
+          "lineStart": 1,
+          "lineEnd": 21
+        },
+        {
+          "path": "e2e/home.spec.ts",
+          "type": "REFERENCE",
+          "description": "비파괴 검증 기준(You did it!/About 링크)",
+          "lineStart": 1,
+          "lineEnd": 14
+        },
+        {
+          "path": "eslint.config.ts",
+          "type": "REFERENCE",
+          "description": "app/layouts/** multi-word off 규칙 확인",
+          "lineStart": 31,
+          "lineEnd": 38
+        },
+        {
+          "path": "app/layouts/default.vue",
+          "type": "CREATE",
+          "description": "휴면 최소 래퍼 레이아웃"
+        }
+      ],
+      "implementationGuide": "1) app/layouts/default.vue 생성. 내용(pseudocode): '<template>\\n  <slot />\\n</template>' 만. <script> 불필요(상태/로직 없음). 2) app/app.vue는 읽기만 하고 수정하지 않는다(비파괴 확인). 3) Phase 2 이관 사실을 커밋 메시지/작업 노트에 한국어로 명시. 도메인 로직·네비게이션·인증은 작성하지 않는다.",
+      "verificationCriteria": "app/layouts/default.vue가 <slot/>만 포함한 최소 래퍼로 존재한다. app/app.vue가 변경되지 않았다(git diff 무변경). npm run dev 또는 test:e2e 시 홈/About 스모크가 그대로 통과한다. default.vue가 lint에서 multi-word-component-names 위반을 일으키지 않는다.",
+      "analysisResult": "ROADMAP 2장 \"아키텍처 & 컨벤션 가이드\"를 비파괴적 기반 작업으로 확립한다. Nuxt 4 app/ 신규 디렉터리 골격(types/data/services/composables/middleware/layouts)과 'component/store → services → data' 단방향 의존 계약, 휴면 default.vue 레이아웃 컨벤션을 도메인 값 선확정 없이 도입한다. 제약: oxfmt 절대 준수(세미콜론 금지·작은따옴표), ~/ 별칭 우선, 자동/명시 import 구분, Pinia setup 스토어 패턴, 한국어 주석·문서/영어 식별자, SSR 가드. 비파괴 핵심: app/app.vue를 변경하지 않아 default.vue가 휴면 상태로 유지되고 기존 e2e 스모크('You did it!'/About 링크)가 그린을 유지한다. 검증 게이트: npm run type-check → npm run lint → npm run format. 정본: 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md, 도메인=docs/require_v1.md. 범위 경계: Phase 1(도메인 타입·더미데이터 실제 정의)·Phase 2(실제 라우트·인증 미들웨어 로직)는 범위 밖이며 빈 골격/계약/문서까지만 수행한다.",
+      "summary": "검증 기준 4개 모두 충족. app/layouts/default.vue를 <slot/>만 포함한 휴면 최소 래퍼로 생성했고(휴면/Phase 2 이관 의도는 한국어 주석으로 명시), app/app.vue는 전혀 변경하지 않았다(git diff app/app.vue 결과 무변경). app.vue가 <NuxtLayout>을 opt-in하지 않으므로 default.vue는 렌더에 영향을 주지 않는 휴면 상태이며, app.vue의 header/HelloWorld('You did it!')/About 링크/<NuxtPage/> 구조가 그대로 유지되어 e2e/home.spec.ts 스모크가 그린을 유지한다. npx eslint app/layouts/default.vue를 단일 실행해 exit 0(위반 0건)으로 vue/multi-word-component-names 미발동을 확인했다(eslint.config.ts의 app/layouts/** off 규칙 적용). nav/AppNav·도메인 로직·인증은 작성하지 않아 범위 경계를 준수했고, SSR 안전(브라우저 API 미사용)·oxfmt(세미콜론 없음) 규칙을 따랐다. app.vue→<NuxtLayout> 전환과 AppNav 도입은 Phase 2로 명시 이관했다.",
+      "completedAt": "2026-06-19T16:53:44.882Z"
+    },
+    {
+      "id": "ff0f4f93-56a6-4959-ac25-58b7832a9294",
+      "name": "shrimp-rules 문서 동기화 및 통합 검증 게이트",
+      "description": "신규 디렉터리/레이아웃 도입을 운영규칙 정본에 반영하고, 전체 산출물을 검증 게이트로 통과시킨다. shrimp-rules.md 아키텍처 표에서 app/types·app/data·app/services의 '(계획)' 표기를 실제 생성 상태(내용은 Phase 1/2에서 채움)로 갱신하고, app/composables·app/middleware·app/layouts 행이 현재 구조와 정합하는지 확인·정정한다. ROADMAP는 정본이므로 변경하지 않는다(필요 시 참조만). 이후 npm run type-check, npm run lint, npm run format을 순차 실행하여 모두 통과시키고, 가능하면 npm run test:e2e 스모크로 비파괴를 최종 확인한다.",
+      "notes": "T1·T2 완료 후 수행(정합 갱신 대상이 존재해야 함). 문서 표기는 한국어. README/문서는 lint 비대상이나 default.vue/.gitkeep 도입 후 전체 게이트를 한 번에 통과시켜 회귀를 차단한다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d451dd14-c068-4147-a1ba-f0b9d457a0d7"
+        },
+        {
+          "taskId": "9623cd21-f372-4bea-9318-96f408e5c744"
+        }
+      ],
+      "createdAt": "2026-06-19T16:46:21.224Z",
+      "updatedAt": "2026-06-19T16:55:43.421Z",
+      "relatedFiles": [
+        {
+          "path": "shrimp-rules.md",
+          "type": "TO_MODIFY",
+          "description": "아키텍처 표 (계획)→생성됨 갱신 및 행 정합",
+          "lineStart": 14,
+          "lineEnd": 45
+        },
+        {
+          "path": "package.json",
+          "type": "REFERENCE",
+          "description": "type-check/lint/format/test:e2e 스크립트",
+          "lineStart": 6,
+          "lineEnd": 19
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "정본(변경 금지), 2장 정합 기준",
+          "lineStart": 105,
+          "lineEnd": 142
+        }
+      ],
+      "implementationGuide": "1) shrimp-rules.md 아키텍처 표 수정: types/data/services 행의 '(계획)' → 생성됨 표기(예: '*(생성됨 · 내용 Phase 1/2)*'), 자동/명시 import 구분 문구와 layouts/middleware/composables 행 정합 점검. 2) 검증 순차 실행: 'npm run type-check' → 'npm run lint' → 'npm run format'. 3) (가능 시) 'npm run test:e2e'로 스모크 그린 확인. 4) 실패 시 oxfmt/별칭/세미콜론 규칙 위반부터 점검. 정본 충돌(ROADMAP vs require) 발생 시 shrimp-rules 13장 우선순위 규칙 적용.",
+      "verificationCriteria": "shrimp-rules.md에서 types/data/services의 '(계획)' 표기가 생성 상태로 갱신되고 모든 행이 실제 app/ 구조와 일치한다. npm run type-check, npm run lint, npm run format이 모두 오류 없이 통과한다. (실행 가능 시) npm run test:e2e 스모크가 그린을 유지한다. ROADMAP.md는 변경되지 않았다.",
+      "analysisResult": "ROADMAP 2장 \"아키텍처 & 컨벤션 가이드\"를 비파괴적 기반 작업으로 확립한다. Nuxt 4 app/ 신규 디렉터리 골격(types/data/services/composables/middleware/layouts)과 'component/store → services → data' 단방향 의존 계약, 휴면 default.vue 레이아웃 컨벤션을 도메인 값 선확정 없이 도입한다. 제약: oxfmt 절대 준수(세미콜론 금지·작은따옴표), ~/ 별칭 우선, 자동/명시 import 구분, Pinia setup 스토어 패턴, 한국어 주석·문서/영어 식별자, SSR 가드. 비파괴 핵심: app/app.vue를 변경하지 않아 default.vue가 휴면 상태로 유지되고 기존 e2e 스모크('You did it!'/About 링크)가 그린을 유지한다. 검증 게이트: npm run type-check → npm run lint → npm run format. 정본: 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md, 도메인=docs/require_v1.md. 범위 경계: Phase 1(도메인 타입·더미데이터 실제 정의)·Phase 2(실제 라우트·인증 미들웨어 로직)는 범위 밖이며 빈 골격/계약/문서까지만 수행한다.",
+      "summary": "검증 기준 전부 충족. shrimp-rules.md 아키텍처 표에서 app/types·app/data·app/services의 '(계획)' 표기를 실제 생성 상태로 갱신했다(types/data는 '생성됨·.gitkeep·내용 Phase 1', services는 '생성됨·계약은 README.md·내용 Phase 1'로 표기하고 README 링크 추가). 33번 안내 문구도 6개 디렉터리 골격 생성 완료 및 default.vue 휴면 상태를 반영하도록 정정했다. composables/middleware/layouts 행은 기존 정합 상태 확인. 통합 검증 게이트를 순차 실행해 npm run type-check(타입 오류 0), npm run lint(oxlint→eslint 위반 0), npm run format(oxfmt 16파일 정상) 모두 통과했다. git status로 비파괴 확인: app/app.vue·docs/ROADMAP.md 무변경, lint/format이 기존 추적 소스를 변경하지 않았으며 변경된 추적 파일은 의도한 shrimp-rules.md뿐이다(.mcp.json·shrimp_data는 이번 작업과 무관한 기존 항목). npm run test:e2e 스모크 2/2 통과(홈 'You did it!'·About 링크)로 default.vue 휴면 도입과 디렉터리 골격이 기존 동작을 깨지 않음을 최종 확인했다. ROADMAP.md 정본은 변경하지 않았다.",
+      "completedAt": "2026-06-19T16:55:43.420Z"
+    }
+  ]
+}

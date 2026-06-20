@@ -1,0 +1,180 @@
+{
+  "tasks": [
+    {
+      "id": "e8faa5f6-1b6e-4d42-b5dd-f07c86e6cd87",
+      "name": "라우트 페이지 4종 골격 + index 리다이렉트",
+      "description": "1차 FO 화면을 파일 기반 라우팅으로 등록한다. app/pages/login.vue(가드 없음), app/pages/reserve.vue·app/pages/reservations.vue·app/pages/review/[reservationId].vue(보호 3종)를 빈 골격으로 생성한다. 보호 3종은 <script setup>에서 definePageMeta({ middleware: 'auth' })를 선언한다. 각 페이지는 식별용 <section> + 제목 + data-testid(page-login/page-reserve/page-reservations/page-review)를 둔다. review 페이지는 useRoute().params.reservationId를 표시만 한다(Phase 7 본구현). app/pages/index.vue를 수정해 navigateTo('/reserve')로 즉시 리다이렉트하고 기존 TheWelcome 데모 렌더를 제거한다. 실제 폼/슬롯/목록 UI는 Phase 3~7 범위이므로 작성하지 않는다.",
+      "notes": "페이지는 빈 골격. data-testid로 e2e 셀렉터 안정화. 보호페이지 middleware:'auth'는 T3 미들웨어 파일이 있어야 런타임 동작 — 검증은 T4에 집중(중간 dev 미실행). index 리다이렉트 대상 /reserve는 보호페이지라 미인증 시 /login으로 연쇄(정상).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:13:46.498Z",
+      "updatedAt": "2026-06-19T17:15:34.856Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "Phase 2 라우트 표·페이지 예시",
+          "lineStart": 359,
+          "lineEnd": 427
+        },
+        {
+          "path": "app/pages/index.vue",
+          "type": "TO_MODIFY",
+          "description": "TheWelcome 제거 후 /reserve 리다이렉트",
+          "lineStart": 1,
+          "lineEnd": 7
+        },
+        {
+          "path": "app/pages/login.vue",
+          "type": "CREATE",
+          "description": "로그인 페이지 골격(가드 없음)"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "CREATE",
+          "description": "예약 페이지 골격(가드)"
+        },
+        {
+          "path": "app/pages/reservations.vue",
+          "type": "CREATE",
+          "description": "예약 목록 골격(가드)"
+        },
+        {
+          "path": "app/pages/review/[reservationId].vue",
+          "type": "CREATE",
+          "description": "후기 동적 라우트 골격(가드)"
+        }
+      ],
+      "implementationGuide": "1) login.vue: <script setup lang=ts> 비우거나 주석, <template><section data-testid='page-login'><h1>로그인</h1></section>. 2) reserve/reservations/review: 동일 패턴 + <script setup>에 definePageMeta({ middleware: 'auth' }). review는 'const route = useRoute()' 후 {{ route.params.reservationId }} 표시. 3) index.vue: <script setup lang=ts> 'navigateTo('/reserve')' (모듈 최상위 await 불필요, setup 동기 호출). <template>는 빈 안내 또는 생략. useRoute/navigateTo/definePageMeta는 자동임포트(import 금지). oxfmt 스타일. ROADMAP 360~425줄 예시 준수.",
+      "verificationCriteria": "app/pages에 login/reserve/reservations/review/[reservationId] 4종이 생성되고 보호 3종에 definePageMeta({middleware:'auth'})가 선언된다. index.vue가 navigateTo('/reserve')로 리다이렉트하며 TheWelcome을 더 이상 렌더하지 않는다. 각 페이지에 data-testid가 있다. 자동임포트 매크로에 import 구문이 없다. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 2 \"라우팅 & 레이아웃 골격\" 구현. 파일 기반 라우트 4종(login/reserve/reservations/review/[reservationId]) 등록, AppNav+default.vue 레이아웃 활성화, app.vue를 <NuxtLayout><NuxtPage/></NuxtLayout> 전환, auth 미들웨어 항상-미인증 스텁 도입. 제약: 파일기반 라우팅만(vue-router 수동·router.beforeEach 금지), 가드는 defineNuxtRouteMiddleware+definePageMeta({middleware:'auth'}), 네비 <NuxtLink>/이동 navigateTo, 자동임포트(AppNav/layouts/middleware/매크로 import 금지), oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭, <script setup lang=ts>, 주석 한국어/식별자 영어, SSR 안전. 핵심: app.vue 데모 헤더(HelloWorld 'You did it!'·About nav) 제거로 e2e/home.spec.ts가 깨지므로 동일 Phase에서 신규 라우팅 기준으로 갱신해 스위트 그린 유지. 데모 컴포넌트·about.vue는 ROADMAP 미지시로 삭제하지 않음(Phase 8 정리 후보). auth 스토어는 Phase 3 — 이번 미들웨어는 isLoggedIn=false 스텁(TODO). 리다이렉트 체인 '/'→/reserve→/login(가드없음 종료, 무한루프 방지). 정본: ROADMAP/require 변경 금지. DoD: 4라우트 등록·보호페이지 /login 리다이렉트·NuxtLink/레이아웃 적용·npm run type-check·lint·format·test:e2e 통과.",
+      "summary": "app/pages에 파일 기반 라우트 4종을 빈 골격으로 생성했다. login.vue(가드 없음, data-testid=page-login), reserve.vue·reservations.vue·review/[reservationId].vue는 <script setup>에서 definePageMeta({ middleware: 'auth' })를 선언한 보호 라우트다(각 data-testid=page-reserve/page-reservations/page-review). review는 useRoute()로 route.params.reservationId를 표시만 한다(Phase 7 본구현 예정). index.vue를 수정해 await navigateTo('/reserve')로 즉시 리다이렉트하고 기존 TheWelcome 데모 렌더를 제거했다(data-testid=page-index). definePageMeta/navigateTo/useRoute는 자동임포트라 import 구문을 작성하지 않았고, 모든 페이지가 <script setup lang=ts>·oxfmt 스타일(세미콜론 없음·작은따옴표)을 따른다. 실제 폼/슬롯/목록 UI는 Phase 3~7 범위로 남겼다. 보호페이지 가드의 런타임 동작은 T3 미들웨어 생성 후 T4 통합 검증에서 확인 예정.",
+      "completedAt": "2026-06-19T17:15:34.846Z"
+    },
+    {
+      "id": "5e561d3e-445d-4d4b-a712-bf87b874cfff",
+      "name": "레이아웃 활성화 (AppNav + default.vue + app.vue NuxtLayout 전환)",
+      "description": "공통 레이아웃과 네비게이션을 도입하고 app.vue를 레이아웃 opt-in으로 전환한다. app/components/AppNav.vue를 신규 생성해 <NuxtLink>로 /login·/reserve·/reservations 네비를 제공한다(각 링크 data-testid: nav-login/nav-reserve/nav-reservations). 로그인/로그아웃 상태 연동은 Phase 3이므로 정적 링크로 두고 auth 스토어에 의존하지 않으며 TODO(Phase 3) 주석을 남긴다. app/layouts/default.vue를 휴면 <slot/> 단독에서 'AppNav + <main><slot/></main>' 구조로 활성화한다. app/app.vue를 현재 데모 헤더(logo/HelloWorld 'You did it!'/Home·About nav/<NuxtPage/>)에서 '<NuxtLayout><NuxtPage/></NuxtLayout>'로 교체한다. 이 교체가 데모 헤더를 제거하는 의도된 파괴적 변경이며 e2e 갱신(T4)과 짝을 이룬다.",
+      "notes": "app.vue 교체로 'You did it!'/About nav 소멸 → e2e 깨짐은 T4에서 갱신. AppNav는 auth 미의존(Phase 3 상태 연동 TODO). default.vue/app.vue/AppNav 파일명은 eslint multi-word off 또는 다단어라 위반 없음. 데모 컴포넌트는 삭제하지 않음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:13:46.498Z",
+      "updatedAt": "2026-06-19T17:16:10.200Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "app.vue/default.vue 구현 예시",
+          "lineStart": 380,
+          "lineEnd": 399
+        },
+        {
+          "path": "app/app.vue",
+          "type": "TO_MODIFY",
+          "description": "데모 헤더 → NuxtLayout/NuxtPage",
+          "lineStart": 1,
+          "lineEnd": 86
+        },
+        {
+          "path": "app/layouts/default.vue",
+          "type": "TO_MODIFY",
+          "description": "휴면 → AppNav+slot 활성화",
+          "lineStart": 1,
+          "lineEnd": 5
+        },
+        {
+          "path": "app/components/AppNav.vue",
+          "type": "CREATE",
+          "description": "공통 네비게이션(NuxtLink)"
+        }
+      ],
+      "implementationGuide": "1) AppNav.vue: <script setup lang=ts>(TODO Phase3 로그인상태) <template><nav><NuxtLink data-testid='nav-login' to='/login'>로그인</NuxtLink> ...reserve/reservations</nav>. 2) default.vue: <template><div class='app-shell'><AppNav /><main><slot /></main></div></template>(AppNav 자동임포트, import 금지). 휴면 주석 제거. 3) app.vue: 기존 <script>/<style> 데모 제거, <template><NuxtLayout><NuxtPage /></NuxtLayout></template>만. ROADMAP 380~399줄 예시 준수. oxfmt.",
+      "verificationCriteria": "AppNav.vue가 <NuxtLink>로 /login·/reserve·/reservations 링크(data-testid 부여)를 제공하고 auth 스토어에 의존하지 않는다. default.vue가 AppNav+<main><slot/></main>로 활성화된다. app.vue가 <NuxtLayout><NuxtPage/></NuxtLayout>로 교체되고 데모 헤더가 제거된다. <RouterLink>/<a href> 라우팅·router.beforeEach 미사용. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 2 \"라우팅 & 레이아웃 골격\" 구현. 파일 기반 라우트 4종(login/reserve/reservations/review/[reservationId]) 등록, AppNav+default.vue 레이아웃 활성화, app.vue를 <NuxtLayout><NuxtPage/></NuxtLayout> 전환, auth 미들웨어 항상-미인증 스텁 도입. 제약: 파일기반 라우팅만(vue-router 수동·router.beforeEach 금지), 가드는 defineNuxtRouteMiddleware+definePageMeta({middleware:'auth'}), 네비 <NuxtLink>/이동 navigateTo, 자동임포트(AppNav/layouts/middleware/매크로 import 금지), oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭, <script setup lang=ts>, 주석 한국어/식별자 영어, SSR 안전. 핵심: app.vue 데모 헤더(HelloWorld 'You did it!'·About nav) 제거로 e2e/home.spec.ts가 깨지므로 동일 Phase에서 신규 라우팅 기준으로 갱신해 스위트 그린 유지. 데모 컴포넌트·about.vue는 ROADMAP 미지시로 삭제하지 않음(Phase 8 정리 후보). auth 스토어는 Phase 3 — 이번 미들웨어는 isLoggedIn=false 스텁(TODO). 리다이렉트 체인 '/'→/reserve→/login(가드없음 종료, 무한루프 방지). 정본: ROADMAP/require 변경 금지. DoD: 4라우트 등록·보호페이지 /login 리다이렉트·NuxtLink/레이아웃 적용·npm run type-check·lint·format·test:e2e 통과.",
+      "summary": "공통 레이아웃과 네비게이션을 도입하고 app.vue를 레이아웃 opt-in으로 전환했다. app/components/AppNav.vue를 신규 생성해 <NuxtLink>로 /login·/reserve·/reservations 정적 링크(각 data-testid=nav-login/nav-reserve/nav-reservations)를 제공하며 auth 스토어에 의존하지 않고 Phase 3 로그인/로그아웃 상태 연동을 TODO 주석으로 남겼다. app/layouts/default.vue를 휴면 <slot/> 단독에서 'app-shell 안에 AppNav + <main><slot/></main>' 구조로 활성화했다(AppNav 자동임포트, import 미작성). app/app.vue를 기존 데모 헤더(logo/HelloWorld 'You did it!'/Home·About nav/<NuxtPage/>)에서 <NuxtLayout><NuxtPage/></NuxtLayout>로 교체해 데모 헤더를 제거했다 — 이는 의도된 파괴적 변경으로 e2e 갱신(T4)과 짝을 이룬다. <RouterLink>/<a href> 라우팅·router.beforeEach를 사용하지 않고 NuxtLink/NuxtLayout/NuxtPage만 사용했으며, 모든 파일이 oxfmt 스타일(세미콜론 없음·작은따옴표)을 따른다. 데모 컴포넌트(HelloWorld/TheWelcome/WelcomeItem/icons)는 ROADMAP 미지시로 삭제하지 않았다. 전체 type-check/lint/e2e는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:16:10.199Z"
+    },
+    {
+      "id": "9f03584e-0613-4135-acc3-5a7a2a8c4449",
+      "name": "auth 라우트 미들웨어 스텁",
+      "description": "보호 페이지를 /login으로 보내는 미인증 라우트 미들웨어 스텁을 app/middleware/auth.ts에 작성한다. defineNuxtRouteMiddleware((to) => { ... })로 작성하고, auth 스토어가 아직 없으므로 isLoggedIn=false 상수 스텁을 둔다. 미인증 시 navigateTo({ path: '/login', query: { redirect: to.fullPath } })를 반환한다. Phase 3에서 const auth = useAuthStore(); auth.isLoggedIn으로 교체할 지점을 TODO(Phase 3) 주석으로 명시한다. 파일 추가로 더 이상 불필요한 app/middleware/.gitkeep을 제거한다.",
+      "notes": "스텁은 항상 미인증이라 모든 보호페이지가 /login으로 리다이렉트(DoD2). login.vue는 가드 미선언이라 체인 종료(무한루프 방지). SSR 안전(브라우저 API 미사용).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:13:46.498Z",
+      "updatedAt": "2026-06-19T17:16:36.917Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "auth.ts 미들웨어 예시",
+          "lineStart": 401,
+          "lineEnd": 412
+        },
+        {
+          "path": "app/middleware/auth.ts",
+          "type": "CREATE",
+          "description": "미인증 가드 스텁"
+        },
+        {
+          "path": "app/middleware/.gitkeep",
+          "type": "OTHER",
+          "description": "제거 대상(.ts 추가됨)"
+        }
+      ],
+      "implementationGuide": "1) app/middleware/auth.ts: 'export default defineNuxtRouteMiddleware((to) => {\\n  // TODO(Phase 3): const auth = useAuthStore(); const isLoggedIn = auth.isLoggedIn\\n  const isLoggedIn = false\\n  if (!isLoggedIn) {\\n    return navigateTo({ path: '/login', query: { redirect: to.fullPath } })\\n  }\\n})'. defineNuxtRouteMiddleware/navigateTo 자동임포트(import 금지). 2) rm app/middleware/.gitkeep. ROADMAP 401~412줄 예시 준수. oxfmt: 세미콜론 없음·작은따옴표.",
+      "verificationCriteria": "app/middleware/auth.ts가 defineNuxtRouteMiddleware로 작성되고 isLoggedIn=false 스텁에서 navigateTo({path:'/login', query:{redirect: to.fullPath}})를 반환한다. TODO(Phase 3) 교체 주석이 있다. app/middleware/.gitkeep이 제거된다. 자동임포트 매크로 import 미작성. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 2 \"라우팅 & 레이아웃 골격\" 구현. 파일 기반 라우트 4종(login/reserve/reservations/review/[reservationId]) 등록, AppNav+default.vue 레이아웃 활성화, app.vue를 <NuxtLayout><NuxtPage/></NuxtLayout> 전환, auth 미들웨어 항상-미인증 스텁 도입. 제약: 파일기반 라우팅만(vue-router 수동·router.beforeEach 금지), 가드는 defineNuxtRouteMiddleware+definePageMeta({middleware:'auth'}), 네비 <NuxtLink>/이동 navigateTo, 자동임포트(AppNav/layouts/middleware/매크로 import 금지), oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭, <script setup lang=ts>, 주석 한국어/식별자 영어, SSR 안전. 핵심: app.vue 데모 헤더(HelloWorld 'You did it!'·About nav) 제거로 e2e/home.spec.ts가 깨지므로 동일 Phase에서 신규 라우팅 기준으로 갱신해 스위트 그린 유지. 데모 컴포넌트·about.vue는 ROADMAP 미지시로 삭제하지 않음(Phase 8 정리 후보). auth 스토어는 Phase 3 — 이번 미들웨어는 isLoggedIn=false 스텁(TODO). 리다이렉트 체인 '/'→/reserve→/login(가드없음 종료, 무한루프 방지). 정본: ROADMAP/require 변경 금지. DoD: 4라우트 등록·보호페이지 /login 리다이렉트·NuxtLink/레이아웃 적용·npm run type-check·lint·format·test:e2e 통과.",
+      "summary": "app/middleware/auth.ts에 미인증 라우트 미들웨어 스텁을 작성했다. defineNuxtRouteMiddleware((to) => {...})로 작성하고 auth 스토어 미존재 단계라 const isLoggedIn = false 상수 스텁을 두었으며, 미인증 시 navigateTo({ path: '/login', query: { redirect: to.fullPath } })를 반환한다. Phase 3 교체 지점(const auth = useAuthStore(); auth.isLoggedIn)을 TODO(Phase 3) 주석으로 명시했다. defineNuxtRouteMiddleware/navigateTo는 자동임포트라 import 구문을 작성하지 않았다. 파일 추가로 불필요해진 app/middleware/.gitkeep을 제거해 디렉터리에 auth.ts만 남겼다. login.vue는 가드 미선언이라 리다이렉트 체인이 /login에서 종료되어 무한루프가 없고, 브라우저 API 미사용으로 SSR 안전하다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 런타임 리다이렉트 동작은 T4 통합 검증(e2e)에서 확인 예정.",
+      "completedAt": "2026-06-19T17:16:36.914Z"
+    },
+    {
+      "id": "1f7589dd-a6fc-414e-9b19-0b10917c381c",
+      "name": "e2e 스모크 갱신 + 통합 검증 게이트",
+      "description": "app.vue 데모 헤더 제거로 무효화된 e2e/home.spec.ts를 신규 라우팅 기준으로 갱신하고, Phase 2 전체를 검증 게이트로 통과시킨다. e2e/home.spec.ts 재작성: (1) /login 직접 진입 시 로그인 페이지(data-testid=page-login)가 렌더된다, (2) 미인증 상태로 /reserve 진입 시 URL이 /login으로 리다이렉트된다(redirect 쿼리 포함 확인), (3) AppNav의 <NuxtLink>(data-testid=nav-login 등)가 노출되고 클릭 시 /login으로 이동한다. 데모 'You did it!'/About 의존을 제거한다. 이후 npm run type-check, npm run lint, npm run format, npm run test:e2e를 순차 통과시킨다. DoD 4종(4라우트 등록·가드 리다이렉트·NuxtLink/레이아웃 적용·게이트 통과)을 확인한다. ROADMAP/require 정본은 변경 금지.",
+      "notes": "T1~T3 완료 후 수행(라우트·레이아웃·미들웨어 존재 전제). e2e는 텍스트 대신 data-testid 사용. 파일명은 home.spec.ts 유지(내용만 교체)로 단순화. 갱신된 스위트가 그린이어야 Phase 2 완료.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e8faa5f6-1b6e-4d42-b5dd-f07c86e6cd87"
+        },
+        {
+          "taskId": "5e561d3e-445d-4d4b-a712-bf87b874cfff"
+        },
+        {
+          "taskId": "9f03584e-0613-4135-acc3-5a7a2a8c4449"
+        }
+      ],
+      "createdAt": "2026-06-19T17:13:46.498Z",
+      "updatedAt": "2026-06-19T17:17:28.218Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/home.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "신규 라우팅 기준 스모크로 재작성",
+          "lineStart": 1,
+          "lineEnd": 14
+        },
+        {
+          "path": "package.json",
+          "type": "REFERENCE",
+          "description": "type-check/lint/format/test:e2e 스크립트",
+          "lineStart": 6,
+          "lineEnd": 19
+        },
+        {
+          "path": "playwright.config.ts",
+          "type": "REFERENCE",
+          "description": "baseURL 3000·dev 자동기동",
+          "lineStart": 1,
+          "lineEnd": 27
+        }
+      ],
+      "implementationGuide": "1) e2e/home.spec.ts 내용 교체: import {expect,test}; test('/login 렌더', async({page})=>{ await page.goto('/login'); await expect(page.getByTestId('page-login')).toBeVisible() }); test('미인증 /reserve→/login', async({page})=>{ await page.goto('/reserve'); await expect(page).toHaveURL(/\\/login/) }); test('AppNav 네비', async({page})=>{ await page.goto('/login'); await expect(page.getByTestId('nav-login')).toBeVisible() }). 2) 'npm run type-check' → 'npm run lint' → 'npm run format' → 'npm run test:e2e'. 3) 실패 시 oxfmt/자동임포트/리다이렉트 체인 점검. 4) git diff로 ROADMAP/require 무변경 확인.",
+      "verificationCriteria": "갱신된 e2e/home.spec.ts가 /login 렌더·미인증 /reserve→/login 리다이렉트·AppNav 네비를 검증하고 'You did it!'/About 의존이 없다. npm run type-check·lint·format·test:e2e 모두 통과. DoD 4종 충족. ROADMAP.md/require_v1.md 무변경.",
+      "analysisResult": "ROADMAP Phase 2 \"라우팅 & 레이아웃 골격\" 구현. 파일 기반 라우트 4종(login/reserve/reservations/review/[reservationId]) 등록, AppNav+default.vue 레이아웃 활성화, app.vue를 <NuxtLayout><NuxtPage/></NuxtLayout> 전환, auth 미들웨어 항상-미인증 스텁 도입. 제약: 파일기반 라우팅만(vue-router 수동·router.beforeEach 금지), 가드는 defineNuxtRouteMiddleware+definePageMeta({middleware:'auth'}), 네비 <NuxtLink>/이동 navigateTo, 자동임포트(AppNav/layouts/middleware/매크로 import 금지), oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭, <script setup lang=ts>, 주석 한국어/식별자 영어, SSR 안전. 핵심: app.vue 데모 헤더(HelloWorld 'You did it!'·About nav) 제거로 e2e/home.spec.ts가 깨지므로 동일 Phase에서 신규 라우팅 기준으로 갱신해 스위트 그린 유지. 데모 컴포넌트·about.vue는 ROADMAP 미지시로 삭제하지 않음(Phase 8 정리 후보). auth 스토어는 Phase 3 — 이번 미들웨어는 isLoggedIn=false 스텁(TODO). 리다이렉트 체인 '/'→/reserve→/login(가드없음 종료, 무한루프 방지). 정본: ROADMAP/require 변경 금지. DoD: 4라우트 등록·보호페이지 /login 리다이렉트·NuxtLink/레이아웃 적용·npm run type-check·lint·format·test:e2e 통과.",
+      "summary": "app.vue 데모 헤더 제거로 무효화된 e2e/home.spec.ts를 신규 라우팅 기준으로 재작성하고 Phase 2 전체 검증 게이트를 통과시켰다. 갱신된 스모크 3종: (1) /login 직접 진입 시 data-testid=page-login 렌더, (2) 미인증 /reserve 접근 시 URL이 /login?redirect= 로 리다이렉트(가드 스텁 동작), (3) AppNav data-testid=nav-login 노출 + nav-reserve 클릭 시 보호라우트라 /login으로 복귀. 데모 'You did it!'/About 의존을 완전히 제거하고 data-testid 셀렉터로 전환했다. 통합 게이트: npm run type-check(타입 오류 0), npm run lint(oxlint→eslint 위반 0), npm run format(oxfmt 30파일), npm run test:e2e(3/3 통과) 순차 통과. DoD 4종 충족 — 4라우트 파일기반 등록(login 렌더+보호3종 리다이렉트로 등록·가드 동시 입증), 보호페이지 /login 리다이렉트, NuxtLink 네비+default.vue 레이아웃 전 페이지 적용, 검증 게이트 통과. git diff로 docs/ROADMAP.md·docs/require_v1.md 무변경 확인. 변경 요약: app.vue·default.vue·index.vue·home.spec.ts 수정, AppNav.vue·auth.ts·login/reserve/reservations/review 신규, middleware/.gitkeep 제거(.mcp.json·shrimp_data는 무관 기존 항목).",
+      "completedAt": "2026-06-19T17:17:28.215Z"
+    }
+  ]
+}

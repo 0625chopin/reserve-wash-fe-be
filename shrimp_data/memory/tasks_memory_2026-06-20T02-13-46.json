@@ -1,0 +1,246 @@
+{
+  "tasks": [
+    {
+      "id": "8bad243c-e85e-4cb7-b200-92b4adad891b",
+      "name": "도메인 타입 정의 (enums.ts + domain.ts)",
+      "description": "앱 전체 타입 기반인 app/types/enums.ts와 app/types/domain.ts를 생성한다. enums.ts에 리터럴 유니언 타입을 정의한다: UserRole('USER'|'MANAGER'|'STORE_ADMIN'|'ADMIN'), CarType('LIGHT'|'SMALL'|'MID'|'LARGE'|'VAN_ETC'), ServiceType('EXT'|'INT'|'FULL'|'PREMIUM'), SlotStatus('AVAILABLE'|'HOLDING'|'RESERVED'|'COMPLETED'), ReservationStatus('HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'). domain.ts에 enums를 import type으로 가져와 인터페이스를 정의한다: User(id,email,name,role), Store(id,name,bayCount,approved), Bay(id,storeId,code 'A1'~'AN'), Manager(id,storeId,name,isStoreAdmin,dayoffDates string[]), Slot(storeId,bayId,date,timeSlot,status — UNIQUE 키 필드 조합), Price(carType,serviceType,amount), Reservation(id,userId,storeId,bayId,managerId|null,date,timeSlot,carType,serviceType,amount,status), Review(id,reservationId,userId,storeId,managerId|null,rating,text,createdAt). any 금지, 모든 필드 타입 명시. require 3장(역할)·5.2(슬롯)·5.4(엔티티)·9.1(rating 1~5) 추적 주석.",
+      "notes": "타입 전용 파일이라 런타임 영향 0. import type 필수. 이 태스크가 모든 후속 data/service 태스크의 선행. enums→domain 단방향(domain만 enums import).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:01:59.955Z",
+      "updatedAt": "2026-06-19T17:04:24.971Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "Phase 1 enums.ts/domain.ts 구현 예시",
+          "lineStart": 173,
+          "lineEnd": 266
+        },
+        {
+          "path": "docs/require_v1.md",
+          "type": "REFERENCE",
+          "description": "3장 역할·5.2 슬롯·5.4 엔티티·9.1 평점",
+          "lineStart": 65,
+          "lineEnd": 174
+        },
+        {
+          "path": "app/types/enums.ts",
+          "type": "CREATE",
+          "description": "리터럴 유니언 enum 5종"
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "CREATE",
+          "description": "도메인 인터페이스 8종"
+        }
+      ],
+      "implementationGuide": "1) app/types/enums.ts: 'export type X = ...' 5개. 2) app/types/domain.ts: 'import type { CarType, ReservationStatus, ServiceType, SlotStatus, UserRole } from ~/types/enums' 후 인터페이스 8개. ROADMAP 196~266줄 예시 구조 준수. oxfmt: 세미콜론 없음·작은따옴표. 주석 한국어 + require 섹션 표기. rating은 number(1~5 주석).",
+      "verificationCriteria": "app/types/enums.ts에 5개 리터럴 유니언 타입이 require 값과 일치한다. app/types/domain.ts가 enums를 import type으로 가져오고 8개 인터페이스를 any 없이 정의한다. 세미콜론 없음·작은따옴표. nuxt typecheck에서 두 파일 타입 오류 0.",
+      "analysisResult": "ROADMAP Phase 1 \"도메인 타입 & 더미 데이터 레이어\" 구현. enums→domain→data→services/composables 단방향 의존 계층으로 타입·더미데이터·슬롯유틸·가격서비스를 docs/require_v1.md 정본과 1:1 일치하게 구축한다. 제약: oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭 우선, import type(types)·명시 import(data/services), any 금지, 주석 한국어/식별자 영어, SSR 안전(순수 함수). app/services/README.md 단방향 계약 준수(priceService는 ~/data·~/types만 의존). 정본: 도메인=docs/require_v1.md, 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md. require 10.3 가격 20개: LIGHT[EXT10000/INT10000/FULL18000/PREMIUM28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000]. DoD: npm run type-check 통과, 가격 20개 require 10.3 일치, generateTimeSlots()=48개, getPrice('MID','FULL')=27000, npm run lint·format 통과. 범위 경계: 스토어/UI/라우팅/미들웨어 인증은 Phase 2~5. vitest 임의 추가 금지(검증은 임시 스크립트/타입검사). 기존 app.vue/pages/stores 무변경으로 E2E 스모크 보존.",
+      "summary": "app/types/enums.ts에 5개 리터럴 유니언 타입(UserRole 4값, CarType 5값, ServiceType 4값, SlotStatus 4값, ReservationStatus 4값)을 require_v1.md 정본과 일치하게 정의했고, app/types/domain.ts에 enums를 import type으로 가져와 8개 인터페이스(User, Store, Bay, Manager, Slot, Price, Reservation, Review)를 any 없이 모든 필드 타입 명시로 정의했다. Slot은 (storeId,bayId,date,timeSlot,status)로 UNIQUE 키 필드를 구성, Reservation은 managerId: string|null 등 전체 필드 포함, Review.rating은 number(1~5 주석)다. require 3장/5.2/5.4/6.1/9.1/10.x/11.3 추적 주석을 한국어로 부기했다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수, enums→domain 단방향(domain만 enums import). 타입 전용 파일이라 런타임 영향 0이며 전체 type-check는 T5 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:04:24.968Z"
+    },
+    {
+      "id": "9bc24ddd-1014-4b82-aa6f-d6d09afbf2fa",
+      "name": "가격 데이터 + 가격 서비스 (prices.ts + priceService.ts)",
+      "description": "require_v1.md 10.3 확정 단가 20개를 app/data/prices.ts에 Price[] 배열로 전사하고, app/services/priceService.ts에 getPrice 조회 함수를 구현한다. prices.ts: 'import type { Price } from ~/types/domain' 후 차종5×서비스4=20개 객체. 값(원): LIGHT EXT10000 INT10000 FULL18000 PREMIUM28000 / SMALL 12000 12000 22000 32000 / MID 15000 15000 27000 38000 / LARGE 18000 18000 33000 45000 / VAN_ETC 22000 22000 40000 55000. priceService.ts: 'import type { CarType, ServiceType } from ~/types/enums' + 'import { prices } from ~/data/prices' 후 'export function getPrice(carType, serviceType): number' — prices.find로 조회, 미발견 시 한국어 메시지로 throw. README 단방향 계약 준수(서비스는 data·types만 의존).",
+      "notes": "가격 20개는 require 10.3과 1:1 정확 대조 필수(오전사 금지). priceService는 컴포넌트/스토어가 app/data 직접 import하지 않도록 하는 단일 진입점. 2단계 $fetch 교체 지점.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8bad243c-e85e-4cb7-b200-92b4adad891b"
+        }
+      ],
+      "createdAt": "2026-06-19T17:01:59.955Z",
+      "updatedAt": "2026-06-19T17:05:17.146Z",
+      "relatedFiles": [
+        {
+          "path": "docs/require_v1.md",
+          "type": "REFERENCE",
+          "description": "10.3 가격 매트릭스 확정 단가",
+          "lineStart": 286,
+          "lineEnd": 296
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "prices.ts/priceService.ts 예시",
+          "lineStart": 268,
+          "lineEnd": 310
+        },
+        {
+          "path": "app/services/README.md",
+          "type": "REFERENCE",
+          "description": "단방향 의존 계약",
+          "lineStart": 1,
+          "lineEnd": 55
+        },
+        {
+          "path": "app/data/prices.ts",
+          "type": "CREATE",
+          "description": "가격 20개 배열"
+        },
+        {
+          "path": "app/services/priceService.ts",
+          "type": "CREATE",
+          "description": "getPrice 조회 함수"
+        }
+      ],
+      "implementationGuide": "1) prices.ts 20개 배열, 행=차종/열 순서 EXT,INT,FULL,PREMIUM, // require 10.3 주석. 2) priceService.getPrice: const found = prices.find(p => p.carType===carType && p.serviceType===serviceType); if(!found) throw new Error(`단가를 찾을 수 없습니다: ${carType} / ${serviceType}`); return found.amount. ROADMAP 268~310줄 예시 준수. 3) DoD 검증: prices 길이 20, getPrice('MID','FULL')===27000을 임시 스크립트(상대경로 import .mjs 또는 정적 대조)로 확인 후 임시파일 삭제.",
+      "verificationCriteria": "prices.ts가 정확히 20개 항목을 가지며 require 10.3 단가와 1:1 일치한다. getPrice('MID','FULL')가 27000을 반환한다. priceService가 ~/data·~/types만 import한다(단방향). 미발견 시 throw. 세미콜론 없음·작은따옴표. type-check 통과.",
+      "analysisResult": "ROADMAP Phase 1 \"도메인 타입 & 더미 데이터 레이어\" 구현. enums→domain→data→services/composables 단방향 의존 계층으로 타입·더미데이터·슬롯유틸·가격서비스를 docs/require_v1.md 정본과 1:1 일치하게 구축한다. 제약: oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭 우선, import type(types)·명시 import(data/services), any 금지, 주석 한국어/식별자 영어, SSR 안전(순수 함수). app/services/README.md 단방향 계약 준수(priceService는 ~/data·~/types만 의존). 정본: 도메인=docs/require_v1.md, 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md. require 10.3 가격 20개: LIGHT[EXT10000/INT10000/FULL18000/PREMIUM28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000]. DoD: npm run type-check 통과, 가격 20개 require 10.3 일치, generateTimeSlots()=48개, getPrice('MID','FULL')=27000, npm run lint·format 통과. 범위 경계: 스토어/UI/라우팅/미들웨어 인증은 Phase 2~5. vitest 임의 추가 금지(검증은 임시 스크립트/타입검사). 기존 app.vue/pages/stores 무변경으로 E2E 스모크 보존.",
+      "summary": "app/data/prices.ts에 require 10.3 확정 단가 20개를 Price[] 배열로 1:1 전사했다(정적 검증: carType 항목 정확히 20개). 값 전수 일치 — LIGHT[10000/10000/18000/28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000], 열 순서 EXT/INT/FULL/PREMIUM. DoD 핵심인 MID/FULL=27000을 grep으로 확인했다. app/services/priceService.ts의 getPrice(carType, serviceType)는 prices.find로 조회하고 미발견 시 한국어 메시지로 throw하며 found.amount를 반환한다. import 정적 확인 결과 priceService는 ~/types/enums(import type)와 ~/data/prices만 의존해 README 단방향 계약(services→data·types)을 준수한다. 2단계 $fetch 교체 지점을 TODO 주석으로 명시했다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check/lint/format은 T5 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:05:17.142Z"
+    },
+    {
+      "id": "06aa086c-f0f1-4961-8765-717035e0de1d",
+      "name": "더미 엔티티 데이터 (stores.ts + managers.ts + users.ts)",
+      "description": "로그인·매장/매니저 선택·예약 흐름이 1단계에서 사용할 더미 데이터를 app/data에 정의한다. stores.ts: Store[] 더미(최소 2~3개 매장, bayCount·approved 포함) + 매장별 Bay[] 'A1'~'AN'(bayCount와 일치). managers.ts: Manager[] 더미(매장별 N명, isStoreAdmin 일부 true, dayoffDates 일부 'YYYY-MM-DD' 포함). users.ts: User[] 더미(로그인용 2~3명, role 다양: USER 중심 + 필요 시 MANAGER/ADMIN). 모두 domain 인터페이스를 import type으로 충족. require에 구체 더미 값 명세가 없으므로 인터페이스를 충족하는 합리적 더미를 작성하되, 후속 Phase가 사용하는 필드(approved, dayoffDates, bayCount, code A1~AN)는 의미 있는 값으로 채운다.",
+      "notes": "구체 더미 값은 require 명세 부재로 추론이나 인터페이스/제약(베이 A1~AN, approved 등)은 정본 구조 준수. 결정적 테스트(Phase 8)를 위해 고정값 사용. 매니저 dayoffDates는 Phase 5 슬롯 비활성에 사용되므로 최소 1명은 휴무일 포함.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8bad243c-e85e-4cb7-b200-92b4adad891b"
+        }
+      ],
+      "createdAt": "2026-06-19T17:01:59.955Z",
+      "updatedAt": "2026-06-19T17:06:03.837Z",
+      "relatedFiles": [
+        {
+          "path": "docs/require_v1.md",
+          "type": "REFERENCE",
+          "description": "5.1 매장·베이, 6.1 매니저 휴무",
+          "lineStart": 135,
+          "lineEnd": 185
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "Phase 1 데이터 파일 체크리스트",
+          "lineStart": 157,
+          "lineEnd": 169
+        },
+        {
+          "path": "app/data/stores.ts",
+          "type": "CREATE",
+          "description": "매장+베이 더미"
+        },
+        {
+          "path": "app/data/managers.ts",
+          "type": "CREATE",
+          "description": "매니저+휴무일 더미"
+        },
+        {
+          "path": "app/data/users.ts",
+          "type": "CREATE",
+          "description": "더미 사용자"
+        }
+      ],
+      "implementationGuide": "1) stores.ts: 'import type { Bay, Store } from ~/types/domain' 후 export const stores: Store[], export const bays: Bay[](또는 매장별 베이 생성). bayCount=베이 개수 일치, code 'A1'..'A{n}'. 2) managers.ts: 'import type { Manager } from ~/types/domain' 후 export const managers: Manager[], dayoffDates 일부 포함. 3) users.ts: 'import type { User } from ~/types/domain' 후 export const users: User[]. 주석 한국어 + require 5.1/6.1 추적. oxfmt 스타일.",
+      "verificationCriteria": "stores/managers/users가 domain 인터페이스를 충족하고 import type만 사용한다. 베이 code가 A1~AN 형식이며 bayCount와 일치한다. 최소 1명 매니저가 dayoffDates를 가진다. type-check 통과. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 1 \"도메인 타입 & 더미 데이터 레이어\" 구현. enums→domain→data→services/composables 단방향 의존 계층으로 타입·더미데이터·슬롯유틸·가격서비스를 docs/require_v1.md 정본과 1:1 일치하게 구축한다. 제약: oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭 우선, import type(types)·명시 import(data/services), any 금지, 주석 한국어/식별자 영어, SSR 안전(순수 함수). app/services/README.md 단방향 계약 준수(priceService는 ~/data·~/types만 의존). 정본: 도메인=docs/require_v1.md, 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md. require 10.3 가격 20개: LIGHT[EXT10000/INT10000/FULL18000/PREMIUM28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000]. DoD: npm run type-check 통과, 가격 20개 require 10.3 일치, generateTimeSlots()=48개, getPrice('MID','FULL')=27000, npm run lint·format 통과. 범위 경계: 스토어/UI/라우팅/미들웨어 인증은 Phase 2~5. vitest 임의 추가 금지(검증은 임시 스크립트/타입검사). 기존 app.vue/pages/stores 무변경으로 E2E 스모크 보존.",
+      "summary": "app/data에 결정적 고정 더미 데이터 3종을 생성했다. stores.ts: 매장 3개(강남점 bayCount3·approved true, 홍대점 bayCount2·approved true, 판교점 bayCount3·approved false — Phase 4 노출 필터 테스트용) + bays 배열을 매장별 'A1'~'A{bayCount}' 형식으로 정의해 bayCount와 개수를 정확히 일치(store1 3개, store2 2개, store3 3개). managers.ts: 매니저 4명(매장별 N명, isStoreAdmin 일부 true, mgr1·mgr3가 dayoffDates 보유 — Phase 5 휴무 슬롯 비활성에 사용). users.ts: 더미 사용자 4명(USER 2명·MANAGER 1명·ADMIN 1명, email 기반 로그인 대비). 모두 domain 인터페이스를 import type으로만 충족하고 any 미사용. 구체 값은 require에 명세가 없어 합리적 더미로 작성했으나 베이 A1~AN·approved·dayoffDates 등 후속 Phase 사용 필드는 의미 있는 값으로 채웠다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check는 T5 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:06:03.832Z"
+    },
+    {
+      "id": "1ca5513b-cc22-47ef-ac0b-27cdb262e32b",
+      "name": "슬롯 생성 유틸 (composables/useSlots.ts)",
+      "description": "날짜별 30분 단위 슬롯 생성 유틸을 app/composables/useSlots.ts에 구현한다. generateTimeSlots(): string[] — 00:00~23:30을 30분 단위 'HH:mm' 48개로 반환(시 0~23 × 분 {0,30}, padStart 2자리). generateSlotsForDate(storeId: string, bays: Bay[], date: string): Slot[] — 베이×시간 조합으로 Slot 생성(status 'AVAILABLE'). 순수 함수로 작성(브라우저 API·타이머 미사용, SSR 안전). domain 타입을 import type으로 사용.",
+      "notes": "composables는 자동임포트 대상이나 Phase 1에선 호출부 없음 — 시그니처/동작만 확립(Phase 5에서 SlotGrid가 사용). 순수 함수라 SSR 안전. any 금지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8bad243c-e85e-4cb7-b200-92b4adad891b"
+        }
+      ],
+      "createdAt": "2026-06-19T17:01:59.955Z",
+      "updatedAt": "2026-06-19T17:06:38.152Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "useSlots.ts 구현 예시",
+          "lineStart": 312,
+          "lineEnd": 340
+        },
+        {
+          "path": "docs/require_v1.md",
+          "type": "REFERENCE",
+          "description": "5.2 슬롯 30분 단위 정의",
+          "lineStart": 141,
+          "lineEnd": 147
+        },
+        {
+          "path": "app/composables/useSlots.ts",
+          "type": "CREATE",
+          "description": "슬롯 생성 유틸"
+        }
+      ],
+      "implementationGuide": "1) 'import type { Bay, Slot } from ~/types/domain'. 2) generateTimeSlots: for hour 0..23, for minute of [0,30] → `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}` push. 3) generateSlotsForDate: times=generateTimeSlots(); for bay of bays, for timeSlot of times → slots.push({storeId, bayId: bay.id, date, timeSlot, status:'AVAILABLE'}). ROADMAP 312~340줄 예시 준수. DoD 검증: generateTimeSlots().length===48을 임시 스크립트로 확인 후 삭제.",
+      "verificationCriteria": "generateTimeSlots()가 48개 'HH:mm' 문자열을 반환한다(00:00 시작, 23:30 끝). generateSlotsForDate가 베이수×48 슬롯을 status 'AVAILABLE'로 생성한다. import type만 사용·브라우저 API 미사용. type-check 통과. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 1 \"도메인 타입 & 더미 데이터 레이어\" 구현. enums→domain→data→services/composables 단방향 의존 계층으로 타입·더미데이터·슬롯유틸·가격서비스를 docs/require_v1.md 정본과 1:1 일치하게 구축한다. 제약: oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭 우선, import type(types)·명시 import(data/services), any 금지, 주석 한국어/식별자 영어, SSR 안전(순수 함수). app/services/README.md 단방향 계약 준수(priceService는 ~/data·~/types만 의존). 정본: 도메인=docs/require_v1.md, 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md. require 10.3 가격 20개: LIGHT[EXT10000/INT10000/FULL18000/PREMIUM28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000]. DoD: npm run type-check 통과, 가격 20개 require 10.3 일치, generateTimeSlots()=48개, getPrice('MID','FULL')=27000, npm run lint·format 통과. 범위 경계: 스토어/UI/라우팅/미들웨어 인증은 Phase 2~5. vitest 임의 추가 금지(검증은 임시 스크립트/타입검사). 기존 app.vue/pages/stores 무변경으로 E2E 스모크 보존.",
+      "summary": "app/composables/useSlots.ts에 슬롯 생성 유틸 2종을 순수 함수로 구현했다. generateTimeSlots()는 시 0~23 × 분 {0,30} 이중 루프로 'HH:mm'(padStart 2자리) 48개를 반환하며, 임시 .mjs 실행 검증에서 length=48·first='00:00'·last='23:30'을 확인 후 임시파일을 삭제했다(소스 오염 없음). generateSlotsForDate(storeId, bays, date)는 generateTimeSlots()×베이 조합으로 Slot을 생성하며 초기 status는 모두 'AVAILABLE'(반환 개수 = 베이수×48). domain의 Bay·Slot을 import type으로만 사용하고 any·브라우저 API·타이머를 쓰지 않아 SSR 안전하다. oxfmt 스타일(세미콜론 없음·작은따옴표·템플릿 리터럴) 준수. composables 자동임포트 대상이나 Phase 1에선 호출부 없이 시그니처/동작만 확립(Phase 5 SlotGrid에서 사용). 전체 type-check/lint/format은 T5 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:06:38.148Z"
+    },
+    {
+      "id": "98b2483b-6dbb-412c-9215-777ff19eab35",
+      "name": "통합 검증 게이트 + .gitkeep 정리 + 문서 동기화",
+      "description": "Phase 1 전체 산출물을 검증 게이트로 통과시키고 부수 정리를 수행한다. 1) 실제 .ts 파일이 추가된 app/types·app/data·app/composables의 .gitkeep을 제거한다(폴더 추적이 .ts로 보장됨). app/middleware는 파일이 없으므로 .gitkeep 유지. 2) shrimp-rules.md 아키텍처 표의 types/data 표기를 '.gitkeep'에서 실제 파일 존재 상태로 경미 동기화. 3) npm run type-check, npm run lint, npm run format을 순차 통과. 4) DoD 4종 최종 확인(타입통과/가격20개일치/슬롯48개/getPrice MID·FULL=27000) — 임시 검증 스크립트는 실행 후 반드시 삭제하여 소스 오염 방지. 5) 기존 app.vue/pages 무변경 및 e2e 스모크 그린(가능 시) 확인. ROADMAP.md/require_v1.md 정본은 변경 금지.",
+      "notes": "T1~T4 완료 후 수행. 임시 검증 파일은 커밋·소스에 남기지 말 것. middleware .gitkeep은 Phase 2까지 폴더 추적 유지 위해 보존. 문서 정본(ROADMAP/require) 불변.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8bad243c-e85e-4cb7-b200-92b4adad891b"
+        },
+        {
+          "taskId": "9bc24ddd-1014-4b82-aa6f-d6d09afbf2fa"
+        },
+        {
+          "taskId": "06aa086c-f0f1-4961-8765-717035e0de1d"
+        },
+        {
+          "taskId": "1ca5513b-cc22-47ef-ac0b-27cdb262e32b"
+        }
+      ],
+      "createdAt": "2026-06-19T17:01:59.955Z",
+      "updatedAt": "2026-06-19T17:08:53.725Z",
+      "relatedFiles": [
+        {
+          "path": "shrimp-rules.md",
+          "type": "TO_MODIFY",
+          "description": "아키텍처 표 types/data 실제 파일 반영",
+          "lineStart": 27,
+          "lineEnd": 33
+        },
+        {
+          "path": "package.json",
+          "type": "REFERENCE",
+          "description": "type-check/lint/format/test:e2e 스크립트",
+          "lineStart": 6,
+          "lineEnd": 19
+        },
+        {
+          "path": "app/types/.gitkeep",
+          "type": "OTHER",
+          "description": "제거 대상(.ts 추가됨)"
+        },
+        {
+          "path": "app/data/.gitkeep",
+          "type": "OTHER",
+          "description": "제거 대상"
+        },
+        {
+          "path": "app/composables/.gitkeep",
+          "type": "OTHER",
+          "description": "제거 대상"
+        }
+      ],
+      "implementationGuide": "1) rm app/types/.gitkeep app/data/.gitkeep app/composables/.gitkeep (middleware는 유지). 2) shrimp-rules.md 표 미세 갱신(types/data: 실제 enums/domain·prices 등 존재 반영). 3) 'npm run type-check' → 'npm run lint' → 'npm run format'. 4) DoD 수치 검증: 임시 .mjs(상대경로 import)로 prices.length·getPrice·generateTimeSlots().length 출력 확인 후 임시파일 삭제. ~ 별칭 소스는 유지. 5) (가능 시) 'npm run test:e2e'. 실패 시 oxfmt/별칭/순환의존부터 점검.",
+      "verificationCriteria": "npm run type-check·lint·format 모두 통과. DoD 4종 충족(가격20개·슬롯48개·getPrice MID·FULL=27000·타입통과). types/data/composables의 .gitkeep 제거·middleware .gitkeep 유지. 임시 검증 파일 미잔존. app.vue/pages 무변경, ROADMAP·require 불변. shrimp-rules.md 표 동기화.",
+      "analysisResult": "ROADMAP Phase 1 \"도메인 타입 & 더미 데이터 레이어\" 구현. enums→domain→data→services/composables 단방향 의존 계층으로 타입·더미데이터·슬롯유틸·가격서비스를 docs/require_v1.md 정본과 1:1 일치하게 구축한다. 제약: oxfmt(세미콜론 금지·작은따옴표), ~/ 별칭 우선, import type(types)·명시 import(data/services), any 금지, 주석 한국어/식별자 영어, SSR 안전(순수 함수). app/services/README.md 단방향 계약 준수(priceService는 ~/data·~/types만 의존). 정본: 도메인=docs/require_v1.md, 로드맵=docs/ROADMAP.md, 운영규칙=shrimp-rules.md. require 10.3 가격 20개: LIGHT[EXT10000/INT10000/FULL18000/PREMIUM28000], SMALL[12000/12000/22000/32000], MID[15000/15000/27000/38000], LARGE[18000/18000/33000/45000], VAN_ETC[22000/22000/40000/55000]. DoD: npm run type-check 통과, 가격 20개 require 10.3 일치, generateTimeSlots()=48개, getPrice('MID','FULL')=27000, npm run lint·format 통과. 범위 경계: 스토어/UI/라우팅/미들웨어 인증은 Phase 2~5. vitest 임의 추가 금지(검증은 임시 스크립트/타입검사). 기존 app.vue/pages/stores 무변경으로 E2E 스모크 보존.",
+      "summary": "Phase 1 통합 검증 게이트를 전부 통과했다. 1) .gitkeep 정리: 실제 .ts가 추가된 app/types·app/data·app/composables의 .gitkeep을 제거하고 파일 없는 app/middleware의 .gitkeep만 유지(find 확인). 2) shrimp-rules.md 아키텍처 표를 실제 파일 존재 상태로 동기화(types: enums/domain, data: prices/stores/managers/users, services: priceService + README 계약, middleware/layouts는 골격 단계 명시). 3) 검증 게이트: npm run type-check(타입 오류 0), npm run lint(oxlint→eslint 위반 0), npm run format(oxfmt 24파일) 순차 통과. 4) DoD 4종을 로컬 tsc로 트랜스파일한 실제 산출물 실행으로 확정: prices.length=20, getPrice('MID','FULL')=27000, generateTimeSlots().length=48, generateSlotsForDate(2 bays)=96. 임시 검증 디렉터리는 실행 후 삭제(find로 잔존 없음 확인). 5) 비파괴: git diff로 app/app.vue·app/pages·docs/ROADMAP.md·docs/require_v1.md 무변경 확인, npm run test:e2e 스모크 2/2 통과. 정본(ROADMAP/require) 불변. ~ 별칭 소스는 유지(검증은 별칭→상대경로 임시 사본으로 우회).",
+      "completedAt": "2026-06-19T17:08:53.722Z"
+    }
+  ]
+}

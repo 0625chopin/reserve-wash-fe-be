@@ -1,0 +1,463 @@
+{
+  "tasks": [
+    {
+      "id": "7c01d605-1b77-4e69-bdcf-62668dc3a3bb",
+      "name": "T1: reservationService.ts — 슬롯 시드 + 서버교체 시그니처 계층",
+      "description": "데이터 접근 추상화 계층에 예약/슬롯 서비스를 신규 작성한다. 1단계는 결정적 더미 점유 시드를 제공하고, 2·3단계 서버 위임 교체 지점을 시그니처로 고정한다. 단방향 의존 계약(services→data·types만) 준수. 컴포넌트/스토어가 이 시그니처에만 의존하도록 한다.",
+      "notes": "상태 변이(hold/confirm)는 여기 두지 않는다 — 스토어 소유. service는 초기 시드+서버교체 지점만. priceService.ts/storeService.ts의 TODO 주석·시그니처 패턴을 따른다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T07:49:56.767Z",
+      "relatedFiles": [
+        {
+          "path": "app/services/reservationService.ts",
+          "type": "CREATE",
+          "description": "예약/슬롯 서비스 신규(시드+시그니처)"
+        },
+        {
+          "path": "app/services/priceService.ts",
+          "type": "REFERENCE",
+          "description": "서비스 작성 패턴·TODO 주석 참조",
+          "lineStart": 1,
+          "lineEnd": 14
+        },
+        {
+          "path": "app/services/README.md",
+          "type": "REFERENCE",
+          "description": "단방향 의존 계약·2단계 교체 지점",
+          "lineStart": 15,
+          "lineEnd": 56
+        },
+        {
+          "path": "app/types/enums.ts",
+          "type": "DEPENDENCY",
+          "description": "SlotStatus 타입",
+          "lineStart": 15,
+          "lineEnd": 16
+        }
+      ],
+      "implementationGuide": "app/services/reservationService.ts 신규.\n- import type { SlotStatus } from '~/types/enums'.\n- 슬롯 식별 키 헬퍼는 스토어와 공유하므로 여기서는 시드 조회 시그니처만 노출.\n- export function getSeededSlotStatus(storeId, bayId, date, timeSlot): SlotStatus — 결정적 고정 시드(예: 특정 storeId|bayId|date|timeSlot 1건만 'RESERVED' 반환, 그 외 'AVAILABLE'). 시드 상수는 in-module 또는 app/data 신규(둘 다 가능하나 services는 data·types만 import 허용). E2E 충돌 재현용 고정 날짜/슬롯을 주석으로 명시.\n- // TODO(2단계): $fetch GET /slots 로 교체(시그니처 유지) / // TODO(3단계): MySQL 유니크 인덱스+트랜잭션.\n- oxfmt 스타일(세미콜론 없음·작은따옴표), ~/ 별칭.",
+      "verificationCriteria": "getSeededSlotStatus가 고정 입력에 결정적 SlotStatus 반환(특정 슬롯 RESERVED, 그 외 AVAILABLE). services가 data·types만 import(components/stores 역import 없음). // TODO(2단계)/(3단계) 주석 존재. npm run type-check 통과.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T1 완료: app/services/reservationService.ts 신규 생성. slotKey(storeId|bayId|date|timeSlot) UNIQUE 헬퍼 + 결정적 더미 선점유 시드(seededSlotStatus: store1-A1 2026-06-25 10:00 = RESERVED) + getSeededSlotStatus(시드 없으면 AVAILABLE) 시그니처 노출. 상태 변이는 스토어 소유로 분리, service는 시드+서버교체 지점만 담당. // TODO(2단계 $fetch)/(3단계 MySQL) 주석 명시. SlotStatus(types)만 import — 단방향 의존 준수(stores/components 역import 없음). type-check·lint 통과.",
+      "completedAt": "2026-06-20T07:49:56.764Z"
+    },
+    {
+      "id": "b4337c17-df62-458e-8903-49fd49b8ad04",
+      "name": "T2: stores/reservation.ts — Pinia setup 동시성 스토어",
+      "description": "슬롯 점유 상태와 예약 목록을 소유하는 Pinia setup 스토어를 신규 작성한다. 낙관적 갱신(holdSlot)과 확정 직전 충돌 재검사(confirmReservation), release를 구현한다. 슬롯 status는 런타임 맵 우선 + 없을 때 reservationService 시드 합성.",
+      "notes": "스토어는 app/data 직접 import 금지(시드는 service 경유). 자동임포트 대상이므로 호출부에서 useReservationStore import 작성 금지. ROADMAP 예시의 getStatus는 시드 미합성이었으나 본 구현은 R1 위해 런타임 우선+시드 합성으로 확장.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "7c01d605-1b77-4e69-bdcf-62668dc3a3bb"
+        }
+      ],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T07:51:30.578Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "CREATE",
+          "description": "동시성 시뮬레이션 스토어"
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "REFERENCE",
+          "description": "Pinia setup·명시 import 패턴",
+          "lineStart": 1,
+          "lineEnd": 27
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "reservation 스토어 예시 코드",
+          "lineStart": 607,
+          "lineEnd": 664
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "DEPENDENCY",
+          "description": "Slot·Reservation 인터페이스",
+          "lineStart": 44,
+          "lineEnd": 73
+        }
+      ],
+      "implementationGuide": "app/stores/reservation.ts 신규(Pinia setup, counter.ts/auth.ts 패턴).\n- import { computed, ref } from 'vue'; import { defineStore } from 'pinia'; import type { Reservation, Slot } from '~/types/domain'; import type { SlotStatus } from '~/types/enums'; import { getSeededSlotStatus } from '~/services/reservationService'.\n- function slotKey(storeId,bayId,date,timeSlot) = `${storeId}|${bayId}|${date}|${timeSlot}` (UNIQUE).\n- slotStatus = ref<Record<string,SlotStatus>>({}); reservations = ref<Reservation[]>([]).\n- getStatus(slot): slotStatus[key] ?? getSeededSlotStatus(...) ?? 'AVAILABLE' (런타임 맵 우선 → 시드 합성; R1 release 후 명시 'AVAILABLE' 기록이 시드 오버라이드).\n- holdSlot(slot): current=getStatus; if RESERVED/COMPLETED/HOLDING return false; slotStatus[key]='HOLDING'; return true.\n- confirmReservation(reservation): if slotStatus[key] !== 'HOLDING' return false; slotStatus[key]='RESERVED'; reservations.push({...reservation,status:'RESERVED'}); return true. // TODO(2단계): 서버(reservationService) 위임 // TODO(3단계): MySQL 트랜잭션+유니크 인덱스.\n- releaseSlot(slot): if slotStatus[key]==='HOLDING' slotStatus[key]='AVAILABLE'.\n- reservedCount=computed(()=>reservations.value.length).\n- return { slotStatus, reservations, reservedCount, getStatus, holdSlot, confirmReservation, releaseSlot }.\nROADMAP 607~664행 예시 코드 기준.",
+      "verificationCriteria": "holdSlot: AVAILABLE→true·HOLDING 기록, 이미 점유 슬롯→false. confirmReservation: HOLDING일 때만 true+RESERVED+목록추가, 아니면 false. releaseSlot: HOLDING→AVAILABLE. getStatus가 시드 RESERVED 슬롯에 'RESERVED' 반환. // TODO(2·3단계) 주석 존재. npm run type-check 통과.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T2 완료: app/stores/reservation.ts Pinia setup 스토어 신규. slotKey UNIQUE 헬퍼, slotStatus(런타임 맵)·reservations 상태. getStatus는 런타임 맵 우선 + getSeededSlotStatus 합성(R1: release의 명시 AVAILABLE이 시드 오버라이드). holdSlot은 RESERVED/COMPLETED/HOLDING이면 false(베이 점유 선택 불가 포함), 아니면 HOLDING. confirmReservation은 HOLDING일 때만 true+RESERVED+목록추가(// TODO 2·3단계 주석). releaseSlot은 HOLDING→AVAILABLE. reservedCount computed. 시드는 reservationService 경유로만 읽어 data 직접 import 없음(단방향 준수). type-check·lint 통과.",
+      "completedAt": "2026-06-20T07:51:30.571Z"
+    },
+    {
+      "id": "3832c474-e40c-4c4d-b5a1-e63060613139",
+      "name": "T3: composables/useToast.ts — SSR 안전 재사용 토스트",
+      "description": "성공·충돌 알림을 표현하는 재사용 토스트 컴포저블을 신규 작성한다. Nuxt SSR에서 요청 간 상태 누수가 없도록 useState 기반 전역 단일 인스턴스로 만들고, 자동 닫힘 타이머는 클라이언트 전용으로 가드한다.",
+      "notes": "reserve.vue 인라인 토스트(reserved+setTimeout)의 타이머/자동닫힘 책임을 이 컴포저블로 일반화. 단, 예약 성공 토스트의 풍부한 카드 UI(scrim/요약 dl)는 reserve.vue에 유지하고, 본 컴포저블은 충돌 등 단문 메시지 토스트에 사용(T5에서 통합 방식 확정). SSR에서 setTimeout/window 직접 접근 금지(import.meta.client 가드).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T07:52:42.852Z",
+      "relatedFiles": [
+        {
+          "path": "app/composables/useToast.ts",
+          "type": "CREATE",
+          "description": "재사용 토스트 컴포저블"
+        },
+        {
+          "path": "app/composables/useSlots.ts",
+          "type": "REFERENCE",
+          "description": "기존 컴포저블 작성 스타일"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "REFERENCE",
+          "description": "인라인 토스트 타이머 패턴(이관 대상)",
+          "lineStart": 132,
+          "lineEnd": 153
+        }
+      ],
+      "implementationGuide": "app/composables/useToast.ts 신규(자동임포트 대상).\n- useState('toast', () => ({ visible:false, message:'' })) 기반 전역 상태(SSR 직렬화 안전).\n- show(message: string, durationMs = 4000): state.value={visible:true,message}; if(import.meta.client){ clearTimeout(timer); timer=setTimeout(()=>{state.value.visible=false}, durationMs) }.\n- hide(): state.value.visible=false; clearTimeout(timer).\n- 타이머 변수는 모듈 스코프(클라이언트 한정 동작). onScopeDispose로 정리 가능하면 정리.\n- return { toast: state(readonly 가능), show, hide }.\noxfmt 스타일. ref·computed 필요 시 명시 import(useState는 Nuxt 자동 제공).",
+      "verificationCriteria": "show 호출 시 visible=true·message 설정, durationMs 후 자동 false(클라이언트). SSR 렌더 시 setTimeout 미실행(예외 없음). useState 사용으로 요청 간 상태 누수 없음. npm run type-check 통과.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T3 완료: app/composables/useToast.ts 신규(자동임포트). useState('toast', ...) 기반 전역 단일 인스턴스로 SSR 요청 간 상태 누수 방지. show(message, durationMs=4000)는 visible/message 설정 후 import.meta.client 가드 안에서만 setTimeout 자동 닫힘, hide()도 클라이언트 가드. 타이머는 모듈 스코프. 상태는 readonly로 노출(외부는 show/hide로만 제어). SSR 렌더 시 setTimeout 미실행. type-check·lint 통과. 충돌/안내 단문 토스트용이며 예약 성공 카드 UI는 T5에서 reserve.vue에 유지·통합.",
+      "completedAt": "2026-06-20T07:52:42.845Z"
+    },
+    {
+      "id": "c09c55fe-cb09-4c88-be3d-63b6a19b33f9",
+      "name": "T4: components/SlotGrid.vue — 선택 시간대 베이 점유 미니그리드",
+      "description": "선택한 (날짜·시간) 시간대에 한해 해당 매장 베이들의 점유 현황을 보여주는 미니 슬롯 그리드를 신규 작성한다. 베이 N칸을 status별 색상으로 렌더하고 클릭으로 점유를 요청한다. 매니저 휴무일에는 전체 비활성.",
+      "notes": "전체 48슬롯×베이 그리드가 아니라 '선택 시간대 1열 × 베이 N'의 미니 그리드(하이브리드 결정). 휠이 시간 선택을 담당하므로 그리드는 점유 시각화+베이 선택 역할. SearchableSelect 베이 선택과 병행하거나 대체할지는 T5에서 reserve.vue 통합 시 확정(중복 UX 방지).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b4337c17-df62-458e-8903-49fd49b8ad04"
+        }
+      ],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T07:54:53.446Z",
+      "relatedFiles": [
+        {
+          "path": "app/components/SlotGrid.vue",
+          "type": "CREATE",
+          "description": "미니 슬롯 그리드 컴포넌트"
+        },
+        {
+          "path": "app/components/SearchableSelect.vue",
+          "type": "REFERENCE",
+          "description": "props/emit·testid·스타일 패턴",
+          "lineStart": 1,
+          "lineEnd": 40
+        },
+        {
+          "path": "app/assets/main.css",
+          "type": "REFERENCE",
+          "description": "@theme 색상 토큰·공통 클래스",
+          "lineStart": 11,
+          "lineEnd": 164
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "DEPENDENCY",
+          "description": "Bay 인터페이스",
+          "lineStart": 27,
+          "lineEnd": 33
+        }
+      ],
+      "implementationGuide": "app/components/SlotGrid.vue 신규(자동임포트, <script setup lang=ts>).\n- defineProps<{ storeId:string; date:string; timeSlot:string; bays: Bay[]; disabled?:boolean }>() (Bay는 ~/types/domain 명시 import).\n- defineEmits<{ (e:'hold', bayId:string):void }>().\n- const store = useReservationStore() (자동임포트).\n- 각 bay 칸: status = store.getStatus({ storeId, bayId:bay.id, date, timeSlot, status:'AVAILABLE' }). 색상 클래스 매핑: AVAILABLE(보더/surface, 클릭가능), HOLDING(brand-primary 채움), RESERVED|COMPLETED(muted·비활성). props.disabled(휴무일)면 전체 비활성.\n- 클릭 핸들러: AVAILABLE/HOLDING이고 !disabled이면 emit('hold', bay.id).\n- data-testid=`slot-${storeId}-${bay.id}-${timeSlot}`, 그리드 컨테이너 testid='slot-grid'.\n- 색은 main.css @theme 토큰만(하드코딩 hex 금지). 베이 수 N=동일시간대 최대 수용 시각화(ROADMAP 596).",
+      "verificationCriteria": "선택 시간대에 베이 N칸 렌더. status별 색상 구분(AVAILABLE/HOLDING/RESERVED). RESERVED·휴무일 비활성으로 클릭 불가. AVAILABLE 클릭 시 hold 이벤트 emit. data-testid=slot-{storeId}-{bayId}-{timeSlot}. 하드코딩 hex 없음(토큰 사용). npm run type-check 통과.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T4 완료: app/components/SlotGrid.vue 신규(자동임포트, script setup lang=ts). props(storeId/date/timeSlot/bays/disabled) + emit('hold', bayId). useReservationStore.getStatus로 베이별 status를 cells computed로 산출(slotStatus 반응). status별 시각: AVAILABLE(보더/hover 브랜드), HOLDING(브랜드 채움), RESERVED/COMPLETED(muted·점선·선택불가), disabled(휴무 취소선·선택불가). data-testid=slot-{storeId}-{bayId}-{timeSlot}, 컨테이너 testid=slot-grid, data-status 부여. 색은 @theme 토큰(var())만 사용·하드코딩 hex 없음. AVAILABLE/HOLDING 클릭만 hold emit. type-check·lint 통과.",
+      "completedAt": "2026-06-20T07:54:53.438Z"
+    },
+    {
+      "id": "98d62581-29d9-4f9f-b407-9bd5985c1d78",
+      "name": "T5: reserve.vue 통합 — 서비스 선택·가격·미니그리드·확정/충돌 흐름",
+      "description": "예약 페이지에 서비스(ServiceType) 선택·가격 자동 계산·현장결제 안내·미니 슬롯 그리드·낙관적 점유·확정 시 충돌 토스트 흐름을 통합한다. 기존 순차선택·휠·watch 초기화·성공 토스트 UI는 보존하고 증분 추가한다.",
+      "notes": "useReservationStore·useToast는 자동임포트(import 금지). getPrice·authStore는 명시 import/자동임포트 규칙 준수. 베이 선택을 SearchableSelect와 미니그리드 양쪽에서 하면 중복이므로 단일 진실(selectedBayId) 동기화. 명세 v1 순차 게이팅(FR-1/FR-2)·NFR-1 초기화 유지. 색 하드코딩 금지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b4337c17-df62-458e-8903-49fd49b8ad04"
+        },
+        {
+          "taskId": "3832c474-e40c-4c4d-b5a1-e63060613139"
+        },
+        {
+          "taskId": "c09c55fe-cb09-4c88-be3d-63b6a19b33f9"
+        }
+      ],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T08:04:49.516Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "TO_MODIFY",
+          "description": "서비스·가격·미니그리드·확정/충돌 통합",
+          "lineStart": 1,
+          "lineEnd": 358
+        },
+        {
+          "path": "app/services/priceService.ts",
+          "type": "DEPENDENCY",
+          "description": "getPrice 재사용",
+          "lineStart": 1,
+          "lineEnd": 14
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "DEPENDENCY",
+          "description": "currentUser.id(userId)",
+          "lineStart": 1,
+          "lineEnd": 27
+        },
+        {
+          "path": "docs/예약_규칙_명세_v1.md",
+          "type": "REFERENCE",
+          "description": "순차 게이팅·초기화 규칙 정합",
+          "lineStart": 109,
+          "lineEnd": 214
+        }
+      ],
+      "implementationGuide": "app/pages/reserve.vue 수정(기존 구조 보존).\n1) 서비스 select: SearchableSelect 재사용, options=서비스 4분류[{code:'EXT'|'INT'|'FULL'|'PREMIUM', name}], v-model=selectedServiceType, testid='service-select'. 차종 또는 베이 단계 뒤 노출.\n2) 가격: import { getPrice } from '~/services/priceService'; const price=computed(()=> selectedCarType.value && selectedServiceType.value ? getPrice(selectedCarType.value, selectedServiceType.value) : null). 금액+‘현장결제만 가능’ 안내 표기(require 6.4), testid='price-display'.\n3) 미니그리드: canPickSlot && selectedDate && selectedTime일 때 <SlotGrid :store-id :date=selectedDate :time-slot=selectedTime :bays=storeBays :disabled=휴무일여부 @hold=onHoldSlot/> (ClientOnly 또는 import.meta.client). onHoldSlot(bayId): selectedBayId=bayId; reservationStore.holdSlot(slot).\n4) 확정: onReserve()에서 canReserve면 const ok=reservationStore.confirmReservation(reservation); reservation={id, userId:authStore.currentUser?.id, storeId,bayId,managerId,date,timeSlot,carType,serviceType, amount:price.value, status:'RESERVED'(스토어가 설정)}. ok=true→기존 성공 토스트(reserved 요약) 유지+가격/서비스 추가 표기; ok=false→useToast().show('선택하신 슬롯이 방금 예약되었습니다. 다른 슬롯을 선택해 주세요.') + 그리드 자동 갱신(getStatus 반응성).\n5) 충돌 토스트 표시 컴포넌트: useToast의 visible/message를 Teleport 토스트로 렌더(성공 토스트와 별개 또는 통합). testid='toast'.\n6) watch 초기화에 selectedServiceType 포함 적절히. SSR 가드 유지.",
+      "verificationCriteria": "서비스 선택 시 금액 자동 표시+‘현장결제만’ 안내. 미니그리드 슬롯 클릭 시 HOLDING 시각화. 확정 성공→예약 목록 RESERVED+성공 토스트. 시드 RESERVED 슬롯 확정 시도→충돌 토스트(다른 슬롯 선택)+예약 미생성. 기존 순차선택·휠·watch 초기화 회귀 없음. npm run type-check·npm run lint 통과.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T5 완료: reserve.vue에 Phase 5 통합. ①서비스 select(SearchableSelect 재사용, getServiceTypes via storeService + 신규 app/data/serviceTypes.ts) ②price computed(getPrice)+priceLabel(ko-KR)+'현장결제만 가능' 안내(testid=price-display) ③미니 SlotGrid(ClientOnly, storeBays·선택 날짜/시간, @hold=onHoldSlot로 낙관적 점유) ④onReserve: 미점유면 holdSlot 시도 후 confirmReservation, 성공→RESERVED+성공 토스트(서비스/금액 행 추가), 실패→useToast 충돌 토스트 '…다른 슬롯을 선택…'(testid=toast) ⑤heldSlot 추적 + watch(carType/manager/date/time)에서 releaseHeld로 점유 해제(NFR-1) ⑥canReserve에 serviceType 포함. useReservationStore/useAuthStore/useToast 자동임포트, getPrice/getServiceTypes 명시 import, 색 토큰만 사용. 기존 예약 E2E에 서비스 선택 단계 추가(회귀 방지). type-check·lint 통과 + e2e/reserve.spec.ts 7/7 통과(예약 접수 성공 경로 포함).",
+      "completedAt": "2026-06-20T08:04:49.513Z"
+    },
+    {
+      "id": "0b56cfc7-e3a8-46a8-be40-deda99b4c0df",
+      "name": "T6: e2e/reserve.spec.ts — 예약 성공·가격·동시 충돌 시나리오",
+      "description": "Playwright E2E로 예약 성공 흐름과 동시 예약 충돌 재선택 유도를 결정적으로 검증한다. data-testid 셀렉터와 고정 더미 값으로 단정한다.",
+      "notes": "셀렉터는 data-testid+getByTestId만(텍스트/클래스 지양). 더미 데이터 고정값 기반 단정. webServer 포트 3000. 시드 슬롯 식별자는 T1과 일치시켜야 하므로 T1 구현 후 확정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "98d62581-29d9-4f9f-b407-9bd5985c1d78"
+        }
+      ],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T08:07:48.692Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "성공·가격·충돌 시나리오"
+        },
+        {
+          "path": "e2e/auth.spec.ts",
+          "type": "REFERENCE",
+          "description": "로그인 셀렉터·흐름"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "충돌 테스트 예시",
+          "lineStart": 900,
+          "lineEnd": 942
+        }
+      ],
+      "implementationGuide": "e2e/reserve.spec.ts 갱신/추가.\n- 로그인(기존 auth.spec 패턴)→/reserve.\n- 시나리오A 예약 성공: 매장→매니저→차종→베이 선택, 휠 날짜/시간(고정값), 미니그리드 AVAILABLE 슬롯 클릭(getByTestId('slot-...') → HOLDING 시각 확인), 서비스 선택 후 getByTestId('price-display') 금액 단정, confirm(getByTestId('reserve-submit')) → 성공 토스트(getByTestId('reserve-result')) 단정.\n- 시나리오B 충돌: T1 시드로 RESERVED 고정된 슬롯을 선택/확정 시도 → getByTestId('toast') toContainText('다른 슬롯을 선택') 단정, 예약 미생성.\n- ROADMAP 922~942 예시 구조 참고. 고정 날짜·고정 매장/베이/슬롯 사용(현재시각·Math.random 의존 회피).\noxfmt 스타일.",
+      "verificationCriteria": "시나리오A: 슬롯 클릭→HOLDING, 가격 표시, 확정→성공 토스트 단정 통과. 시나리오B: 시드 RESERVED 슬롯 확정시도→‘다른 슬롯을 선택’ 토스트·예약 미생성 단정 통과. npm run test:e2e 통과(결정적).",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T6 완료: e2e/reserve.spec.ts에 Phase 5 시나리오 2건 추가. selectBase 헬퍼(강남점→이매니저→소형→A1→외부세차) 공통화. 시나리오A: price-display 12,000원 단정 → 비점유 슬롯(2026-06-26 11:00) 휠 선택 → 미니그리드 slot-store1-store1-A1-11:00 클릭 후 data-status=HOLDING 단정 → 확정 시 reserve-result(외부세차·현장결제) 단정. 시나리오B: 시드 RESERVED 슬롯(2026-06-25 10:00) 휠 선택 → 그리드 셀 data-status=RESERVED·disabled 단정 → 확정 시도 시 toast '다른 슬롯을 선택' 단정 + reserve-result 미생성(toHaveCount 0). data-testid 셀렉터·고정 더미값 사용. npm run test:e2e 9/9 통과, lint 통과.",
+      "completedAt": "2026-06-20T08:07:48.686Z"
+    },
+    {
+      "id": "e0a51970-3d4a-491a-8e36-54b164126a91",
+      "name": "T7: ROADMAP Phase 5 갱신 + 명세 Q1~Q8 범위외 메모",
+      "description": "구현 완료에 맞춰 docs/ROADMAP.md Phase 5 태스크 체크리스트·DoD를 갱신하고, 하이브리드 UI 결정과 예약 명세 v1의 미해결 질문(Q1~Q8)이 본 Phase 범위 외임을 명시 메모로 남긴다(코드 변경 없음).",
+      "notes": "문서만 수정(코드/정본 require_v1.md·명세 v1 본문은 수정하지 않음). 명세 v1은 읽기 전용 참조. 커밋 메시지 한국어.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "98d62581-29d9-4f9f-b407-9bd5985c1d78"
+        }
+      ],
+      "createdAt": "2026-06-20T07:05:23.972Z",
+      "updatedAt": "2026-06-20T08:10:37.531Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 5 체크리스트·DoD·하이브리드 결정 메모",
+          "lineStart": 584,
+          "lineEnd": 675
+        },
+        {
+          "path": "docs/예약_규칙_명세_v1.md",
+          "type": "REFERENCE",
+          "description": "미해결 질문 Q1~Q8",
+          "lineStart": 243,
+          "lineEnd": 257
+        }
+      ],
+      "implementationGuide": "docs/ROADMAP.md Phase 5 절(584~675행) 수정.\n- 태스크 체크리스트·DoD 항목 [ ]→[x] 구현 완료분 반영.\n- 하이브리드 UI 결정(휠 유지 + 선택 시간대 베이 점유 미니 SlotGrid) 1~2줄 메모 추가(SlotGrid가 휠을 대체하지 않음 명시).\n- 명세 v1 Q1~Q8(차종↔베이 4등급/특대형 D1/가격 영향)은 Phase 5 범위 외이며 getBaysForCar 현행 누적수용 유지·임의 확정 금지임을 메모(별도 의사결정 필요). docs/예약_규칙_명세_v1.md 8장 참조 링크.\n- shrimp-rules.md 도메인/문서 정합성 규칙(화면 구현 시 해당 Phase 체크리스트·DoD 갱신) 준수.",
+      "verificationCriteria": "Phase 5 체크리스트·DoD가 실제 구현 상태와 일치(완료분 [x]). 하이브리드 UI 결정 메모 존재. Q1~Q8 범위 외 메모+명세 8장 참조 존재. 코드/정본 미변경.",
+      "analysisResult": "Phase 5(FW5, ★핵심) — 예약 페이지 미니 슬롯 그리드 + 동시성 시뮬레이션. 데이터 진화 1단계(백엔드 없음)에서 Pinia 클라이언트 상태로 슬롯 잠금·낙관적 갱신·확정 직전 충돌 감지를 시뮬레이션하고, 차종×서비스 가격 자동 계산 + '현장결제만 가능' 안내를 표시한다. 슬롯 전이 AVAILABLE→HOLDING→RESERVED→COMPLETED(release/충돌 시 AVAILABLE). UI는 사용자 확정 '하이브리드': 현행 순차선택(매장→매니저→차종→베이)+휠 날짜/시간 유지 + 선택 시간대 베이 점유 미니 SlotGrid 추가. 정본 우선순위: 예약 UI 동작=docs/예약_규칙_명세_v1.md, 도메인/가격=docs/require_v1.md, 스택/디렉터리=docs/ROADMAP.md. 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup 문법, 자동임포트 대상 import 금지/types·data·services·vue·pinia는 명시 import, 데이터 접근은 services 경유(스토어는 data 직접 import 금지, services는 data·types만 의존-단방향), SSR 안전(import.meta.client/onMounted/ClientOnly), 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 확장점 // TODO(2단계)/(3단계) 주석, E2E data-testid+고정값 결정적 단정, 주석/커밋 한국어·식별자 영어. 명세 v1 미해결 Q1~Q8(차종↔베이 4등급/특대형)은 본 Phase 범위 외 — getBaysForCar 현행 누적수용 유지, 임의 확정 금지.",
+      "summary": "T7 완료: docs/ROADMAP.md Phase 5 태스크 체크리스트 10항목·DoD 8항목을 모두 [x]로 갱신(실제 구현 상태 반영: 미니그리드/HOLDING/전일·교대조 휴무 비활성/베이 점유 비활성/가격·현장결제/충돌 토스트/type-check·lint·e2e 9/9). '구현 메모(Phase 5 완료 시점)' 추가 — ①하이브리드 UI 확정(휠 유지 + 미니 SlotGrid, 휠 미대체) ②데이터 접근(reservationService 시드 + 스토어 상태 소유, 교체 지점 주석) ③명세 v1 Q1~Q8(차종↔베이 4등급/특대형/가격)은 범위 외이며 getBaysForCar 누적수용 유지·임의 구현 금지 + 예약_규칙_명세_v1.md 8장 링크. 코드/정본(require_v1.md·명세 v1 본문) 미변경. lint 통과.",
+      "completedAt": "2026-06-20T08:10:37.530Z"
+    },
+    {
+      "id": "f4e5880f-d5ff-43c6-a8c1-b83effe2ff49",
+      "name": "NR1: 도메인 타입 확장 — DayoffType enum + ManagerDayoff + Manager 구조 변경",
+      "description": "매니저 휴무를 전일/교대조 단위로 표현하도록 타입 레이어를 확장한다. 운영 24시간은 유지하고 3교대(SHIFT_1/2/3) 기반 부분 휴무를 모델링한다. require_v1.md 5.4·5.5 정본과 일치시킨다.",
+      "notes": "이 변경은 Manager.dayoffDates를 사용하는 기존 코드(reserve.vue, storeService 호출부)에 파급된다 — 후속 태스크에서 마이그레이션. oxfmt 스타일.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T07:33:57.621Z",
+      "updatedAt": "2026-06-20T07:48:25.505Z",
+      "relatedFiles": [
+        {
+          "path": "app/types/enums.ts",
+          "type": "TO_MODIFY",
+          "description": "DayoffType 유니언 추가",
+          "lineStart": 1,
+          "lineEnd": 24
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "TO_MODIFY",
+          "description": "ManagerDayoff 추가 + Manager.dayoffs 구조 변경",
+          "lineStart": 35,
+          "lineEnd": 42
+        },
+        {
+          "path": "docs/require_v1.md",
+          "type": "REFERENCE",
+          "description": "5.4·5.5 휴무 유형·3교대 정본"
+        }
+      ],
+      "implementationGuide": "app/types/enums.ts: export type DayoffType = 'FULL_DAY' | 'SHIFT_1' | 'SHIFT_2' | 'SHIFT_3' 추가(주석: 3교대 06-14/14-22/22-06, require 5.5). app/types/domain.ts: export interface ManagerDayoff { date: string; type: DayoffType } 추가. Manager 인터페이스의 dayoffDates: string[] 를 dayoffs: ManagerDayoff[] 로 교체(ROADMAP v1.3 Phase 1 예시 기준). 기존 import 영향 확인.",
+      "verificationCriteria": "DayoffType 4값 정의, ManagerDayoff{date,type} 정의, Manager.dayoffs: ManagerDayoff[]로 변경. npm run type-check 통과(연쇄 오류는 후속 태스크에서 해소).",
+      "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
+      "summary": "NR1 완료: app/types/enums.ts에 DayoffType('FULL_DAY'|'SHIFT_1'|'SHIFT_2'|'SHIFT_3') 추가(3교대 06-14/14-22/22-06 주석), app/types/domain.ts에 ManagerDayoff{date,type} 추가 및 Manager.dayoffDates→dayoffs: ManagerDayoff[] 구조 변경, DayoffType import 추가. enums/domain 자체 컴파일 정상, 연쇄 오류는 NR2·NR3에서 해소되어 최종 type-check·lint 통과. require_v1.md 5.4·5.5 정본 일치.",
+      "completedAt": "2026-06-20T07:48:25.503Z"
+    },
+    {
+      "id": "e8297d34-51b5-499e-b486-52aa3046b656",
+      "name": "NR2: 더미데이터 + storeService 교대조 휴무 판정 함수",
+      "description": "managers.ts 더미를 전일/교대조 혼합 케이스로 갱신하고, 특정 (매니저,날짜,시간)이 휴무인지 판정하는 서비스 함수를 추가한다. E2E 결정성을 위해 고정 날짜/교대 케이스를 포함한다.",
+      "notes": "야간조(22:00~06:00)는 자정을 넘으므로 경계 비교 주의. getManager/getManagersByStore 시그니처는 유지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "f4e5880f-d5ff-43c6-a8c1-b83effe2ff49"
+        }
+      ],
+      "createdAt": "2026-06-20T07:33:57.621Z",
+      "updatedAt": "2026-06-20T07:48:36.333Z",
+      "relatedFiles": [
+        {
+          "path": "app/data/managers.ts",
+          "type": "TO_MODIFY",
+          "description": "전일/교대조 더미 케이스"
+        },
+        {
+          "path": "app/services/storeService.ts",
+          "type": "TO_MODIFY",
+          "description": "isManagerOffAt + 교대 경계 상수",
+          "lineStart": 1,
+          "lineEnd": 50
+        }
+      ],
+      "implementationGuide": "app/data/managers.ts: dayoffDates 배열을 dayoffs: ManagerDayoff[]로 교체 — 전일 1건, SHIFT_1/SHIFT_2 부분 휴무 각 1건 이상(고정 날짜). app/services/storeService.ts: SHIFT 시간 경계 상수(SHIFT_1 06:00~14:00, SHIFT_2 14:00~22:00, SHIFT_3 22:00~06:00) + export function isManagerOffAt(manager, date, timeSlot): boolean (FULL_DAY→그날 전체 true, SHIFT_x→해당 시간대만 true, 야간조 22-06 자정 넘김 처리). 'HH:mm' 분 단위 비교. data·types만 import(단방향).",
+      "verificationCriteria": "isManagerOffAt: FULL_DAY 날짜는 모든 timeSlot true, SHIFT_1 날짜는 06:00~13:30만 true·14:00은 false, SHIFT_3는 22:00~05:30 true. 더미에 전일+교대조 케이스 존재. npm run type-check 통과.",
+      "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
+      "summary": "NR2 완료: app/data/managers.ts를 dayoffs: ManagerDayoff[]로 교체(mgr1 2026-06-22 FULL_DAY·06-23 SHIFT_1·06-29 FULL_DAY, mgr3 06-23 SHIFT_2 — 고정 날짜로 E2E 결정성 확보). app/services/storeService.ts에 toMinutes/isInShift 헬퍼와 isManagerOffAt(전일→항상 true, 교대조→해당 시간대만, 야간조 22-06 자정 넘김 t>=1320||t<360 처리), isManagerFullDayOff(날짜 단위) 추가. services 단방향 의존 유지. type-check·lint 통과.",
+      "completedAt": "2026-06-20T07:48:36.327Z"
+    },
+    {
+      "id": "4eea4d71-a904-41eb-a892-993555457ae8",
+      "name": "NR3: reserve.vue 매니저 휴무 비활성 반영 (전일=날짜 / 교대조=시간)",
+      "description": "예약 페이지에서 매니저 휴무를 전일이면 날짜 비활성, 교대조면 해당 시간대 30분 슬롯 비활성으로 반영한다. 기존 dayoffDates 사용처를 dayoffs 구조로 마이그레이션한다.",
+      "notes": "NR3의 휴무 비활성 작업은 reserve.vue의 날짜/시간 휠 disabled 로직으로, T5(슬롯그리드 통합)와 독립적으로 먼저 구현 완료함. T5 의존 제거(파일 충돌 우려는 T5 구현 시 휴무 분기 보존으로 처리). NR2만 선행으로 유지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e8297d34-51b5-499e-b486-52aa3046b656"
+        }
+      ],
+      "createdAt": "2026-06-20T07:33:57.621Z",
+      "updatedAt": "2026-06-20T07:49:05.722Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "TO_MODIFY",
+          "description": "전일/교대조 휴무 날짜·시간 비활성",
+          "lineStart": 52,
+          "lineEnd": 106
+        }
+      ],
+      "implementationGuide": "app/pages/reserve.vue: selectedManagerDayoffs(=manager.dayoffs)로 변경. dateItems disabled = dayoffs.some(d=>d.date===value && d.type==='FULL_DAY'). timeItems(휠/미니그리드 시간)에 selectedDate 기준 isManagerOffAt(manager, selectedDate, timeSlot)로 disabled 적용. 안내 문구(취소선=휴무) 갱신. 기존 watch 초기화 유지.",
+      "verificationCriteria": "전일 휴무 날짜는 날짜 선택에서 비활성. 교대조 휴무 날짜 선택 시 해당 시간대 슬롯만 비활성(그 외 시간 선택 가능). npm run type-check·lint 통과.",
+      "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
+      "summary": "NR3 완료: app/pages/reserve.vue에서 selectedManagerDayoffs를 manager.dayoffs로 마이그레이션. dateItems는 isManagerFullDayOff로 전일 휴무 날짜만 disabled, timeItems는 선택 날짜 기준 isManagerOffAt로 교대조 휴무 시간대 슬롯만 disabled. 날짜 변경 시 기존 선택 시간이 휴무에 걸리면 초기화하는 watch(selectedDate) 안전장치 추가(NFR-1). 안내 문구를 '휴무(전일·교대조) 시간대'로 갱신. storeService 함수 명시 import. type-check·lint 통과.",
+      "completedAt": "2026-06-20T07:49:05.720Z"
+    },
+    {
+      "id": "5bc3ea4a-b56d-4584-a19e-82497f51f444",
+      "name": "NR4: 베이 슬롯 점유 선택 불가 보장 (미니그리드 disabled)",
+      "description": "날짜·시간 선택 후 미니 SlotGrid에서 해당 시간대에 RESERVED/COMPLETED인 베이를 비활성(선택 불가)으로 표시한다. 베이 select와 미니그리드 선택 상태를 단일 진실로 동기화한다. require 5.2·6.1·7장.",
+      "notes": "베이는 날짜/시간보다 먼저 선택되므로 충돌 판정은 날짜·시간 확정 후 미니그리드에서 수행(선택 순서 유지). 기존 T4 SlotGrid·T5 reserve.vue를 보강.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c09c55fe-cb09-4c88-be3d-63b6a19b33f9"
+        },
+        {
+          "taskId": "4eea4d71-a904-41eb-a892-993555457ae8"
+        }
+      ],
+      "createdAt": "2026-06-20T07:33:57.621Z",
+      "updatedAt": "2026-06-20T08:12:26.119Z",
+      "relatedFiles": [
+        {
+          "path": "app/components/SlotGrid.vue",
+          "type": "TO_MODIFY",
+          "description": "RESERVED/COMPLETED 베이 disabled"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "TO_MODIFY",
+          "description": "점유 베이 재선택 유도"
+        }
+      ],
+      "implementationGuide": "app/components/SlotGrid.vue: 각 베이 칸 status가 RESERVED/COMPLETED면 disabled(클릭 불가·muted), reservationStore.getStatus 기반. app/pages/reserve.vue: 선택된 selectedBayId가 그 시간대에 점유 상태가 되면 안내 + 재선택 유도(미니그리드에서 다른 베이 클릭). 매니저 교대조 휴무 시간대(NR3)와 베이 점유 disabled를 함께 반영.",
+      "verificationCriteria": "특정 시간대에 RESERVED인 베이가 미니그리드에서 비활성으로 표시되고 클릭 불가. 점유 베이 선택 상태에서 확정 시도 시 재선택 유도. npm run type-check·lint 통과.",
+      "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
+      "summary": "NR4 완료: 베이 점유 선택 불가를 보장. SlotGrid는 RESERVED/COMPLETED 베이를 disabled(클릭 불가·muted, T4 구현)로 표시하고, 확정 시 onReserve가 충돌 토스트로 재선택 유도(T5). 본 태스크에서 reserve.vue에 selectedBayOccupied computed(현재 날짜·시간에 선택 베이가 RESERVED/COMPLETED인지 reservation.getStatus로 판정) + 미니그리드 하단 사전 안내 문구(data-testid=bay-occupied-notice)를 추가해 클릭 전 재선택을 유도. 단일 진실(selectedBayId)을 grid 클릭(onHoldSlot)과 select가 공유. 확정 충돌 경로(submit→toast)는 유지(submit 비활성화하지 않음 — T6 시나리오B 보존). type-check·lint·e2e 9/9 통과.",
+      "completedAt": "2026-06-20T08:12:26.114Z"
+    },
+    {
+      "id": "db0711e6-fe96-468f-b4a8-8f808cb4be02",
+      "name": "NR5: e2e — 교대조 휴무 슬롯 비활성 + 베이 점유 선택불가 시나리오",
+      "description": "Playwright로 (1) 매니저 교대조 휴무 시간대 슬롯 비활성, (2) 예약된 베이가 해당 시간대에 선택 불가가 되는 시나리오를 결정적으로 검증한다. data-testid + 고정 더미값 사용.",
+      "notes": "NR2 더미의 교대조 휴무 날짜·NR4 점유 베이 시드 식별자와 일치시켜야 함. 기존 T6 시나리오(성공·충돌)와 구분.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "5bc3ea4a-b56d-4584-a19e-82497f51f444"
+        },
+        {
+          "taskId": "0b56cfc7-e3a8-46a8-be40-deda99b4c0df"
+        }
+      ],
+      "createdAt": "2026-06-20T07:33:57.621Z",
+      "updatedAt": "2026-06-20T08:14:44.290Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "교대조 휴무·베이 점유 시나리오"
+        }
+      ],
+      "implementationGuide": "e2e/reserve.spec.ts: 시나리오C — SHIFT_x 휴무 매니저 선택+휴무 날짜 선택 → 해당 교대 시간대 슬롯이 disabled(선택 불가) 단정, 그 외 시간대는 선택 가능 단정. 시나리오D — 시드로 RESERVED인 베이를 그 시간대 미니그리드에서 disabled 단정 + 다른 베이 선택 가능. getByTestId(slot-{storeId}-{bayId}-{timeSlot}) 및 휴무/베이 testid 사용. 고정 날짜.",
+      "verificationCriteria": "교대조 휴무 시간대 슬롯 비활성·그 외 시간대 선택 가능 단정 통과. RESERVED 베이 미니그리드 비활성 단정 통과. npm run test:e2e 결정적 통과.",
+      "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
+      "summary": "NR5 완료: e2e/reserve.spec.ts에 시나리오 2건 추가. 시나리오C — 김매니저(강남점) 오전조(SHIFT_1) 휴무일 2026-06-23 선택 → 시간 휠 08:00은 toHaveClass(/disabled/), 14:00은 not.toHaveClass(/disabled/)로 교대 시간대만 비활성·그 외 선택 가능 단정. 시나리오D — 시드 RESERVED 베이(A1, 2026-06-25 10:00) 선택 시 bay-occupied-notice 노출, 같은 시간대 A2(slot-store1-store1-A2-10:00) data-status=AVAILABLE→클릭 후 HOLDING, 안내 사라짐(toHaveCount 0) 단정. NR2 더미 휴무·NR4 점유 시드·data-testid 일치. lint·e2e 11/11 결정적 통과.",
+      "completedAt": "2026-06-20T08:14:44.287Z"
+    }
+  ]
+}

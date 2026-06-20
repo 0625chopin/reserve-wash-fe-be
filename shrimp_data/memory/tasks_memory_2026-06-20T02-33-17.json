@@ -1,0 +1,187 @@
+{
+  "tasks": [
+    {
+      "id": "dc373a4e-d6bb-4bbc-8952-b490b1566ba7",
+      "name": "auth 스토어 (useCookie 영속 로그인 상태)",
+      "description": "app/stores/auth.ts에 더미 로그인 Pinia setup 스토어를 생성한다. currentUser는 useCookie<User|null>('auth_user', { default: () => null })로 영속화해 SSR 미들웨어 가드가 서버/클라이언트 모두에서 인증 상태를 읽을 수 있게 한다(새로고침·직접진입 호환). isLoggedIn은 computed(() => currentUser.value !== null). login(email, password): boolean은 ~/data/users에서 email로 사용자를 조회하고 password === 'password'(1단계 더미 통일)일 때 currentUser를 설정 후 true, 아니면 false. logout()은 currentUser를 null로. User는 import type, users는 명시 import, useCookie/computed는 자동임포트(computed는 vue에서 import). counter.ts setup 패턴(ref/computed/function/return) 준수.",
+      "notes": "defineStore 자동임포트(@pinia/nuxt). useCookie는 SSR 안전(서버에서도 동작)·소형 직렬화. 더미라 민감정보 없음. 2단계에서 login()을 authService($fetch)로 교체할 단일 지점.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-19T17:24:11.774Z",
+      "updatedAt": "2026-06-19T17:25:06.603Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "auth 스토어 예시(ref→useCookie 영속화)",
+          "lineStart": 457,
+          "lineEnd": 485
+        },
+        {
+          "path": "app/stores/counter.ts",
+          "type": "REFERENCE",
+          "description": "setup 스토어 패턴",
+          "lineStart": 1,
+          "lineEnd": 12
+        },
+        {
+          "path": "app/data/users.ts",
+          "type": "REFERENCE",
+          "description": "더미 사용자(email 조회 대상)",
+          "lineStart": 1,
+          "lineEnd": 10
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "User 인터페이스",
+          "lineStart": 1,
+          "lineEnd": 12
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "CREATE",
+          "description": "더미 로그인 auth 스토어"
+        }
+      ],
+      "implementationGuide": "1) 'import { computed } from vue'; 'import type { User } from ~/types/domain'; 'import { users } from ~/data/users'. 2) export const useAuthStore = defineStore('auth', () => { const currentUser = useCookie<User | null>('auth_user', { default: () => null }); const isLoggedIn = computed(() => currentUser.value !== null); function login(email: string, password: string): boolean { const found = users.find((u) => u.email === email); if (found && password === 'password') { currentUser.value = found; return true } return false }; function logout() { currentUser.value = null }; return { currentUser, isLoggedIn, login, logout } }). ROADMAP 457~485줄 예시를 useCookie 영속 버전으로. oxfmt 스타일.",
+      "verificationCriteria": "app/stores/auth.ts가 setup 스토어로 currentUser(useCookie 영속)·isLoggedIn(computed)·login·logout을 제공한다. login은 users email 조회+password==='password' 시 true·currentUser 설정, 아니면 false. logout은 currentUser=null. User import type·users 명시 import·useCookie 자동임포트. type-check 통과. 세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 3 \"인증/로그인(FW2)\" 구현. 더미 로그인 auth 스토어(useCookie 영속 currentUser), 로그인 폼/검증, 미들웨어 가드 실연동(Phase 2 스텁 교체), AppNav 로그인 상태 분기를 구축한다. 제약: Pinia setup 스토어 문법(counter.ts 패턴), useAuthStore/useCookie/useRoute/navigateTo/defineNuxtRouteMiddleware 자동임포트(import 금지), users는 ~/data/users 명시 import·User는 import type, 미들웨어 defineNuxtRouteMiddleware+useAuthStore().isLoggedIn(router.beforeEach 금지), NuxtLink/navigateTo(<a href> 금지), oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(localStorage/window 금지·useCookie 사용). 핵심 설계: currentUser를 useCookie로 영속화해 SSR 미들웨어 가드가 새로고침/직접진입에도 인증 상태를 인식. AppNav는 미로그인 시도 보호링크(예약/예약목록)를 노출(클릭 시 가드가 /login)하고 로그인 링크를 보여 기존 e2e/home.spec.ts 3종을 그린 유지, 로그인 시만 사용자명+로그아웃(nav-logout) 추가. 비밀번호는 1단계 더미 'password' 통일 가정. 정본 ROADMAP/require 변경 금지. DoD: 로그인성공→/reserve, 잘못된 입력 시 에러 메시지, 미인증 /reserve→/login, 로그아웃 후 보호라우트 접근불가, npm run type-check·lint·format·test:e2e 통과. 범위 경계: 이메일 인증·승인·회원가입(BO), 매장/매니저 선택(Phase4), 슬롯/예약(Phase5)은 제외.",
+      "summary": "app/stores/auth.ts에 더미 로그인 Pinia setup 스토어를 생성했다. currentUser는 useCookie<User|null>('auth_user', { default: () => null })로 영속화해 SSR 미들웨어 가드가 서버/클라이언트 모두에서 인증 상태를 읽도록 했다(새로고침·직접진입 호환). isLoggedIn은 computed(() => currentUser.value !== null), login(email,password):boolean은 users에서 email 조회 + password==='password' 시 currentUser 설정 후 true·아니면 false, logout()은 currentUser를 null로 한다. counter.ts setup 패턴(ref/computed/function/return)을 따랐고, User는 import type, users는 ~/data/users 명시 import, useCookie/defineStore는 자동임포트·computed는 vue에서 import했다. 2단계 authService 교체 지점을 TODO 주석으로 명시했다. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:25:06.600Z"
+    },
+    {
+      "id": "c6595589-f428-4967-9cd9-700c78e7fbeb",
+      "name": "로그인 폼 + 검증 (login.vue)",
+      "description": "app/pages/login.vue를 빈 골격에서 동작하는 로그인 폼으로 구현한다. 이메일/비밀번호 입력(data-testid=login-email, login-password), 제출 버튼(login-submit), 에러 메시지(login-error, v-if). 검증: 필수값 + 이메일 형식(정규식). 제출 시 검증 실패하면 에러 표시, useAuthStore().login(email,password) 실패하면 '이메일 또는 비밀번호가 올바르지 않습니다'(계정/비번 구분 없는 통합 문구) 표시, 성공하면 route.query.redirect(문자열이면) 또는 '/reserve'로 navigateTo. 기존 data-testid=page-login 래퍼 유지. 폼은 <form @submit.prevent>로 처리.",
+      "notes": "비밀번호 input type=password. 에러는 보안상 통합 문구. SSR 안전(브라우저 API 미사용). 이미 로그인 상태 /login 재진입 리다이렉트는 범위 외(미구현). 이메일 정규식은 단순형(과검증 회피).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "dc373a4e-d6bb-4bbc-8952-b490b1566ba7"
+        }
+      ],
+      "createdAt": "2026-06-19T17:24:11.774Z",
+      "updatedAt": "2026-06-19T17:25:30.059Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "Phase 3 로그인 폼 태스크/DoD",
+          "lineStart": 437,
+          "lineEnd": 503
+        },
+        {
+          "path": "app/pages/login.vue",
+          "type": "TO_MODIFY",
+          "description": "빈 골격 → 로그인 폼",
+          "lineStart": 1,
+          "lineEnd": 6
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "DEPENDENCY",
+          "description": "useAuthStore().login 사용"
+        }
+      ],
+      "implementationGuide": "1) <script setup lang=ts>: const auth = useAuthStore(); const route = useRoute(); const email = ref(''); const password = ref(''); const error = ref(''). function onSubmit() { error.value = ''; const emailOk = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email.value); if (!email.value || !password.value) { error.value = '이메일과 비밀번호를 입력하세요'; return } if (!emailOk) { error.value = '이메일 형식이 올바르지 않습니다'; return } if (!auth.login(email.value, password.value)) { error.value = '이메일 또는 비밀번호가 올바르지 않습니다'; return } const redirect = route.query.redirect; navigateTo(typeof redirect === 'string' ? redirect : '/reserve') }. ref는 vue import, useAuthStore/useRoute/navigateTo 자동임포트. 2) <template><section data-testid=page-login><h1>로그인</h1><form @submit.prevent=onSubmit><input data-testid=login-email v-model=email .../><input data-testid=login-password type=password v-model=password .../><button data-testid=login-submit>로그인</button></form><p v-if=error data-testid=login-error>{{ error }}</p></section>. oxfmt.",
+      "verificationCriteria": "login.vue가 email/password 입력(login-email/login-password)·제출(login-submit)·에러(login-error)를 제공한다. 필수값/이메일형식 검증과 login 실패 시 에러 메시지를 표시한다. 성공 시 redirect 쿼리 또는 /reserve로 navigateTo한다. page-login 유지·자동임포트 매크로 import 미작성·type-check 통과·세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 3 \"인증/로그인(FW2)\" 구현. 더미 로그인 auth 스토어(useCookie 영속 currentUser), 로그인 폼/검증, 미들웨어 가드 실연동(Phase 2 스텁 교체), AppNav 로그인 상태 분기를 구축한다. 제약: Pinia setup 스토어 문법(counter.ts 패턴), useAuthStore/useCookie/useRoute/navigateTo/defineNuxtRouteMiddleware 자동임포트(import 금지), users는 ~/data/users 명시 import·User는 import type, 미들웨어 defineNuxtRouteMiddleware+useAuthStore().isLoggedIn(router.beforeEach 금지), NuxtLink/navigateTo(<a href> 금지), oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(localStorage/window 금지·useCookie 사용). 핵심 설계: currentUser를 useCookie로 영속화해 SSR 미들웨어 가드가 새로고침/직접진입에도 인증 상태를 인식. AppNav는 미로그인 시도 보호링크(예약/예약목록)를 노출(클릭 시 가드가 /login)하고 로그인 링크를 보여 기존 e2e/home.spec.ts 3종을 그린 유지, 로그인 시만 사용자명+로그아웃(nav-logout) 추가. 비밀번호는 1단계 더미 'password' 통일 가정. 정본 ROADMAP/require 변경 금지. DoD: 로그인성공→/reserve, 잘못된 입력 시 에러 메시지, 미인증 /reserve→/login, 로그아웃 후 보호라우트 접근불가, npm run type-check·lint·format·test:e2e 통과. 범위 경계: 이메일 인증·승인·회원가입(BO), 매장/매니저 선택(Phase4), 슬롯/예약(Phase5)은 제외.",
+      "summary": "app/pages/login.vue를 빈 골격에서 동작하는 로그인 폼으로 구현했다. 이메일/비밀번호 입력(data-testid=login-email type=email, login-password type=password)·제출 버튼(login-submit)·에러 메시지(login-error, v-if)를 제공하고 기존 page-login 래퍼를 유지했다. <form @submit.prevent=onSubmit>으로 처리하며 onSubmit은 (1)필수값 누락 시 '이메일과 비밀번호를 입력하세요', (2)이메일 정규식 불일치 시 '이메일 형식이 올바르지 않습니다', (3)useAuthStore().login 실패 시 '이메일 또는 비밀번호가 올바르지 않습니다'(계정/비번 구분 없는 통합 문구)를 표시하고, 성공 시 route.query.redirect(문자열이면) 또는 '/reserve'로 navigateTo한다. ref만 vue에서 import하고 useAuthStore/useRoute/navigateTo는 자동임포트로 import 구문을 작성하지 않았다. 브라우저 전용 API 미사용(SSR 안전). oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check/e2e는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:25:30.055Z"
+    },
+    {
+      "id": "81475f6e-1694-4368-853a-69bb0efdf782",
+      "name": "미들웨어 가드 실연동 + AppNav 상태분기",
+      "description": "Phase 2 스텁을 실제 인증과 연결하고 네비를 로그인 상태에 따라 분기한다. app/middleware/auth.ts: isLoggedIn=false 스텁을 const auth = useAuthStore(); if (!auth.isLoggedIn) return navigateTo({ path: '/login', query: { redirect: to.fullPath } })로 교체(TODO 주석 제거). app/components/AppNav.vue: const auth = useAuthStore()와 onLogout(){ auth.logout(); navigateTo('/login') } 추가. 템플릿은 항상 예약(nav-reserve)·예약목록(nav-reservations) NuxtLink를 노출하고, 미로그인 시 로그인 링크(nav-login), 로그인 시 사용자명(nav-username)+로그아웃 버튼(nav-logout @click=onLogout)을 보인다. 기존 nav-login/nav-reserve/nav-reservations testid를 유지해 home.spec.ts 호환.",
+      "notes": "보호링크 상시 노출(미로그인 클릭→가드 /login)로 home.spec.ts nav-reserve→/login 테스트 그린 유지. nav-login은 미로그인 시만 노출(home.spec은 미로그인 기준이라 호환). currentUser?.name 옵셔널 체이닝. SSR 안전.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "dc373a4e-d6bb-4bbc-8952-b490b1566ba7"
+        }
+      ],
+      "createdAt": "2026-06-19T17:24:11.774Z",
+      "updatedAt": "2026-06-19T17:25:59.002Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "미들웨어 교체·AppNav 상태 예시",
+          "lineStart": 487,
+          "lineEnd": 503
+        },
+        {
+          "path": "app/middleware/auth.ts",
+          "type": "TO_MODIFY",
+          "description": "스텁 → useAuthStore 연동",
+          "lineStart": 1,
+          "lineEnd": 9
+        },
+        {
+          "path": "app/components/AppNav.vue",
+          "type": "TO_MODIFY",
+          "description": "정적 → 로그인 상태 분기",
+          "lineStart": 1,
+          "lineEnd": 20
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "DEPENDENCY",
+          "description": "useAuthStore 소비"
+        }
+      ],
+      "implementationGuide": "1) middleware/auth.ts: 'export default defineNuxtRouteMiddleware((to) => { const auth = useAuthStore(); if (!auth.isLoggedIn) { return navigateTo({ path: '/login', query: { redirect: to.fullPath } }) } })'. 2) AppNav.vue <script setup lang=ts>: const auth = useAuthStore(); function onLogout() { auth.logout(); navigateTo('/login') }. <template><nav class=app-nav><NuxtLink data-testid=nav-reserve to=/reserve>예약</NuxtLink><NuxtLink data-testid=nav-reservations to=/reservations>예약 목록</NuxtLink><NuxtLink v-if=!auth.isLoggedIn data-testid=nav-login to=/login>로그인</NuxtLink><template v-else><span data-testid=nav-username>{{ auth.currentUser?.name }}</span><button data-testid=nav-logout @click=onLogout>로그아웃</button></template></nav>. useAuthStore/navigateTo 자동임포트. oxfmt.",
+      "verificationCriteria": "middleware/auth.ts가 useAuthStore().isLoggedIn으로 미인증 시 /login 리다이렉트(스텁/ TODO 제거). AppNav가 예약·예약목록 상시 노출, 미로그인 시 nav-login, 로그인 시 nav-username+nav-logout(클릭 시 logout+/login)을 표시한다. 기존 nav-* testid 유지. <a href>·router.beforeEach 미사용. type-check 통과·세미콜론 없음·작은따옴표.",
+      "analysisResult": "ROADMAP Phase 3 \"인증/로그인(FW2)\" 구현. 더미 로그인 auth 스토어(useCookie 영속 currentUser), 로그인 폼/검증, 미들웨어 가드 실연동(Phase 2 스텁 교체), AppNav 로그인 상태 분기를 구축한다. 제약: Pinia setup 스토어 문법(counter.ts 패턴), useAuthStore/useCookie/useRoute/navigateTo/defineNuxtRouteMiddleware 자동임포트(import 금지), users는 ~/data/users 명시 import·User는 import type, 미들웨어 defineNuxtRouteMiddleware+useAuthStore().isLoggedIn(router.beforeEach 금지), NuxtLink/navigateTo(<a href> 금지), oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(localStorage/window 금지·useCookie 사용). 핵심 설계: currentUser를 useCookie로 영속화해 SSR 미들웨어 가드가 새로고침/직접진입에도 인증 상태를 인식. AppNav는 미로그인 시도 보호링크(예약/예약목록)를 노출(클릭 시 가드가 /login)하고 로그인 링크를 보여 기존 e2e/home.spec.ts 3종을 그린 유지, 로그인 시만 사용자명+로그아웃(nav-logout) 추가. 비밀번호는 1단계 더미 'password' 통일 가정. 정본 ROADMAP/require 변경 금지. DoD: 로그인성공→/reserve, 잘못된 입력 시 에러 메시지, 미인증 /reserve→/login, 로그아웃 후 보호라우트 접근불가, npm run type-check·lint·format·test:e2e 통과. 범위 경계: 이메일 인증·승인·회원가입(BO), 매장/매니저 선택(Phase4), 슬롯/예약(Phase5)은 제외.",
+      "summary": "Phase 2 스텁을 실제 인증과 연결하고 AppNav를 로그인 상태로 분기했다. app/middleware/auth.ts를 const auth = useAuthStore(); if (!auth.isLoggedIn) return navigateTo({ path: '/login', query: { redirect: to.fullPath } })로 교체하고 isLoggedIn=false 스텁/TODO를 제거했다. app/components/AppNav.vue에 const auth = useAuthStore()와 onLogout(){ auth.logout(); navigateTo('/login') }를 추가하고, 템플릿은 예약(nav-reserve)·예약목록(nav-reservations) NuxtLink를 항상 노출, v-if=!auth.isLoggedIn으로 로그인 링크(nav-login), v-else로 사용자명(nav-username, currentUser?.name 옵셔널 체이닝)+로그아웃 버튼(nav-logout @click=onLogout)을 표시한다. 기존 nav-login/nav-reserve/nav-reservations testid를 유지해 보호링크 상시 노출(미로그인 클릭→가드 /login)로 home.spec.ts 3종 호환을 보장한다. useAuthStore/navigateTo/defineNuxtRouteMiddleware 자동임포트(import 미작성), <a href>·router.beforeEach 미사용, SSR 안전. oxfmt 스타일(세미콜론 없음·작은따옴표) 준수. 전체 type-check/e2e는 T4 통합 게이트에서 최종 확인 예정.",
+      "completedAt": "2026-06-19T17:25:58.998Z"
+    },
+    {
+      "id": "1dad8b35-e0e1-44f6-b528-d9bd449866b8",
+      "name": "e2e auth 시나리오 + 통합 검증 게이트",
+      "description": "Phase 3 인증 플로우를 검증하는 e2e/auth.spec.ts를 추가하고 전체 검증 게이트를 통과시킨다. 시나리오: (a)/login에서 올바른 더미계정(user@test.com/password) 로그인→URL이 /reserve로 이동+nav-logout 노출, (b)잘못된 비밀번호 입력→login-error 노출+URL /login 잔류, (c)로그인 후 nav-logout 클릭→/login 이동, 이어서 /reserve 직접 진입→/login 리다이렉트(보호 접근불가). 기존 e2e/home.spec.ts 3종은 미로그인 기준이라 무변경으로 그린 유지됨을 확인한다. 이후 npm run type-check, npm run lint, npm run format, npm run test:e2e를 순차 통과시키고 DoD 5종을 확인한다. ROADMAP/require 정본 변경 금지.",
+      "notes": "T1~T3 완료 후 수행. data-testid 셀렉터. home.spec.ts는 수정하지 않음(미로그인 기준 호환). 로그인 후 쿠키 영속 덕에 (c)의 goto('/reserve') full load도 일관 동작. 갱신 스위트 그린이어야 Phase 3 완료.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "dc373a4e-d6bb-4bbc-8952-b490b1566ba7"
+        },
+        {
+          "taskId": "c6595589-f428-4967-9cd9-700c78e7fbeb"
+        },
+        {
+          "taskId": "81475f6e-1694-4368-853a-69bb0efdf782"
+        }
+      ],
+      "createdAt": "2026-06-19T17:24:11.774Z",
+      "updatedAt": "2026-06-19T17:28:41.083Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/auth.spec.ts",
+          "type": "CREATE",
+          "description": "로그인/오류/로그아웃 시나리오"
+        },
+        {
+          "path": "e2e/home.spec.ts",
+          "type": "REFERENCE",
+          "description": "미로그인 기준(무변경 그린 확인)",
+          "lineStart": 1,
+          "lineEnd": 23
+        },
+        {
+          "path": "package.json",
+          "type": "REFERENCE",
+          "description": "type-check/lint/format/test:e2e",
+          "lineStart": 6,
+          "lineEnd": 19
+        }
+      ],
+      "implementationGuide": "1) e2e/auth.spec.ts: import {expect,test}. test(a): goto('/login'); getByTestId('login-email').fill('user@test.com'); getByTestId('login-password').fill('password'); getByTestId('login-submit').click(); await expect(page).toHaveURL(/\\/reserve/); await expect(page.getByTestId('nav-logout')).toBeVisible(). test(b): goto('/login'); fill email 'user@test.com'·password 'wrong'; submit; await expect(page.getByTestId('login-error')).toBeVisible(); await expect(page).toHaveURL(/\\/login/). test(c): 로그인 반복 후 getByTestId('nav-logout').click(); await expect(page).toHaveURL(/\\/login/); await page.goto('/reserve'); await expect(page).toHaveURL(/\\/login/). 2) 'npm run type-check'→'npm run lint'→'npm run format'→'npm run test:e2e'. 3) 실패 시 useCookie 영속/리다이렉트 쿼리/oxfmt 점검. 4) git diff로 ROADMAP/require 무변경 확인.",
+      "verificationCriteria": "e2e/auth.spec.ts가 로그인 성공→/reserve+nav-logout, 잘못된 비번→login-error+/login, 로그아웃→/login 및 보호 접근불가를 검증한다. home.spec.ts 무변경 그린. npm run type-check·lint·format·test:e2e 전부 통과(home+auth 스위트). DoD 5종 충족. ROADMAP.md/require_v1.md 무변경.",
+      "analysisResult": "ROADMAP Phase 3 \"인증/로그인(FW2)\" 구현. 더미 로그인 auth 스토어(useCookie 영속 currentUser), 로그인 폼/검증, 미들웨어 가드 실연동(Phase 2 스텁 교체), AppNav 로그인 상태 분기를 구축한다. 제약: Pinia setup 스토어 문법(counter.ts 패턴), useAuthStore/useCookie/useRoute/navigateTo/defineNuxtRouteMiddleware 자동임포트(import 금지), users는 ~/data/users 명시 import·User는 import type, 미들웨어 defineNuxtRouteMiddleware+useAuthStore().isLoggedIn(router.beforeEach 금지), NuxtLink/navigateTo(<a href> 금지), oxfmt(세미콜론 금지·작은따옴표)·~/ 별칭·<script setup lang=ts>·주석 한국어/식별자 영어, SSR 안전(localStorage/window 금지·useCookie 사용). 핵심 설계: currentUser를 useCookie로 영속화해 SSR 미들웨어 가드가 새로고침/직접진입에도 인증 상태를 인식. AppNav는 미로그인 시도 보호링크(예약/예약목록)를 노출(클릭 시 가드가 /login)하고 로그인 링크를 보여 기존 e2e/home.spec.ts 3종을 그린 유지, 로그인 시만 사용자명+로그아웃(nav-logout) 추가. 비밀번호는 1단계 더미 'password' 통일 가정. 정본 ROADMAP/require 변경 금지. DoD: 로그인성공→/reserve, 잘못된 입력 시 에러 메시지, 미인증 /reserve→/login, 로그아웃 후 보호라우트 접근불가, npm run type-check·lint·format·test:e2e 통과. 범위 경계: 이메일 인증·승인·회원가입(BO), 매장/매니저 선택(Phase4), 슬롯/예약(Phase5)은 제외.",
+      "summary": "Phase 3 인증 플로우 e2e/auth.spec.ts를 추가하고 전체 검증 게이트를 통과시켰다. 시나리오 3종: (a)올바른 더미계정(user@test.com/password) 로그인→/reserve 이동+nav-logout 노출, (b)잘못된 비밀번호→login-error 노출+/login 잔류, (c)로그인 후 nav-logout 클릭→/login, 이어 /reserve 직접진입→/login 리다이렉트(보호 접근불가). 기존 home.spec.ts 3종은 무변경으로 그린 유지(git diff 확인). 최초 실행 시 auth 3종이 실패했는데, 원인은 Vue 하이드레이션 완료 전 Playwright가 제출 버튼을 클릭해 @submit.prevent 미적용 상태에서 네이티브 폼 GET 제출이 발생(/login?...로 리로드)한 레이스였다(home.spec는 NuxtLink=네이티브 anchor라 영향 없어 통과). 폼 상호작용 전 page.goto('/login', { waitUntil: 'networkidle' })로 하이드레이션 완료를 대기하도록 보강해 해결했고, 재실행에서 e2e 6/6(home 3+auth 3) 통과를 확인했다. 통합 게이트: npm run type-check(타입 오류 0)·lint(위반 0)·format(oxfmt 31파일)·test:e2e(6/6) 통과. DoD 5종 충족(로그인성공→/reserve, 잘못된 입력 에러, 미인증 /reserve→/login, 로그아웃 후 접근불가, 게이트 통과). git diff로 docs/ROADMAP.md·docs/require_v1.md 무변경 확인.",
+      "completedAt": "2026-06-19T17:28:41.080Z"
+    }
+  ]
+}
