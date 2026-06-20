@@ -32,6 +32,7 @@
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
 - **1차(ROADMAP_1) Phase 0~8 구현 완료**: `app/types`(`enums`·`domain`)·`app/data`(`prices`·`stores`·`managers`·`carTypes`·`serviceTypes`·`users`)·`app/composables`(`useSlots`·`useToast`)·`app/services`(`priceService`·`storeService`·`reservationService`)가 채워졌고, 인증(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)·레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)·**예약 위저드 3분할**(`app/pages/reserve/{index,slot,done}.vue` + `app/stores/reservationDraft.ts` + 위저드/진입 가드)·예약 목록·상태전이(`app/pages/reservations.vue` + `app/stores/reservation.ts`)·후기/평점(`app/pages/review/[reservationId].vue` + `app/stores/review.ts`)·입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`·`SlotGrid.vue`)·Playwright E2E(`e2e/`)가 모두 구현됐다. 1차 DoD는 `docs/roadmaps/ROADMAP_1.md`, **2차(Spring Boot 백엔드 + BO)는 `docs/roadmaps/ROADMAP_2.md`** 를 정본으로 따르라.
+- **미구현(다음 1차 대상) — 일반 회원가입(FW1)**: `/signup`은 ROADMAP_1 **Phase 3.1(v1.5)** 에 정의됐으나 **아직 미구현**이다. 구현 시 즉시 가입(더미) 방식으로 `app/pages/signup.vue`(신규)·`app/middleware/guest.ts`(신규)·`app/stores/auth.ts`의 `signup` 액션(이메일 중복 검사 → in-memory `users` 추가 → 자동 로그인)을 만들고, `app/components/AppNav.vue`·`app/pages/login.vue`에 상호 링크를 추가하라. 이메일 인증/SMTP·매니저/관리자 가입은 2차(`ROADMAP_2`)다.
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
@@ -125,7 +126,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ## 핵심 파일 동시 수정 규칙
 
-- **신규 페이지 추가 시**: `app/pages/`에 `.vue` 파일을 생성하면 라우트가 자동 등록된다(수동 등록 불필요). 보호가 필요하면 `definePageMeta({ middleware: 'auth' })`를 함께 지정하라.
+- **신규 페이지 추가 시**: `app/pages/`에 `.vue` 파일을 생성하면 라우트가 자동 등록된다(수동 등록 불필요). 보호가 필요하면 `definePageMeta({ middleware: 'auth' })`를 함께 지정하라. **로그인 상태를 차단해야 하는 게스트 전용 페이지(로그인·회원가입)는 `guest` 미들웨어**(로그인 상태면 `/reserve`로 리다이렉트 — `auth`의 반대)로 보호하라(`guest.ts` 미존재 시 ROADMAP_1 Phase 3.1 패턴으로 신설).
 - **전역 모듈/플러그인 추가 시**: 의존성 설치 → `nuxt.config.ts`의 `modules`에 등록(또는 `app/plugins/`에 플러그인 생성)을 함께 수행하라.
 - **의존성 설치 후**: `npm run postinstall`(`nuxt prepare`)로 `.nuxt` 타입을 재생성하라.
 - **npm 스크립트 추가 시**: `package.json`과 `CLAUDE.md`의 "주요 명령어" 표를 함께 갱신하라.
