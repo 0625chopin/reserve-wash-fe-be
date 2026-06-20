@@ -34,15 +34,21 @@ async function onSubmit() {
 
 // 개발용 빠른 로그인 — 역할별 시드 계정으로 즉시 로그인(비번 공통 'password').
 // import.meta.dev 가드로 프로덕션 빌드에는 노출되지 않음(테스트 계정 보호).
+// to: 역할별 대표 랜딩 경로(require v1.7 §12.4 역할별 페이지 그룹)로 이동.
 const isDev = import.meta.dev
 const quickAccounts = [
-  { key: 'user', label: '일반사용자', email: 'user@test.com' },
-  { key: 'manager', label: '일반매장매니저', email: 'manager@test.com' },
-  { key: 'storeadmin', label: '매장매니저관리자', email: 'storeadmin@test.com' },
-  { key: 'admin', label: '관리자', email: 'admin@test.com' },
+  { key: 'user', label: '일반사용자', email: 'user@test.com', to: '/reserve' },
+  { key: 'manager', label: '일반매장매니저', email: 'manager@test.com', to: '/manager/reserve' },
+  {
+    key: 'storeadmin',
+    label: '매장매니저관리자',
+    email: 'storeadmin@test.com',
+    to: '/store-admin/dayoff-approvals',
+  },
+  { key: 'admin', label: '관리자', email: 'admin@test.com', to: '/admin/manager-approvals' },
 ] as const
 
-async function quickLogin(loginEmail: string) {
+async function quickLogin(loginEmail: string, to: string) {
   error.value = ''
   email.value = loginEmail
   password.value = 'password'
@@ -50,8 +56,8 @@ async function quickLogin(loginEmail: string) {
     error.value = '빠른 로그인 실패 — 백엔드(:8080) 기동 여부를 확인하세요'
     return
   }
-  const redirect = route.query.redirect
-  navigateTo(typeof redirect === 'string' ? redirect : '/reserve')
+  // 빠른 로그인은 역할별 대표 페이지로 이동(redirect 쿼리보다 우선)
+  navigateTo(to)
 }
 </script>
 
@@ -132,7 +138,7 @@ async function quickLogin(loginEmail: string) {
             :data-testid="`quick-login-${acc.key}`"
             type="button"
             class="btn btn-ghost text-sm"
-            @click="quickLogin(acc.email)"
+            @click="quickLogin(acc.email, acc.to)"
           >
             {{ acc.label }}
           </button>
