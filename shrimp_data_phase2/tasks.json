@@ -1,0 +1,188 @@
+{
+  "tasks": [
+    {
+      "id": "9f0080d7-ce07-4d7c-b0f6-118db038ce6e",
+      "name": "backend Gradle 빌드 스캐폴딩 + application.yml(H2/MyBatis)",
+      "description": "Nuxt 모노레포 루트 하위에 backend/ 독립 Gradle 프로젝트의 빌드 골격과 런타임 설정을 생성한다. Spring Boot 3.3.5 + Java 21 toolchain + 의존성(spring-boot-starter-web, mybatis-spring-boot-starter 3.0.4, spring-boot-starter-validation, h2 runtime) 선언. spring-boot-starter-data-jpa는 절대 추가하지 않는다(JPA 금지). Gradle Wrapper(gradlew, gradlew.bat, gradle/wrapper/gradle-wrapper.properties)를 distributionUrl=gradle-8.10.2-bin.zip로 작성하고, 로컬 gradle 미설치이므로 gradle-wrapper.jar는 공식 배포처에서 Invoke-WebRequest로 다운로드한다. application.yml은 H2 in-memory(jdbc:h2:mem:carwash;DB_CLOSE_DELAY=-1;MODE=MySQL), h2.console.enabled=true, mybatis(mapper-locations=classpath:mapper/*.xml, type-aliases-package=com.carwash.domain, map-underscore-to-camel-case=true), server.port=8080을 설정한다. 이번 셋업은 헬스까지이므로 schema.sql/data.sql은 만들지 않으며, 부재 시 기동 실패가 없도록 spring.sql.init은 설정하지 않는다(또는 mode:never).",
+      "notes": "로컬 gradle 미설치로 'gradle wrapper' 명령 사용 불가 → wrapper 파일 수기 작성 + jar 다운로드. data-jpa 의존성 추가 금지(shrimp-rules 272행). backend는 루트 package.json과 분리된 독립 빌드.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T14:42:09.352Z",
+      "updatedAt": "2026-06-20T14:44:00.701Z",
+      "relatedFiles": [
+        {
+          "path": "backend/build.gradle",
+          "type": "CREATE",
+          "description": "BE 의존성·Java21 toolchain·Spring Boot 3.3.5"
+        },
+        {
+          "path": "backend/settings.gradle",
+          "type": "CREATE",
+          "description": "rootProject.name=backend"
+        },
+        {
+          "path": "backend/gradle/wrapper/gradle-wrapper.properties",
+          "type": "CREATE",
+          "description": "Gradle 8.10.2 distributionUrl"
+        },
+        {
+          "path": "backend/gradlew",
+          "type": "CREATE",
+          "description": "Unix wrapper 스크립트"
+        },
+        {
+          "path": "backend/gradlew.bat",
+          "type": "CREATE",
+          "description": "Windows wrapper 스크립트"
+        },
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "type": "CREATE",
+          "description": "H2/MyBatis/포트 설정"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "1.2·1.4·Phase 0 생성 파일 목록",
+          "lineStart": 85,
+          "lineEnd": 262
+        }
+      ],
+      "implementationGuide": "1) Write backend/settings.gradle: rootProject.name = 'backend'.\n2) Write backend/build.gradle (Groovy DSL): plugins { id 'java'; id 'org.springframework.boot' version '3.3.5'; id 'io.spring.dependency-management' version '1.1.6' }; group 'com.carwash'; java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }; repositories mavenCentral; dependencies { implementation 'org.springframework.boot:spring-boot-starter-web'; implementation 'org.springframework.boot:spring-boot-starter-validation'; implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'; runtimeOnly 'com.h2database:h2'; testImplementation 'org.springframework.boot:spring-boot-starter-test' }; tasks.named('test'){ useJUnitPlatform() }. (data-jpa 절대 금지)\n3) Write backend/gradle/wrapper/gradle-wrapper.properties: distributionUrl=https\\://services.gradle.org/distributions/gradle-8.10.2-bin.zip, distributionBase=GRADLE_USER_HOME, zipStoreBase=GRADLE_USER_HOME, distributionPath=wrapper/dists, zipStorePath=wrapper/dists.\n4) gradlew/gradlew.bat 표준 스크립트 작성, gradle-wrapper.jar는 PowerShell Invoke-WebRequest로 https://raw.githubusercontent.com/gradle/gradle/v8.10.2/gradle/wrapper/gradle-wrapper.jar (또는 동등 공식 소스) 다운로드하여 backend/gradle/wrapper/gradle-wrapper.jar 배치.\n5) Write backend/src/main/resources/application.yml: spring.datasource(H2 mem MODE=MySQL, driver org.h2.Driver, username sa), spring.h2.console.enabled true, mybatis(위 3개 키), server.port 8080. 주석은 한국어.",
+      "verificationCriteria": "backend/build.gradle에 spring-boot-starter-data-jpa가 없고 mybatis-spring-boot-starter·h2·web·validation이 있다. settings.gradle rootProject.name='backend'. gradle-wrapper.properties distributionUrl이 gradle-8.10.2-bin.zip. gradle-wrapper.jar 파일이 존재한다(다운로드 성공). application.yml에 H2 mem·h2-console·mybatis 3키·port 8080이 있고 spring-boot-starter-data-jpa/ddl-auto 설정이 없다.",
+      "analysisResult": "2차 개발 환경 셋업(Phase 0 환경 부분). Nuxt 4 모노레포 루트(E:\\claudeStudy\\workspaces\\reserve-wash-fe-be)에 backend/ Spring Boot 3.x(Java 21)+MyBatis(mybatis-spring-boot-starter)+H2 in-memory 백엔드를 부트스트랩하고 FE(:3000)↔BE(:8080) CORS/헬스 계약을 수립한다. 정본: docs/roadmaps/ROADMAP_2.md 1장·Phase 0, shrimp-rules.md. 제약: JPA/Hibernate 금지(MyBatis 확정, require_v1.md v1.5), 루트 package.json에 Java 빌드 끼워넣기 금지(backend 독립 Gradle), 1차 FE 자산 무변경(additive), Java 클래스 PascalCase·주석 한국어, FE TS 세미콜론 없음·작은따옴표(oxfmt). 실측: backend/ 미존재, nuxt.config.ts runtimeConfig 없음, .gitignore에 backend 산출물 무시 규칙 없음, 로컬 JDK/Gradle 미설치(빌드·기동 검증은 호스트 JDK 21 선행조건 의존). 검증 게이트 분리: 파일/설정 생성(JDK 비의존)과 빌드/기동 검증(JDK 의존). 버전 고정: Spring Boot 3.3.5, mybatis-spring-boot-starter 3.0.4, Gradle 8.10.2.",
+      "summary": "backend 독립 Gradle 스캐폴딩 완료. settings.gradle(rootProject.name='backend'), build.gradle(Spring Boot 3.3.5 + Java 21 toolchain + web/validation/mybatis-spring-boot-starter 3.0.4/h2 — spring-boot-starter-data-jpa·ddl-auto 미포함 검증됨), Gradle Wrapper 4종(gradlew·gradlew.bat·gradle-wrapper.properties distributionUrl=gradle-8.10.2-bin.zip·gradle-wrapper.jar 43583바이트 공식 소스 다운로드 성공), application.yml(H2 mem MODE=MySQL·h2-console·mybatis 3키·server.port 8080) 생성. JPA 금지·MyBatis 확정 규칙 준수. 빌드 실행 검증은 JDK 21 의존이므로 Task4 게이트로 분리.",
+      "completedAt": "2026-06-20T14:44:00.698Z"
+    },
+    {
+      "id": "8e528afa-d9c4-4ffe-ae0a-7f704bb44eb0",
+      "name": "Spring Boot 진입점 + 헬스 컨트롤러 + CORS 설정 + 스모크 테스트",
+      "description": "com.carwash 패키지에 @SpringBootApplication 진입점, GET /api/health → {\"status\":\"UP\"} 헬스 컨트롤러, FE(:3000) 교차 출처 허용 CORS 설정(WebMvcConfigurer)을 작성한다. 추가로 헬스 계약을 검증하는 스모크 테스트를 둔다. 컨트롤러는 DTO 규칙 대상이나 헬스는 단순 상태맵이므로 Map<String,String> 허용(도메인 객체 아님). 주석 한국어, 클래스 PascalCase·메서드 camelCase.",
+      "notes": "헬스 엔드포인트는 도메인 객체 직접 반환 금지 규칙의 예외(상태 맵). 본 Phase는 service/mapper/domain/dto 계층을 만들지 않는다(Phase 1~ 범위). 테스트는 JDK 21 필요(검증 게이트 태스크에서 실행).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9f0080d7-ce07-4d7c-b0f6-118db038ce6e"
+        }
+      ],
+      "createdAt": "2026-06-20T14:42:09.352Z",
+      "updatedAt": "2026-06-20T14:44:27.520Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/CarwashApplication.java",
+          "type": "CREATE",
+          "description": "@SpringBootApplication 진입점"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/HealthController.java",
+          "type": "CREATE",
+          "description": "GET /api/health"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/CorsConfig.java",
+          "type": "CREATE",
+          "description": "FE :3000 CORS 허용"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/HealthControllerTest.java",
+          "type": "CREATE",
+          "description": "헬스 계약 스모크 테스트"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "헬스/CORS 구현 예시",
+          "lineStart": 264,
+          "lineEnd": 307
+        }
+      ],
+      "implementationGuide": "1) backend/src/main/java/com/carwash/CarwashApplication.java: package com.carwash; @SpringBootApplication; main에서 SpringApplication.run.\n2) backend/src/main/java/com/carwash/controller/HealthController.java: @RestController @RequestMapping(\"/api\"); @GetMapping(\"/health\") public Map<String,String> health(){ return Map.of(\"status\",\"UP\"); } (ROADMAP_2 266~285행 예시 그대로).\n3) backend/src/main/java/com/carwash/config/CorsConfig.java: @Configuration implements WebMvcConfigurer; addCorsMappings에서 addMapping(\"/api/**\").allowedOrigins(\"http://localhost:3000\").allowedMethods(\"GET\",\"POST\",\"PUT\",\"PATCH\",\"DELETE\").allowCredentials(true) (ROADMAP_2 287~307행).\n4) backend/src/test/java/com/carwash/HealthControllerTest.java: @WebMvcTest(HealthController.class) + MockMvc로 GET /api/health 200·jsonPath status=UP 단정. 또는 @SpringBootTest(webEnvironment=RANDOM_PORT)+TestRestTemplate.",
+      "verificationCriteria": "CarwashApplication에 @SpringBootApplication, HealthController가 @RequestMapping(\"/api\")+@GetMapping(\"/health\")로 status:UP 맵 반환, CorsConfig가 /api/** 에 localhost:3000 허용. JPA 애너테이션·JpaRepository 없음. 테스트 파일이 GET /api/health 200·status=UP을 단정한다.",
+      "analysisResult": "2차 개발 환경 셋업(Phase 0 환경 부분). Nuxt 4 모노레포 루트(E:\\claudeStudy\\workspaces\\reserve-wash-fe-be)에 backend/ Spring Boot 3.x(Java 21)+MyBatis(mybatis-spring-boot-starter)+H2 in-memory 백엔드를 부트스트랩하고 FE(:3000)↔BE(:8080) CORS/헬스 계약을 수립한다. 정본: docs/roadmaps/ROADMAP_2.md 1장·Phase 0, shrimp-rules.md. 제약: JPA/Hibernate 금지(MyBatis 확정, require_v1.md v1.5), 루트 package.json에 Java 빌드 끼워넣기 금지(backend 독립 Gradle), 1차 FE 자산 무변경(additive), Java 클래스 PascalCase·주석 한국어, FE TS 세미콜론 없음·작은따옴표(oxfmt). 실측: backend/ 미존재, nuxt.config.ts runtimeConfig 없음, .gitignore에 backend 산출물 무시 규칙 없음, 로컬 JDK/Gradle 미설치(빌드·기동 검증은 호스트 JDK 21 선행조건 의존). 검증 게이트 분리: 파일/설정 생성(JDK 비의존)과 빌드/기동 검증(JDK 의존). 버전 고정: Spring Boot 3.3.5, mybatis-spring-boot-starter 3.0.4, Gradle 8.10.2.",
+      "summary": "Spring Boot 소스 4종 생성 완료. CarwashApplication(@SpringBootApplication 진입점), HealthController(@RequestMapping(\"/api\")+@GetMapping(\"/health\") → Map.of(\"status\",\"UP\")), CorsConfig(WebMvcConfigurer로 /api/** 에 http://localhost:3000·GET/POST/PUT/PATCH/DELETE·allowCredentials 허용), HealthControllerTest(@WebMvcTest+MockMvc로 GET /api/health 200·jsonPath status=UP 단정). JPA 애너테이션·JpaRepository 미사용, 패키지 소문자·클래스 PascalCase·주석 한국어 준수. 실제 컴파일/테스트 실행은 JDK 21 의존이므로 Task4 게이트에서 수행.",
+      "completedAt": "2026-06-20T14:44:27.518Z"
+    },
+    {
+      "id": "acc0a625-16bd-484d-8d80-79572b53107b",
+      "name": "FE 연동 설정(nuxt.config.ts runtimeConfig) + 루트 .gitignore 보강",
+      "description": "FE에서 BE를 $fetch로 호출할 baseURL을 runtimeConfig로 주입하고, backend 빌드 산출물이 커밋되지 않도록 루트 .gitignore를 보강한다. 1차 FE 자산은 무변경(additive) — nuxt.config.ts는 기존 키 보존 후 runtimeConfig만 추가. devProxy는 CorsConfig를 우선 채택하므로 이번엔 추가하지 않는다(선택 사항으로 남김).",
+      "notes": "ROADMAP_2 309~318행 nuxt.config.ts 예시 참조. 1차 동작 무변경 하위호환(public.apiBase 신규 키만 추가). gradle-wrapper.jar는 backend/gradle/wrapper/ 하위라 *.class·build/ 무시 규칙에 걸리지 않음(커밋되어야 함) — .gitignore에 backend/gradle/ 전체를 무시하지 말 것(backend/.gradle/만 무시).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T14:42:09.352Z",
+      "updatedAt": "2026-06-20T14:45:01.726Z",
+      "relatedFiles": [
+        {
+          "path": "nuxt.config.ts",
+          "type": "TO_MODIFY",
+          "description": "runtimeConfig.public.apiBase 추가",
+          "lineStart": 1,
+          "lineEnd": 12
+        },
+        {
+          "path": ".gitignore",
+          "type": "TO_MODIFY",
+          "description": "backend 빌드 산출물 무시 보강",
+          "lineStart": 41,
+          "lineEnd": 53
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "nuxt.config.ts apiBase 예시·gitignore 보강 지침",
+          "lineStart": 117,
+          "lineEnd": 319
+        }
+      ],
+      "implementationGuide": "1) nuxt.config.ts 수정: defineNuxtConfig 객체에 runtimeConfig: { public: { apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080/api' } } 추가. 기존 compatibilityDate/devtools/modules/css/vite 키는 그대로 유지. 세미콜론 없음·작은따옴표 준수.\n2) .gitignore 보강: 파일 끝에 '# Backend (Spring Boot)' 섹션으로 backend/build/, backend/.gradle/, *.class, *.iml 추가. .idea는 이미 라인 20에 존재하므로 중복 추가 금지.\n3) 수정 후 npm run type-check로 nuxt.config.ts 타입 확인(선택, .nuxt 생성 상태 의존).",
+      "verificationCriteria": "nuxt.config.ts에 runtimeConfig.public.apiBase가 추가되고 기존 키(modules/css/vite/compatibilityDate/devtools)가 보존됨. 세미콜론 없음·작은따옴표. .gitignore에 backend/build/·backend/.gradle/·*.class·*.iml이 추가되고 backend/gradle/(wrapper jar 포함)는 통째 무시되지 않음.",
+      "analysisResult": "2차 개발 환경 셋업(Phase 0 환경 부분). Nuxt 4 모노레포 루트(E:\\claudeStudy\\workspaces\\reserve-wash-fe-be)에 backend/ Spring Boot 3.x(Java 21)+MyBatis(mybatis-spring-boot-starter)+H2 in-memory 백엔드를 부트스트랩하고 FE(:3000)↔BE(:8080) CORS/헬스 계약을 수립한다. 정본: docs/roadmaps/ROADMAP_2.md 1장·Phase 0, shrimp-rules.md. 제약: JPA/Hibernate 금지(MyBatis 확정, require_v1.md v1.5), 루트 package.json에 Java 빌드 끼워넣기 금지(backend 독립 Gradle), 1차 FE 자산 무변경(additive), Java 클래스 PascalCase·주석 한국어, FE TS 세미콜론 없음·작은따옴표(oxfmt). 실측: backend/ 미존재, nuxt.config.ts runtimeConfig 없음, .gitignore에 backend 산출물 무시 규칙 없음, 로컬 JDK/Gradle 미설치(빌드·기동 검증은 호스트 JDK 21 선행조건 의존). 검증 게이트 분리: 파일/설정 생성(JDK 비의존)과 빌드/기동 검증(JDK 의존). 버전 고정: Spring Boot 3.3.5, mybatis-spring-boot-starter 3.0.4, Gradle 8.10.2.",
+      "summary": "FE 연동·gitignore 보강 완료. nuxt.config.ts에 runtimeConfig.public.apiBase(process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080/api')를 additive 추가하고 기존 키(compatibilityDate/devtools/modules/css/vite) 전부 보존, 세미콜론 없음·작은따옴표 준수. .gitignore에 backend/build/·backend/.gradle/·*.class·*.iml 추가(.idea 중복 회피). git check-ignore로 backend/gradle/wrapper/gradle-wrapper.jar는 추적 유지(무시 안 됨), backend/build/*.class는 무시됨을 검증. 1차 FE 동작 무변경 하위호환.",
+      "completedAt": "2026-06-20T14:45:01.724Z"
+    },
+    {
+      "id": "b18c1d2e-2cb4-4431-b2de-95256fc9bc3c",
+      "name": "빌드·기동·CORS 통합 검증 (JDK 21 선행조건 게이트)",
+      "description": "JDK 21 설치를 선행조건으로, backend 빌드/테스트/기동과 FE↔BE CORS/헬스 계약을 통합 검증하여 ROADMAP_2 1.5/Phase 0 DoD를 충족한다. 로컬에 java/gradle이 미설치임이 실측됐으므로, 본 태스크 시작 시 java -version으로 JDK 21을 재확인하고 미설치면 사용자에게 설치를 요청('! ' 프리픽스로 직접 설치 권장)한 뒤 검증을 진행한다. JDK 없이는 빌드/기동 DoD를 머신에서 검증할 수 없음을 명확히 고지한다.",
+      "notes": "최대 리스크: 로컬 JDK/Gradle 미설치. 이 게이트는 호스트 선행조건이 충족돼야 통과 가능. 검증 불가 시 앞 3개 태스크 산출물(코드·설정·버전 고정)의 정확성으로 부분 보강하고, JDK 설치 후 재실행하도록 안내. backend bootRun은 run_in_background로 띄우고 검증 후 종료.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9f0080d7-ce07-4d7c-b0f6-118db038ce6e"
+        },
+        {
+          "taskId": "8e528afa-d9c4-4ffe-ae0a-7f704bb44eb0"
+        },
+        {
+          "taskId": "acc0a625-16bd-484d-8d80-79572b53107b"
+        }
+      ],
+      "createdAt": "2026-06-20T14:42:09.352Z",
+      "updatedAt": "2026-06-20T14:52:25.666Z",
+      "relatedFiles": [
+        {
+          "path": "backend/build.gradle",
+          "type": "DEPENDENCY",
+          "description": "빌드 대상"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/HealthController.java",
+          "type": "DEPENDENCY",
+          "description": "헬스 검증 대상"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "1.5/Phase 0 DoD",
+          "lineStart": 157,
+          "lineEnd": 326
+        }
+      ],
+      "implementationGuide": "1) java -version 확인 → Java 21이 아니면 중단하고 사용자에게 JDK 21(예: Temurin 21) 설치 안내. 설치는 사용자가 '! ' 프리픽스 또는 직접 수행.\n2) cd backend && ./gradlew build (컴파일+테스트, gradle-wrapper.jar로 Gradle 8.10.2 자동 다운로드) → BUILD SUCCESSFUL, HealthControllerTest 통과 확인.\n3) ./gradlew bootRun (백그라운드) → :8080 기동. curl/Invoke-WebRequest http://localhost:8080/api/health → {\"status\":\"UP\"} 200 확인. http://localhost:8080/h2-console 응답 확인.\n4) 루트에서 npm run dev (:3000) 동시 기동 → 브라우저/Playwright 또는 fetch로 FE 출처에서 $fetch(apiBase+'/health') 호출 시 CORS 오류 없이 성공 확인.\n5) DoD 체크리스트 4항 + ./gradlew build 통과를 모두 만족하면 완료.",
+      "verificationCriteria": "java -version이 Java 21 출력. cd backend && ./gradlew build BUILD SUCCESSFUL(테스트 포함). ./gradlew bootRun으로 :8080 기동·GET /api/health가 {\"status\":\"UP\"} 200. h2-console 접근 가능. FE :3000 동시 기동 상태에서 FE 출처 $fetch /health가 CORS 오류 없이 성공. (JDK 미설치 시 본 게이트는 미통과로 보고하고 설치 안내)",
+      "analysisResult": "2차 개발 환경 셋업(Phase 0 환경 부분). Nuxt 4 모노레포 루트(E:\\claudeStudy\\workspaces\\reserve-wash-fe-be)에 backend/ Spring Boot 3.x(Java 21)+MyBatis(mybatis-spring-boot-starter)+H2 in-memory 백엔드를 부트스트랩하고 FE(:3000)↔BE(:8080) CORS/헬스 계약을 수립한다. 정본: docs/roadmaps/ROADMAP_2.md 1장·Phase 0, shrimp-rules.md. 제약: JPA/Hibernate 금지(MyBatis 확정, require_v1.md v1.5), 루트 package.json에 Java 빌드 끼워넣기 금지(backend 독립 Gradle), 1차 FE 자산 무변경(additive), Java 클래스 PascalCase·주석 한국어, FE TS 세미콜론 없음·작은따옴표(oxfmt). 실측: backend/ 미존재, nuxt.config.ts runtimeConfig 없음, .gitignore에 backend 산출물 무시 규칙 없음, 로컬 JDK/Gradle 미설치(빌드·기동 검증은 호스트 JDK 21 선행조건 의존). 검증 게이트 분리: 파일/설정 생성(JDK 비의존)과 빌드/기동 검증(JDK 의존). 버전 고정: Spring Boot 3.3.5, mybatis-spring-boot-starter 3.0.4, Gradle 8.10.2.",
+      "summary": "JDK 21 설치 후 ROADMAP_2 1.5/Phase 0 DoD 전부 실측 통과. (1) winget으로 Temurin 21.0.11+10 LTS 설치, java -version이 openjdk 21.0.11 LTS 출력. (2) cd backend && ./gradlew build → Gradle 8.10.2 자동 다운로드 후 BUILD SUCCESSFUL(:test 포함 HealthControllerTest 통과). (3) ./gradlew bootRun → Tomcat :8080 기동(Started CarwashApplication), GET /api/health = HTTP 200 {\"status\":\"UP\"}, /h2-console/ HTTP 200 로그인 페이지 확인. (4) FE :3000 ↔ BE :8080 동시 기동 상태에서 Playwright로 origin http://localhost:3000 브라우저에서 fetch('http://localhost:8080/api/health') 실행 → ok:true status:200 body{status:UP}, CORS 오류 없음. 서버 CORS 헤더도 ACAO=http://localhost:3000·ACAM=GET,POST,PUT,PATCH,DELETE 확인. 검증 후 BE bootRun·임시 FE 백그라운드 프로세스 정리(사용자 기존 :3000 FE는 보존).",
+      "completedAt": "2026-06-20T14:52:25.664Z"
+    }
+  ]
+}
