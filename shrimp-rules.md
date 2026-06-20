@@ -8,6 +8,7 @@
 - 런타임 스택: **Nuxt 4.x**, **Vue 3 (`<script setup>` Composition API)**, **Pinia 3.x (`@pinia/nuxt` 모듈)**.
 - 라우팅: **Nuxt 파일 기반 라우팅** (`app/pages/`). vue-router를 수동 설정하지 않는다(Nuxt 내장).
 - 언어: **TypeScript** (`typescript ~6.0.0`), 빌드 도구: **Nuxt(Vite 내장)**, 타입 검사: **`nuxt typecheck`(내부 vue-tsc)**.
+- 스타일링: **Tailwind CSS v4** (`@tailwindcss/vite` 플러그인을 `nuxt.config.ts`의 `vite.plugins`에 등록, `app/assets/main.css`에서 `@import 'tailwindcss'`). `tailwind.config.js`는 없다(v4는 CSS-first 설정).
 - 렌더링: **기본 SSR**. 클라이언트 전용 로직은 `import.meta.client` 가드 또는 `useCookie` 등을 사용하라.
 - E2E 테스트: **Playwright 설치됨**(`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`). 단위 테스트 러너(vitest)는 미설치.
 
@@ -21,16 +22,16 @@
 | `app/stores/` | Pinia 스토어(자동 임포트) | 신규 스토어 파일을 이 디렉터리에 생성 |
 | `app/components/` | 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함) | 재사용 단위만 배치 |
 | `app/composables/` | 재사용 로직(자동 임포트) | Composition 함수 배치 |
-| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`) | 인증 가드 등 |
-| `app/layouts/` | 공통 레이아웃(자동 임포트) | `default.vue` 등. `app.vue`는 `<NuxtLayout><NuxtPage /></NuxtLayout>` |
-| `app/assets/` | `base.css`·`main.css` 등 스타일 자원 | `nuxt.config.ts`의 `css`로 등록 |
+| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`). `auth.ts` 구현됨 | 인증 가드 등. `definePageMeta({ middleware: 'auth' })`로 적용 |
+| `app/layouts/` | 공통 레이아웃(자동 임포트). `default.vue` 활성(`app.vue`가 `<NuxtLayout>` opt-in) | `default.vue` 수정 또는 신규 레이아웃 추가 |
+| `app/assets/` | `base.css`·`main.css`(Tailwind 진입 + `@theme` 토큰 + `@layer components` 공통 클래스) | `nuxt.config.ts`의 `css`로 등록. **색상/공통 컴포넌트 스타일은 여기서 토큰화** |
 | `app/types/` *(Phase 1 구현됨)* | 도메인 TS 타입/인터페이스/유니언 | `enums.ts`, `domain.ts`. **명시 import 대상**(`import type`) |
 | `app/data/` *(Phase 1 구현됨)* | 더미 데이터(매장/베이/가격/매니저/사용자) | `prices.ts`·`stores.ts`·`managers.ts`·`users.ts`. **명시 import 대상** |
 | `app/services/` *(Phase 1 일부 · 계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts` 등. **명시 import 대상**. 계약: `app/services/README.md` |
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
-- `app/types`·`app/data`·`app/composables`·`app/services`는 Phase 1에서 실제 코드가 채워졌다(타입·더미 데이터·`useSlots`·`priceService`). `app/middleware`(`.gitkeep` 유지)·`app/layouts`는 골격 단계로, 미들웨어 인증 로직·`app.vue`의 `<NuxtLayout>` 전환은 `docs/ROADMAP.md` Phase 2에서 채운다. `app/layouts/default.vue`는 현재 휴면 상태(`app.vue` 미opt-in).
+- Phase 1·2가 구현 진행됨: `app/types`·`app/data`(`enums`·`domain`·`prices`·`stores`·`carTypes`·`managers`·`users`)·`app/composables`(`useSlots`)·`app/services`(`priceService`·`storeService`)가 채워졌고, **인증 흐름(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)과 레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)가 완료**됐다. 예약 흐름(`app/pages/reserve.vue`·`reservations.vue`·`review/[reservationId].vue`)과 입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`)도 구현됨. 남은 작업·DoD는 `docs/ROADMAP.md`를 정본으로 따르라.
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
@@ -94,6 +95,22 @@ export default defineNuxtRouteMiddleware((to) => {
 })
 ```
 
+## 스타일링(Tailwind CSS v4) 규칙
+
+- 스타일링은 **Tailwind CSS v4 유틸리티 클래스**를 우선 사용하라. Tailwind 설정은 **CSS-first**다 — `tailwind.config.js`를 생성하지 마라. 토큰은 `app/assets/main.css`의 **`@theme` 블록**에 CSS 변수로 정의한다.
+- **색상은 하드코딩하지 마라.** `main.css`의 `@theme`에 정의된 브랜드 토큰을 사용하라: 표면 `--color-surface-base/1/2`, 브랜드 `--color-brand-primary(-strong)`·`--color-brand-accent`, 텍스트 `--color-content(-strong/-muted)`, 보더 `--color-line(-soft)`. 새 색이 필요하면 임의 hex 대신 `@theme`에 토큰을 추가하라.
+- **공통 UI는 기존 `@layer components` 클래스를 재사용하라**(중복 정의 금지): `.btn`·`.btn-primary`·`.btn-ghost`, `.input-field`, `.card`, `.field-label`, `.badge-accent`, `.container-app`. 버튼/입력/카드를 만들 때 새 스타일을 인라인으로 짜지 말고 이 클래스를 먼저 적용하라.
+- 컴포넌트 국소 스타일이 꼭 필요하면 `.vue`의 `<style scoped>`를 사용하되, 색/간격은 `@theme` 변수(`var(--color-...)`)를 참조하라.
+
+```vue
+<!-- 올바름 (DO) — 토큰화된 공통 클래스 재사용 -->
+<button class="btn btn-primary">예약</button>
+<input class="input-field" />
+
+<!-- 금지 (DON'T) — 색 하드코딩 + 공통 클래스 무시 -->
+<button style="background:#38bdf8">예약</button>
+```
+
 ## 린트/포맷 워크플로우 규칙 (중요)
 
 - 본 프로젝트는 일반 ESLint+Prettier 조합이 **아니다**. **oxc 도구 체인(oxlint+oxfmt)이 1차, ESLint가 2차**다.
@@ -117,6 +134,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 - **도메인 모델·가격·enum의 정본은 `docs/require_v1.md`다.** `app/types/enums.ts`·`app/types/domain.ts`·`app/data/prices.ts`를 작성·수정할 때 값은 require_v1.md의 5장(도메인)·10장(가격 매트릭스)·11장(프로세스 코드 `FW/M/S`)과 **정확히 일치**시켜라. 불일치 시 require_v1.md를 따르라.
 - **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/ROADMAP.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 ROADMAP.md를 따르라.
+- **예약 화면 동작(순차 선택·차종별 베이 노출·휠 날짜/시간 선택 등)의 정본은 `docs/예약_규칙_명세_v1.md`다.** `app/pages/reserve.vue`·예약 관련 컴포넌트를 수정할 때 이 명세와 일치시켜라.
 - 화면/스토어/서비스를 구현하면 해당 `docs/ROADMAP.md` Phase의 체크리스트·DoD를 함께 갱신하라.
 
 ## 테스트(Playwright) 규칙
@@ -151,4 +169,6 @@ export default defineNuxtRouteMiddleware((to) => {
 - SSR 단계에서 `localStorage`/`window`/`document` 직접 접근 **금지** (`import.meta.client` 가드 또는 `onMounted` 사용).
 - 컴포넌트/스토어에서 `app/data/` 더미 데이터 직접 import **금지** (`app/services/` 경유).
 - 가격/차종/서비스 enum을 `docs/require_v1.md`와 다른 값으로 작성 **금지**.
+- 색상 hex 하드코딩 및 `@layer components` 공통 클래스와 중복되는 인라인 스타일 작성 **금지** (`main.css`의 `@theme` 토큰·공통 클래스 사용).
+- `tailwind.config.js` 생성 **금지** (Tailwind v4 CSS-first, `@theme`로 설정).
 - `node_modules/`, `.nuxt/`, `.output/` 등 빌드 산출물 직접 수정 **금지**.
