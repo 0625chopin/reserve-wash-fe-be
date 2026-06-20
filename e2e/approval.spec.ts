@@ -11,7 +11,8 @@ async function loginAs(page: Page, email: string) {
   await page.getByTestId('login-email').fill(email)
   await page.getByTestId('login-password').fill('password')
   await page.getByTestId('login-submit').click()
-  await expect(page).toHaveURL(/\/reserve$/)
+  // 로그인 성공 — 역할별 기본 화면으로 이동(role별 경로가 다르므로 로그인 상태로 판정)
+  await expect(page.getByTestId('nav-logout')).toBeVisible()
 }
 
 // 신청 페이지 진입 — 매장은 본인 소속(강남점)으로 고정·disabled, 매니저 옵션이 채워질 때까지 대기

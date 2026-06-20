@@ -53,10 +53,29 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 매니저 회원가입 — 소속 매장 지정, PENDING_APPROVAL_L1로 신청(자동 로그인 없음, require v1.9).
+  //   성공해도 승인 전이라 로그인하지 않는다(토큰 미발급). 중복 이메일 등 실패 시 false
+  async function signupManager(payload: {
+    email: string
+    password: string
+    name: string
+    storeId: string
+  }): Promise<boolean> {
+    try {
+      await $fetch(`${apiBase()}/auth/signup-manager`, {
+        method: 'POST',
+        body: payload,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   function logout() {
     token.value = null
     currentUser.value = null
   }
 
-  return { currentUser, isLoggedIn, login, signup, logout }
+  return { currentUser, isLoggedIn, login, signup, signupManager, logout }
 })

@@ -10,7 +10,8 @@ async function loginAs(page: Page, email: string) {
   await page.getByTestId('login-email').fill(email)
   await page.getByTestId('login-password').fill('password')
   await page.getByTestId('login-submit').click()
-  await expect(page).toHaveURL(/\/reserve$/)
+  // 로그인 성공 — 역할별 기본 화면으로 이동(role별 경로가 다르므로 로그인 상태로 판정)
+  await expect(page.getByTestId('nav-logout')).toBeVisible()
 }
 
 // 매니저 대행 폼 채우고 제출 (매장=본인 소속 고정, 김매니저·소형·외부세차·A2)

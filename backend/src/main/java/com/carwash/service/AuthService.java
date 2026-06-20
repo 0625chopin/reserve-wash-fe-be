@@ -62,4 +62,23 @@ public class AuthService {
         userMapper.insert(user);
         return new LoginResponse(tokenProvider.createToken(user), UserResponse.from(user));
     }
+
+    // 매니저 회원가입 (require v1.9 §4.1) — 소속 매장 지정, PENDING_APPROVAL_L1로 등록(자동 로그인 없음).
+    //   2단계 승인(M7 매장매니저관리자 → S3 관리자)을 통과해 ACTIVE가 되기 전에는 로그인 불가.
+    @Transactional
+    public void signupManager(String email, String rawPassword, String name, String storeId) {
+        if (userMapper.findByEmail(email) != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
+        }
+        User user = User.builder()
+                .id("mgr-" + UUID.randomUUID())   // 시드 id(manager1..)와 충돌 회피
+                .email(email)
+                .name(name)
+                .role(UserRole.MANAGER)
+                .passwordHash(passwordEncoder.encode(rawPassword))
+                .approvalStatus(UserApprovalStatus.PENDING_APPROVAL_L1)   // 승인 대기 — 자동 로그인 없음
+                .storeId(storeId)
+                .build();
+        userMapper.insert(user);
+    }
 }

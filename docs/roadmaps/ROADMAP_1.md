@@ -4,8 +4,12 @@
 > **작성일**: 2026-06-20 (최종 수정: 2026-06-21)
 > **작성자**: PM/PL
 > **대상 독자**: 주니어 ~ 시니어 프론트엔드 개발자
-> **연계 문서**: [`docs/require_v1.md`](../require_v1.md) (요구사항 정의서 v1.1 → **v1.7**)
+> **연계 문서**: [`docs/require_v1.md`](../require_v1.md) (요구사항 정의서 v1.1 → **v1.9**)
 > **범위**: 데이터 진화 **1단계(프론트엔드 더미 데이터)** + **FO 플로우(로그인/예약/취소/후기)** 집중 상세화. 2~3단계(Spring Boot → MySQL)는 마일스톤 개요만 기재.
+>
+> **🔄 v1.9 정합 메모 (require v1.9)**: 로그인 페이지를 **역할군별 3분리**(일반사용자 `/login`·매니저 `/manager/login`·관리자 `/admin/login`)하고 **매니저 회원가입(`/manager/signup`)** 을 신설한다. **1차 범위는 일반사용자 로그인(`/login`)·USER 회원가입(`/signup`)으로 그대로 유지**되며, 매니저/관리자 로그인 페이지·매니저 회원가입(소속 매장 선택 + `PENDING_APPROVAL_L1` 신청 → 2단계 승인)은 모두 **2차(ROADMAP_2 Phase 3) 과제**다. 1차 Phase 구성·공수 변동 없음(표기 정합만).
+>
+> **🔄 v1.8 정합 메모 (require v1.8)**: ① `login.vue` 개발용 빠른 로그인을 **역할별 시드 계정 + 역할군별 기본 화면 랜딩**으로 정리(dev 전용, Phase 3 체크리스트 반영) — 일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`. ② 매니저 계열 BO 매장 컨텍스트 고정·`User.storeId`는 **2차(ROADMAP_2) 과제**이며 1차 `USER` 플로우엔 영향 없음(표기 정합만). 1차 FO 범위·Phase 구성·공수 변동 없음.
 >
 > **🔄 v1.6 변경 요약 (require v1.7 정합)**: require_v1.md가 **v1.7**로 갱신되어, v1.6의 "3역할 단순화·승인 제거"가 **번복**되고 **4역할(`USER`/`MANAGER`/`STORE_ADMIN`/`ADMIN`) + 2단계 가입 승인(매장매니저관리자 1차 → 관리자 2차) + 휴가/반차 1단계 승인(매장매니저관리자 종결) + FE 페이지 역할별 4그룹 분리**(require §12.4)로 재확정되었습니다. **1차 FO 범위(데이터 1단계 + USER 플로우)는 실질 변동이 거의 없습니다** — 1차는 `USER`(이메일 인증 즉시 활성, 승인 분기 없음)만 구현 대상이고, 매니저/관리자 가입·승인·역할별 BO 페이지는 모두 **2차(ROADMAP_2)** 과제이기 때문입니다. 본 갱신은 ① 연계 문서 버전 표기(v1.4 → **v1.7**), ② Phase 3/3.1의 승인 분기 서술을 v1.7 상태머신(USER=`EMAIL_VERIFIED→ACTIVE` 직행, 매니저 계열=`PENDING_APPROVAL_L1→L2`)에 맞춤, ③ 부록 BO 프로세스 코드 표기(M6=휴가/반차 신청, M7=가입 1차 승인, M8=휴가/반차 승인, S3=가입 2차 승인, S9 신설)를 v1.7 재정의로 정정하는 **표기·정합 갱신**입니다. Phase 구성·공수·코드 예시(이미 `UserRole = 'USER' | 'MANAGER' | 'STORE_ADMIN' | 'ADMIN'`로 정합)는 변경하지 않았습니다.
 >
@@ -477,8 +481,9 @@ definePageMeta({ middleware: 'auth' })
 - [ ] `app/pages/login.vue` — 이메일/비밀번호 폼, 필수값/형식 검증, 실패 시 에러 메시지
 - [ ] 로그인 성공 시 `redirect` 쿼리 또는 `/reserve`로 이동(`navigateTo`)
 - [ ] `app/middleware/auth.ts`를 `useAuthStore().isLoggedIn`으로 교체 (Phase 2 스텁 제거)
-- [ ] `AppNav.vue`에 로그인 상태/로그아웃 버튼 반영
+- [ ] `AppNav.vue`에 로그인 상태/로그아웃 버튼 반영 — *(v1.8)* 2차에서 역할별 BO 메뉴 분기 추가(§12.4)
 - [ ] (선택) 새로고침 유지를 위해 로그인 상태 저장 — ⚠️ **SSR 주의**(아래 박스 참조)
+- [ ] *(v1.8)* (개발 편의) `login.vue` 개발용 빠른 로그인 — `import.meta.dev` 가드로 dev에서만 노출. **역할별 시드 계정 즉시 로그인 + 역할군별 기본 화면 랜딩**(일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`). 1차는 `USER` 버튼만 유효, 매니저/관리자 랜딩은 2차(ROADMAP_2) BO 페이지 완성 후 동작
 
 > ⚠️ **SSR 주의 (Nuxt 기본 SSR)**: `localStorage`는 **브라우저에만 존재**하므로 서버 렌더 시점에 접근하면 `ReferenceError`가 납니다. 로그인 상태 복원은 `if (import.meta.client) { ... }` 가드 안에서 수행하거나, 서버/클라이언트 모두에서 안전하게 동작하는 **`useCookie`** 사용을 권장합니다(가드 미들웨어가 SSR 단계에서도 인증 상태를 읽으려면 쿠키 방식이 더 안전).
 

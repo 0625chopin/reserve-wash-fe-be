@@ -10,6 +10,10 @@
 > - **프로세스 코드 재정의(require v1.7 §11.1)**: M6=휴가/반차 신청, M7=일반매장매니저 가입 1차 승인(매장매니저관리자), **M8=휴가/반차 승인(신설, 매장매니저관리자 1단계 종결)**, S3=매니저 가입 2차 최종 승인(관리자), **S9=매장별 매니저 근무상태 확인(신설)**. 구 "M6=예약승인" 표기 제거.
 > - **역할별 BO 페이지 4그룹 분리**(require v1.7 §12.4): 일반매장매니저/매장매니저관리자/관리자별 화면 경로를 Phase 6~8에 반영.
 >
+> **🔄 v1.8 정합 반영(2026-06-21 구현 완료)**: ① **매니저 계열 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면 매장 select를 **본인 소속 매장으로 고정**(`disabled`). BE `users.store_id`·`User.storeId`·`UserResponse.storeId`(로그인 응답) 신설, 매니저 시드에 소속 매장 부여(`USER`/`ADMIN`은 NULL). ② **개발용 빠른 로그인 역할별 랜딩** + **AppNav 역할별 BO 메뉴 분기**. (상세: §12.4 제안 경로 하단 v1.8 반영 노트)
+>
+> **🔄 v1.9 정합 반영(Phase 3 증분)**: **로그인 페이지 역할군별 3분리**(`/login`·`/manager/login`·`/admin/login`, 각 역할별 빠른 로그인) + **매니저 회원가입**(`/manager/signup` + `POST /api/auth/signup-manager`, 소속 매장 선택·`PENDING_APPROVAL_L1` 신청·자동 로그인 없음 → 2단계 승인 후 `ACTIVE`). 관리자 회원가입 폼 없음. (Phase 3 체크리스트 반영)
+>
 > ✅ **구현 현황(2026-06-21 v1.7 재정합 완료)**: 기존 BE 구현의 v1.6/구 v2.1 가정(휴무 2단계 결재 `APPROVED_L1→L2`)을 **v1.7로 재정합 완료**했습니다 — 휴가/반차 1단계 collapse(`DayoffApprovalStatus`, STORE_ADMIN 종결), 가입 2단계 승인(M7→S3, `UserApprovalStatus`, `ACTIVE`만 로그인), 역할별 BO 페이지 4그룹 분리(§12.4, `/store-admin/*`·`/admin/manager-approvals` 신설), 로그인/AppNav 역할 정합. BE `./gradlew build`·FE `type-check`·`lint`·`test:e2e`(33건) 전건 통과(Phase 7 구현 메모 참조).
 >
 > **🔧 v2.1 변경(DB 접근 기술 확정)**: require_v1.md **v1.5** 결정에 따라 백엔드 영속 계층을 **MyBatis**(`mybatis-spring-boot-starter`, 매퍼 인터페이스 + XML SQL)로 확정한다. **JPA/Hibernate는 사용하지 않는다.** 이에 따라 본 로드맵의 패키지 구조(`entity/`→`domain/`, `repository/`(JpaRepository)→`mapper/`(`@Mapper`+XML)), 동시성 락(`@Version`→version 컬럼 비교 UPDATE, `@Lock(PESSIMISTIC_WRITE)`→매퍼 `SELECT ... FOR UPDATE` SQL), 스키마 관리(`ddl-auto`→`schema.sql`/Flyway 직접 관리)를 MyBatis 기준으로 기술한다.
@@ -607,6 +611,8 @@ export function getBaysForCar(storeId: string, carType: CarType): Promise<Bay[]>
 - [ ] 이메일 인증 토큰 발급/검증(`POST /api/auth/verify-email`) — 발송은 Phase 9 SMTP에 위임(인터페이스만 선언)
 - [ ] FE `app/stores/auth.ts`의 `login`을 `$fetch('/auth/login')` + 토큰 보관(`useCookie`)으로 교체
 - [ ] FE 미들웨어 `auth.ts`·역할 가드를 토큰 기반으로 교체(ROADMAP_1 Phase 3 자산 위에 증분)
+- [ ] *(v1.9)* **로그인 페이지 역할군별 3분리**: `/login`(일반사용자, 1차 유지)·`/manager/login`(일반매장매니저+매장매니저관리자)·`/admin/login`(관리자). 각 페이지에 `guest` 가드 + 역할별 (개발용) 빠른 로그인. `/login` 빠른 로그인은 일반사용자만 남기고 매니저/관리자 버튼은 각 페이지로 이전
+- [ ] *(v1.9)* **매니저 회원가입 API + 화면**: `POST /api/auth/signup-manager`(이메일/비번/이름/소속 매장 `storeId`) — 중복 409 → `role=MANAGER`·`approvalStatus=PENDING_APPROVAL_L1`로 영속(**자동 로그인·토큰 발급 없음**) → 2단계 승인(M7→S3) 후 `ACTIVE`. FE `app/pages/manager/signup.vue`(매장 select + 폼, 가입 후 "승인 대기" 안내 → `/manager/login`). 관리자 회원가입은 두지 않음
 
 > ⚠️ **SSR 토큰 보관**: 1차 ROADMAP_1 Phase 3에서 안내했듯 `localStorage`는 SSR에서 접근 불가입니다. JWT는 **`useCookie`(httpOnly 권장)** 로 보관해 SSR 미들웨어 단계에서도 인증 상태를 읽게 하세요.
 
@@ -1600,6 +1606,10 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 > ℹ️ **require_v1.md 12장(스택) 참조 시 주의**: require 12.1(FE)은 Nuxt 4 확정, 12.2(BE)는 "Java(LTS) + Spring Boot(최신 무료), 2단계에서 도입"입니다. 본 로드맵 BE 스택(Java 21 + Spring Boot 3.x + H2→MySQL)은 12.2를 정본으로 따릅니다.
 
 > ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로**: ① 일반매장매니저 — `/manager/reserve`(대행)·`/manager/reservations`(취소·완료 보조)·`/manager/dayoffs`(휴가/반차 신청 M6). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8). ③ 관리자 — `/admin/manager-approvals`(가입 2차 최종 승인 S3)·`/admin/sales`(매출 S8)·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9). 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
+
+> ✅ **v1.8 반영(2026-06-21 구현 완료)**: ① **매니저 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면(`/manager/reserve`·`/manager/dayoffs`)에서 매장 select가 **본인 소속 매장으로 고정·`disabled`**(변경 불가)된다. 이를 위해 BE `users.store_id` 컬럼·`User.storeId` 필드·`UserResponse.storeId`(로그인 응답)를 신설하고, 매니저 계열 시드(`manager1`·`storeadmin1`·`pending1/2` → `store1`)에 소속 매장을 부여한다(`USER`/`ADMIN`은 `NULL`). FE는 `auth.currentUser.storeId`로 매장을 고정. ② **개발용 빠른 로그인 역할별 랜딩**(`login.vue`, dev 전용) — 일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`. ③ **AppNav 역할별 BO 메뉴 분기** 노출.
+
+> ✅ **v1.9 반영**: **로그인 페이지 역할군별 3분리** — `/login`(일반사용자, 유지)·`/manager/login`(일반매장매니저+매장매니저관리자)·`/admin/login`(관리자), 각 페이지에 역할별 빠른 로그인. **매니저 회원가입** `/manager/signup`(+ `POST /api/auth/signup-manager`) — 소속 매장 선택 + `role=MANAGER` 신청 → `PENDING_APPROVAL_L1`(자동 로그인 없음) → 2단계 승인(M7→S3) 후 `ACTIVE`. 관리자 회원가입 폼은 두지 않는다(시드/내부 생성).
 
 > ℹ️ **명세 Q1~Q8 참조 시 주의**: 예약_규칙_명세_v1.md 8장의 미해결 질문은 **Phase 0 결정표에서 확정**되며, 그 결과가 Phase 1(도메인·스키마)·Phase 4(베이 노출)에 반영됩니다. 명세 문서 자체는 읽기 전용입니다.
 
