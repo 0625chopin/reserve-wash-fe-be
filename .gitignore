@@ -50,3 +50,10 @@ __screenshots__/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+.playwright-mcp/
+
+# Backend (Spring Boot) — 독립 Gradle 빌드 산출물 (backend/gradle/wrapper 는 커밋 유지)
+backend/build/
+backend/.gradle/
+*.class
+*.iml

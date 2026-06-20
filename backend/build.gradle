@@ -1,0 +1,37 @@
+// 2차 백엔드(Spring Boot) 빌드 설정
+// DB 접근은 MyBatis로만 한다 — JPA/Hibernate(spring-boot-starter-data-jpa) 도입 금지(require_v1.md v1.5)
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.carwash'
+version = '0.0.1-SNAPSHOT'
+
+// Java 21 (LTS) 툴체인 사용 (require 12.2)
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 웹 REST + 입력 검증
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // 영속 계층: MyBatis (매퍼 인터페이스 + XML SQL) — JPA 미사용
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+    // 2단계 인메모리 DB (H2)
+    runtimeOnly 'com.h2database:h2'
+    // 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

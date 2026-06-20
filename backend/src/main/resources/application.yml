@@ -1,0 +1,22 @@
+# 2차 백엔드 런타임 설정 (2단계: H2 in-memory)
+spring:
+  datasource:
+    # 인메모리 H2, MySQL 호환 모드 (재기동 시 휘발 — require 7.2)
+    url: jdbc:h2:mem:carwash;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      # http://localhost:8080/h2-console 로 확인
+      enabled: true
+
+# MyBatis 설정 (JPA/Hibernate 미사용 — require_v1.md v1.5)
+mybatis:
+  mapper-locations: classpath:mapper/*.xml      # 매퍼 XML 위치 (Phase 1부터 추가)
+  type-aliases-package: com.carwash.domain      # 도메인 POJO 별칭 패키지
+  configuration:
+    map-underscore-to-camel-case: true          # snake_case 컬럼 ↔ camelCase 프로퍼티
+
+server:
+  port: 8080
