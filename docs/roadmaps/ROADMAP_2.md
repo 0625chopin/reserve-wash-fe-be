@@ -875,12 +875,14 @@ export async function confirmReservation(payload: Reservation): Promise<boolean>
 }
 ```
 
-#### 완료기준 (DoD)
-- [ ] 동일 슬롯에 **동시 확정 요청 시 한 건만 성공**, 나머지는 409를 받는다(통합테스트 6장 검증)
-- [ ] 409 응답 시 FE가 1차 재선택 토스트("다른 슬롯을 선택해 주세요.")를 노출하고 그리드를 새로고침한다
-- [ ] 슬롯 `UNIQUE` 위반이 500이 아닌 **409**로 매핑된다(최종 방어선)
-- [ ] **1차 예약 위저드 E2E 회귀**(1p→2p→3p)가 서버 예약으로도 통과한다
-- [ ] `./gradlew build` + 동시성 통합테스트 통과, `npm run test:e2e` 통과
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(Phase 4 완료)
+- [x] 동일 슬롯에 **동시 확정 요청 시 한 건만 성공**, 나머지는 409를 받는다 (ReservationConcurrencyTest: 16스레드 동시 confirm → success==1, 나머지 충돌)
+- [x] 409 응답 시 FE가 1차 재선택 토스트("다른 슬롯을 선택해 주세요.")를 노출하고 그리드를 새로고침한다 (reservation.ts confirmReservation false→slot.vue 기존 토스트, 슬롯 재로드)
+- [x] 슬롯 `UNIQUE` 위반이 500이 아닌 **409**로 매핑된다 (GlobalExceptionHandler: DataIntegrityViolation·SlotConflictException→409 SLOT_CONFLICT)
+- [x] **1차 예약 위저드 E2E 회귀**(1p→2p→3p)가 서버 예약으로도 통과한다 (reserve.spec 115·188 서버 confirm 통과, 25건)
+- [x] `./gradlew build`(34건, 동시성 포함) + `npm run type-check` + `npm run test:e2e`(25건) 통과
+
+> 📌 **2차 구현 방침**: 슬롯 행은 **희소**(점유 시에만 존재). 점유는 **INSERT-on-hold** + `uk_slot` UNIQUE를 동시성 최종 방어선으로(동시 INSERT 1건만 통과→나머지 409). confirm은 **낙관락**(`updateStatusWithVersion` 영향행수 0=충돌) + reservation insert를 한 트랜잭션으로, **비관락**(`SELECT ... FOR UPDATE`)은 시연 경로. 보호 API(`/api/reservations/**` JWT 필수, userId는 토큰 uid). FE(additive): 슬롯 상태는 `GET /api/slots` 배치 하이드레이트(useState 캐시, 동기 getStatus 유지), confirm만 `$apiFetch` 서버 위임(reservation.ts/draft/slot.vue 3곳 async). E2E는 슬롯이 서버 전역 자원이라 spec별 유니크 날짜로 조정.
 
 #### 구현 메모 (📌)
 - 📌 **검증 위치 이동**: ROADMAP_1에서 슬롯 충돌은 **클라이언트 Pinia**가 판정했습니다. 이제 **진실은 서버/DB**입니다. FE의 점유 그리드 disabled는 "사전 차단 UX"로 유지하되, **최종 충돌 판정은 서버 409**가 담당합니다. 1차에서 방어 코드로 잔존시킨 `confirm()` 충돌 분기·`useToast`가 본 Phase에서 **실제 경로로 부활**합니다(ROADMAP_1 Phase 8 메모와 정합).

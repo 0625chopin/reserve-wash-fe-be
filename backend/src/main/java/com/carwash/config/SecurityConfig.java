@@ -2,6 +2,7 @@ package com.carwash.config;
 
 import com.carwash.security.JwtAuthenticationFilter;
 import com.carwash.security.JwtTokenProvider;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
@@ -34,11 +35,15 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())                   // 아래 CorsConfigurationSource 사용
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(h -> h.frameOptions(f -> f.disable()))    // h2-console iframe 허용
+                // 미인증 보호 API 접근은 403이 아닌 401로 응답(REST 관례, require 4장 DoD)
+                .exceptionHandling(e -> e.authenticationEntryPoint(
+                        (request, response, ex) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
-                        // 무인증 허용: 인증 API + 헬스 + 카탈로그 조회 + h2-console
+                        // 무인증 허용: 인증 API + 헬스 + 카탈로그 조회 + 슬롯 점유 현황(공개) + h2-console
                         .requestMatchers(
                                 "/api/auth/**", "/api/health",
-                                "/api/stores", "/api/managers", "/api/bays", "/api/prices")
+                                "/api/stores", "/api/managers", "/api/bays", "/api/prices",
+                                "/api/slots")
                         .permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .anyRequest().authenticated())

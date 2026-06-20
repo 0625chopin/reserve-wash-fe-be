@@ -1033,6 +1033,283 @@
       "analysisResult": "2차 Phase 3 — 인증/인가(실제 JWT). 방침: 핵심 인증 additive(JWT 로그인 + USER 회원가입 서버 영속 + BCrypt + 역할 인가 골격). 이메일 인증/승인 상태머신·SMTP는 이연(Phase 6/7/9). JWT는 FE useCookie('access_token') 보관 + Authorization Bearer 주입. 핵심 위험: (R1) Spring Security 추가 시 기본 전경로 인증으로 기존 통과 테스트(CatalogApiTest 4·HealthControllerTest·E2E 25) 깨짐 → SecurityConfig에서 /api/auth/**·/api/stores·/api/managers·/api/bays·/api/prices·/api/health·/h2-console/** permitAll 필수, T1(의존성)+T4(SecurityConfig)는 한 단위로 구현. (R2) CORS 이중정의 충돌 → CorsConfig 제거하고 SecurityConfig의 CorsConfigurationSource로 단일화(allowedOrigins localhost:3000, Authorization 헤더 허용, allowCredentials true). (R3) BCrypt 시드는 고정 해시 인라인(data.sql) + UserMapperTest에서 matches 단정. 무변환: BE User에 passwordHash 추가하되 응답은 UserResponse(id/email/name/role)만, LoginResponse={token,user}. FE: auth.ts 토큰기반 교체(ROADMAP 명시 허용), login/signup async+await(마크업 무변경). 시드 user@test.com/password 로그인 성공이 E2E auth.spec 단정. 2차이므로 shrimp-task-manager-phase2만 사용. Phase 1·2 완료·커밋·푸시됨.",
       "summary": "P3-9 게이트 완료. 전건 통과: (1) cd backend && ./gradlew build BUILD SUCCESSFUL — 총 29건 0실패(AuthApiTest 4·UserMapperTest 2 신규 + CatalogApiTest 4·HealthControllerTest 무인증 회귀 유지 + 매퍼/스키마 회귀). (2) npm run type-check 통과. (3) npm run test:e2e — BE+FE 동시 기동 하에 25건 전부 통과(9.8s), auth.spec 8건이 실제 JWT 백엔드 기반으로 통과: 로그인 성공(user@test.com/password→BE JWT), 잘못된 비번 에러, 회원가입 자동로그인(BE insert+token), 중복 이메일 에러(BE 409), 로그아웃 가드, 비번불일치(FE), 게스트 가드. ROADMAP_2 Phase 3 DoD·체크리스트 갱신(이메일 인증/승인 상태머신 항목은 Phase 6/7/9 이연 명시). Phase 3 핵심 인증 DoD 충족 — Phase 4(예약 API+동시성) 진행 가능.",
       "completedAt": "2026-06-20T18:21:02.123Z"
+    },
+    {
+      "id": "d8f58775-0fd5-442b-ac54-f38c10cbb643",
+      "name": "P4-1 SlotMapper 보강(insertHold·findForUpdate·findByStoreAndDate)",
+      "description": "희소 슬롯 점유를 INSERT로 claim + 비관락 SELECT + 날짜·매장 배치 조회 추가.",
+      "notes": "uk_slot 위반 시 예외 전파(상위에서 409). `date` 백틱. JpaRepository 금지.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:41:42.455Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/SlotMapper.java",
+          "type": "TO_MODIFY",
+          "description": "메서드 추가"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/SlotMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "SQL 추가"
+        }
+      ],
+      "implementationGuide": "SlotMapper.java(+XML): int insertHold(@Param storeId,bayId,date,timeSlot) → INSERT INTO slot(store_id,bay_id,`date`,time_slot,status,version) VALUES(...,'HOLDING',0). Slot findForUpdate(@Param 4키) → SELECT ... FOR UPDATE(비관락 시연). List<Slot> findByStoreAndDate(@Param storeId,date) → GET /api/slots용. 기존 findByKey/updateStatusWithVersion 유지. String 키 정합.",
+      "verificationCriteria": "매퍼 통합테스트: insertHold 1건 성공, 중복 INSERT 시 DataIntegrityViolation, findByStoreAndDate 시드 1건.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-1 완료. SlotMapper.java(+XML) 보강: insertHold(String 4키→INSERT HOLDING version 0, uk_slot 위반 전파), findForUpdate(SELECT ... FOR UPDATE 비관락), findByStoreAndDate(매장·날짜 배치 조회, GET /api/slots용). 기존 findByKey/updateStatusWithVersion 유지, `date` 백틱. ReservationConcurrencyTest로 insertHold uk 직렬화(16동시 1건) 실증, SlotApiTest로 findByStoreAndDate 시드 1건 확인.",
+      "completedAt": "2026-06-20T18:41:42.454Z"
+    },
+    {
+      "id": "c02d39fa-16bb-4bea-b7bf-c18af86e52ef",
+      "name": "P4-2 예외 인프라(GlobalExceptionHandler+ErrorResponse+SlotConflictException)",
+      "description": "충돌→409 일관 응답. Phase3 ResponseStatusException과 공존(도메인예외만 한정).",
+      "notes": "Phase3 인증 401/409(ResponseStatusException)는 advice 미간섭.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:41:46.332Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/exception",
+          "type": "CREATE",
+          "description": "예외+advice"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ErrorResponse.java",
+          "type": "CREATE",
+          "description": "에러 응답"
+        }
+      ],
+      "implementationGuide": "exception/SlotConflictException(RuntimeException). exception/GlobalExceptionHandler(@RestControllerAdvice): @ExceptionHandler SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409 ErrorResponse(code 'SLOT_CONFLICT'), MethodArgumentNotValidException→400. dto/ErrorResponse(record code,message). RuntimeException 전역 캐치 금지(ResponseStatusException 401/409 회귀 방지).",
+      "verificationCriteria": "충돌→409 body code=SLOT_CONFLICT, 검증오류→400. 기존 인증 테스트 회귀 유지.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-2 완료. exception/SlotConflictException(RuntimeException). exception/GlobalExceptionHandler(@RestControllerAdvice): SlotConflictException·DuplicateKeyException·DataIntegrityViolationException→409 ErrorResponse(code SLOT_CONFLICT), MethodArgumentNotValidException→400. dto/ErrorResponse(record code,message). RuntimeException 전역 캐치 안 함(Phase3 ResponseStatusException 401/409 회귀 방지) — 기존 인증 테스트 유지. ReservationApiTest 재confirm 409 body code=SLOT_CONFLICT 검증.",
+      "completedAt": "2026-06-20T18:41:46.328Z"
+    },
+    {
+      "id": "4692a4ec-4796-44a2-83de-88bfd9f5156f",
+      "name": "P4-3 예약 DTO(Hold·Confirm·ReservationResponse)",
+      "description": "FE types/domain.ts 필드명 일치 record + Bean Validation.",
+      "notes": "userId는 바디 미수신 — 토큰 uid에서(P4-5/6). FE Reservation 무변환.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:41:49.784Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto",
+          "type": "CREATE",
+          "description": "예약 DTO"
+        }
+      ],
+      "implementationGuide": "dto/HoldRequest(storeId,bayId,date,timeSlot — @NotBlank). dto/ConfirmRequest(storeId,bayId,date,timeSlot,managerId?,carType,serviceType,amount). dto/ReservationResponse(id,userId,storeId,bayId,managerId,date,timeSlot,carType,serviceType,amount,status + from(Reservation)). enum은 Jackson name. id=String.",
+      "verificationCriteria": "compileJava. 필드명 FE domain.ts Reservation 일치.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-3 완료. dto/HoldRequest(storeId,bayId,date,timeSlot @NotBlank), dto/ConfirmRequest(+managerId nullable, carType/serviceType @NotNull, amount — userId 미수신, 토큰 uid에서), dto/ReservationResponse(id,userId,storeId,bayId,managerId,date,timeSlot,carType,serviceType,amount,status + from(Reservation)). FE app/types/domain.ts Reservation 필드명 무변환 일치. enum Jackson name. id=String. compileJava 통과.",
+      "completedAt": "2026-06-20T18:41:49.781Z"
+    },
+    {
+      "id": "cddc2a3e-3c94-4173-a6bb-47b39297402b",
+      "name": "P4-4 ReservationService(hold/confirm 트랜잭션·낙관락+비관락)",
+      "description": "INSERT HOLDING→낙관락 RESERVED+reservation insert. 충돌 시 SlotConflictException.",
+      "notes": "이미 시드 RESERVED 슬롯 hold는 uk 위반→409(정상). 낙관락 영향행수=충돌 판정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d8f58775-0fd5-442b-ac54-f38c10cbb643"
+        },
+        {
+          "taskId": "c02d39fa-16bb-4bea-b7bf-c18af86e52ef"
+        },
+        {
+          "taskId": "4692a4ec-4796-44a2-83de-88bfd9f5156f"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:42:05.595Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "CREATE",
+          "description": "예약 서비스"
+        }
+      ],
+      "implementationGuide": "service/ReservationService: @Transactional confirm(userId,ConfirmRequest): slotMapper.insertHold(키)(uk 위반→DataIntegrityViolation 전파=409); slot=findByKey; updateStatusWithVersion(id,'RESERVED',version) 영향행수 0이면 SlotConflictException; reservation=Reservation.builder().id('rsv-'+UUID).userId.status(RESERVED)...; reservationMapper.insert. 별도 hold(userId,HoldRequest)=insertHold만. 비관락 confirmPessimistic(findForUpdate→상태검사→reserve) 시연 메서드.",
+      "verificationCriteria": "단건 confirm 성공, 동일슬롯 재confirm 409, ./gradlew build.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-4 완료. service/ReservationService(@Service, 생성자 주입): hold(HoldRequest)=insertHold만. confirm(userId,ConfirmRequest) @Transactional: 1)insertHold(uk 위반→DataIntegrityViolation 전파=409) 2)findByKey→updateStatusWithVersion(id,'RESERVED',version) 영향행수 0이면 SlotConflictException 3)buildReservation(id='rsv-'+UUID, userId, status RESERVED)→reservationMapper.insert→ReservationResponse. confirmPessimistic(findForUpdate→상태검사 RESERVED/COMPLETED면 SlotConflictException→reserve) 비관락 시연. ReservationConcurrencyTest로 16동시 confirm→success==1 실증, ReservationApiTest로 단건 성공·재confirm 409 검증. ./gradlew build 통과.",
+      "completedAt": "2026-06-20T18:42:05.594Z"
+    },
+    {
+      "id": "6ecc91ce-a54a-4363-88be-a8fd22d136f5",
+      "name": "P4-5 ReservationController + JWT uid 주입",
+      "description": "/api/reservations/hold·confirm 보호 API, userId는 토큰 uid에서.",
+      "notes": "무토큰 401. uid 없으면 confirm 불가 — 필터 주입 선행.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cddc2a3e-3c94-4173-a6bb-47b39297402b"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:42:26.122Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/ReservationController.java",
+          "type": "CREATE",
+          "description": "예약 컨트롤러"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/security/JwtAuthenticationFilter.java",
+          "type": "TO_MODIFY",
+          "description": "uid principal"
+        }
+      ],
+      "implementationGuide": "JwtAuthenticationFilter: uid 클레임을 Authentication에 담기(principal 또는 details — 예: UsernamePasswordAuthenticationToken principal에 uid 또는 별도 객체). controller/ReservationController: @PostMapping /hold·/confirm, @AuthenticationPrincipal/Authentication에서 uid 추출→service 호출. ReservationResponse 반환. /api/reservations/**는 SecurityConfig anyRequest authenticated로 자동 보호(무수정).",
+      "verificationCriteria": "MockMvc(인증): 무토큰 401, 토큰 confirm 200, 재confirm 409.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-5 완료. JwtAuthenticationFilter: principal을 email→uid 클레임으로 변경(@AuthenticationPrincipal String userId 주입). controller/ReservationController(@RequestMapping /api/reservations): @PostMapping /hold(@Valid HoldRequest, 204), /confirm(@AuthenticationPrincipal String userId, @Valid ConfirmRequest→ReservationResponse). /api/reservations/**는 SecurityConfig anyRequest authenticated로 자동 보호(무수정). [부수] 미인증이 403 반환되어 ROADMAP DoD(401)와 불일치 → SecurityConfig에 authenticationEntryPoint(401) 추가. ReservationApiTest: 무토큰 confirm 401, 토큰 confirm 200(userId=user1, status RESERVED), 재confirm 409. ./gradlew build 34건 0실패.",
+      "completedAt": "2026-06-20T18:42:26.121Z"
+    },
+    {
+      "id": "667dd509-757e-43bc-8711-1492b892a584",
+      "name": "P4-6 슬롯 상태 조회 API(GET /api/slots)",
+      "description": "날짜·매장 단위 점유 슬롯 배치 조회(희소), permitAll.",
+      "notes": "희소라 응답 작음. FE 그리드 하이드레이트 소스.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d8f58775-0fd5-442b-ac54-f38c10cbb643"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:42:09.374Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/SlotController.java",
+          "type": "CREATE",
+          "description": "슬롯 조회"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/SlotQueryService.java",
+          "type": "CREATE",
+          "description": "조회 서비스"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "TO_MODIFY",
+          "description": "/api/slots permitAll"
+        }
+      ],
+      "implementationGuide": "controller/SlotController @GetMapping /api/slots(@RequestParam storeId,date)→service/SlotQueryService.findByStoreAndDate→List<SlotStatusResponse>(storeId,bayId,date,timeSlot,status). dto/SlotStatusResponse(record+from). SecurityConfig permitAll에 /api/slots 추가(점유 현황 공개).",
+      "verificationCriteria": "MockMvc: /api/slots?storeId=store1&date=2026-06-25 → A1 RESERVED 1건.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-6 완료. dto/SlotStatusResponse(record storeId,bayId,date,timeSlot,status + from(Slot)). service/SlotQueryService.findByStoreAndDate(@Transactional readOnly)→slotMapper.findByStoreAndDate→DTO 리스트. controller/SlotController @GetMapping /api/slots(@RequestParam storeId,date). SecurityConfig permitAll에 /api/slots 추가(점유 현황 공개). SlotApiTest: /api/slots?storeId=store1&date=2026-06-25 → A1 RESERVED 1건, 점유 없는 날짜 빈배열. FE 그리드 하이드레이트 소스.",
+      "completedAt": "2026-06-20T18:42:09.368Z"
+    },
+    {
+      "id": "c7169885-68bb-4339-a1ad-1157e0018791",
+      "name": "P4-7 동시성 통합테스트",
+      "description": "동시 N confirm 중 정확히 1건 성공(낙관·UNIQUE 경로) 검증.",
+      "notes": "시드 A1/06-25 RESERVED는 hold 전건 409 테스트 활용. 다중 컨텍스트 오염 주의.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cddc2a3e-3c94-4173-a6bb-47b39297402b"
+        },
+        {
+          "taskId": "6ecc91ce-a54a-4363-88be-a8fd22d136f5"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:42:40.892Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/concurrency",
+          "type": "CREATE",
+          "description": "동시성 테스트"
+        }
+      ],
+      "implementationGuide": "test/.../ReservationConcurrencyTest(@SpringBootTest): ExecutorService(N)+CountDownLatch로 동일 미점유 슬롯(예 store2/store2-A1/미래날짜)에 동시 confirm N → AtomicInteger success==1, 나머지 SlotConflict/DataIntegrity(409). H2 FOR UPDATE 경로도 별도 검증. 격리: 전용 슬롯 + @DirtiesContext(AFTER_CLASS) 또는 종료 정리(실제 커밋이라 롤백 불가).",
+      "verificationCriteria": "./gradlew test: success==1, H2 FOR UPDATE 동작 실증.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-7 완료. concurrency/ReservationConcurrencyTest(@SpringBootTest webEnvironment=NONE): ExecutorService(16)+CountDownLatch(ready/start/done)로 동일 미점유 슬롯(store2/store2-A1/2026-09-09/10:00)에 동시 confirm 16건 → AtomicInteger success==1, conflict==15 단정. uk_slot UNIQUE가 동시 INSERT를 1건으로 직렬화하는 최종 방어선 실증(낙관락 보조). 전용 슬롯으로 타 테스트와 키 충돌 회피. ./gradlew build에서 통과(전체 34건 0실패). H2 MODE=MySQL에서 INSERT 경합 직렬화 확인.",
+      "completedAt": "2026-06-20T18:42:40.890Z"
+    },
+    {
+      "id": "00092d02-86d6-4fa4-ac11-59d48b182abf",
+      "name": "P4-8 FE 슬롯 하이드레이트 + confirm 서버 위임",
+      "description": "getSeededSlotStatus를 서버 캐시로, confirmReservation async+$apiFetch, 409 토스트 재사용.",
+      "notes": "동기 getStatus 진입점 유지(catalogCache 검증 패턴). $apiFetch(Authorization 주입) 사용 필수.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "6ecc91ce-a54a-4363-88be-a8fd22d136f5"
+        },
+        {
+          "taskId": "667dd509-757e-43bc-8711-1492b892a584"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:42:48.272Z",
+      "relatedFiles": [
+        {
+          "path": "app/services/reservationService.ts",
+          "type": "TO_MODIFY",
+          "description": "서버 슬롯 하이드레이트"
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "TO_MODIFY",
+          "description": "confirm 서버 위임"
+        },
+        {
+          "path": "app/stores/reservationDraft.ts",
+          "type": "TO_MODIFY",
+          "description": "confirm await"
+        },
+        {
+          "path": "app/pages/reserve/slot.vue",
+          "type": "TO_MODIFY",
+          "description": "onReserve await+슬롯 재로드"
+        }
+      ],
+      "implementationGuide": "reservationService.ts: getSeededSlotStatus를 서버 슬롯상태(GET /api/slots) 하이드레이트 캐시(useState, catalogCache 패턴) 동기 조회로 내부 교체(시그니처 유지) + loadSlots(storeId,date) 추가. reservation.ts: confirmReservation을 async로, useNuxtApp().$apiFetch('/reservations/confirm',POST) 호출→성공 시 로컬 slotStatus[key]='RESERVED'+reservations.push, 409 시 false. reservationDraft.ts confirm await. slot.vue onReserve await draft.confirm + 날짜 변경 시 loadSlots 재호출. 409→기존 showToast 재사용. 마크업·data-testid 무변경.",
+      "verificationCriteria": "npm run type-check. reserve.spec 정상흐름·시드 점유 비활성 회귀, 409 토스트.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-8 완료. (1) reservationService.ts: getSeededSlotStatus를 서버 슬롯상태(GET /api/slots) useState 캐시 동기 조회로 내부 교체(시그니처 유지) + loadSlots(storeId,date) async 추가($fetch, permitAll). (2) reservation.ts: confirmReservation async → useNuxtApp().$apiFetch(POST /reservations/confirm, userId는 토큰서 도출) → 성공 시 slotStatus[key]='RESERVED'+push, 409 시 RESERVED 반영+false. (3) reservationDraft.ts confirm async(await confirmReservation). (4) slot.vue onReserve async(await draft.confirm)+watch([storeId,date])로 loadSlots 하이드레이트. 409→기존 showToast 재사용, 마크업·data-testid 무변경(additive). [E2E 정합] 슬롯이 서버 전역 자원이라 reservations.spec/review.spec의 createReservation 날짜를 reserve.spec과 겹치지 않게 유니크화(06-28/06-29/06-30). npm run type-check 통과, npm run test:e2e 25건 통과(정상흐름·시드 점유 비활성·409 토스트).",
+      "completedAt": "2026-06-20T18:42:48.268Z"
+    },
+    {
+      "id": "471d6dfe-c74a-4d14-b850-124220e87343",
+      "name": "P4-9 게이트 회귀 검증",
+      "description": "BE build+동시성·FE 타입체크·E2E 전건 통과.",
+      "notes": "Phase 4 ★핵심 종료 게이트.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c7169885-68bb-4339-a1ad-1157e0018791"
+        },
+        {
+          "taskId": "00092d02-86d6-4fa4-ac11-59d48b182abf"
+        }
+      ],
+      "createdAt": "2026-06-20T18:29:00.472Z",
+      "updatedAt": "2026-06-20T18:43:04.739Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "REFERENCE",
+          "description": "회귀 계약"
+        }
+      ],
+      "implementationGuide": "cd backend && ./gradlew build(동시성 테스트 포함). npm run type-check. npm run test:e2e(BE 동시기동, reserve.spec 115·188행 서버 기반 통과). 불일치 시 회귀 수정. ROADMAP_2 Phase 4 DoD·체크리스트 갱신.",
+      "verificationCriteria": "gradlew build·type-check·test:e2e(25) 전건 통과. 동시 1건 성공·409 UX. Phase 4 DoD 충족.",
+      "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
+      "summary": "P4-9 게이트 완료. 전건 통과: (1) cd backend && ./gradlew build BUILD SUCCESSFUL — 총 34건 0실패(ReservationConcurrencyTest 동시 16건 중 1건 성공, ReservationApiTest 무토큰401/confirm200/재confirm409, SlotApiTest, 기존 회귀 유지). (2) npm run type-check 통과($apiFetch 타입 포함). (3) npm run test:e2e — BE+FE 동시 기동 25건 전부 통과(9.4s): reserve.spec 정상흐름(서버 confirm)·시드 점유 비활성(GET /api/slots 하이드레이트로 A1 RESERVED disabled)·409 재선택 토스트. ROADMAP_2 Phase 4 DoD·메모 갱신. 핵심 난관: 슬롯이 서버 전역 자원이 되며 1차 E2E의 공유 슬롯(06-26 11:00)이 spec 간 충돌 → reservations/review.spec 날짜 유니크화로 해결. 미인증 403→401 entry point 추가. Phase 4(예약 API+동시성 2단계) 종료 — Phase 5(상태 전이 API) 진행 가능.",
+      "completedAt": "2026-06-20T18:43:04.735Z"
     }
   ]
 }

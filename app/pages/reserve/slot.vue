@@ -1,12 +1,22 @@
 <script setup lang="ts">
 // 예약 위저드 2페이지 — 날짜·시간 선택 후 그 시간대 베이 버튼 그리드에서 베이 선택 → 예약하기
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { isManagerFullDayOff, isManagerOffAt } from '~/services/storeService'
+import { loadSlots } from '~/services/reservationService'
 
 definePageMeta({ middleware: ['auth', 'reservation-wizard-guard'] })
 
 const draft = useReservationDraftStore()
 const { toast, show: showToast } = useToast()
+
+// 매장·날짜가 정해지면 서버에서 해당 날짜 점유 슬롯을 로드해 그리드에 반영(2단계 하이드레이트)
+watch(
+  () => [draft.storeId, draft.date] as const,
+  async ([sid, d]) => {
+    if (sid && d) await loadSlots(sid, d)
+  },
+  { immediate: true },
+)
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -50,10 +60,10 @@ const timeItems = computed(() => {
   }))
 })
 
-function onReserve() {
+async function onReserve() {
   if (!draft.canConfirm) return
-  // 확정 직전 충돌 재검사는 스토어 confirm()이 담당 (require 7.1)
-  if (draft.confirm()) {
+  // 확정은 서버(UNIQUE+낙관락)가 최종 판정 — 충돌 시 false → 재선택 토스트 (require 7장)
+  if (await draft.confirm()) {
     navigateTo('/reserve/done')
   } else {
     showToast('선택하신 슬롯이 방금 예약되었습니다. 다른 슬롯을 선택해 주세요.')

@@ -35,22 +35,41 @@ export const useReservationStore = defineStore('reservation', () => {
     return true
   }
 
-  // 확정 직전 충돌 재검사 후 RESERVED 전이 (require 7.1 1단계)
-  // TODO(2단계): 이 검증을 서버(reservationService)로 위임 — UNIQUE 제약 + 락
-  // TODO(3단계): MySQL 트랜잭션 + 유니크 인덱스로 원천 차단
-  function confirmReservation(reservation: Reservation): boolean {
+  // 확정 — 서버(POST /api/reservations/confirm) 위임. UNIQUE 제약 + 낙관락이 동시성 최종 판정.
+  // 성공 시 로컬 RESERVED 반영 + 목록 추가, 409 등 충돌이면 false(호출부에서 재선택 토스트).
+  // 3단계(MySQL)에서도 서버 트랜잭션 + 유니크 인덱스로 시그니처 동일 유지.
+  async function confirmReservation(reservation: Reservation): Promise<boolean> {
     const key = slotKey(
       reservation.storeId,
       reservation.bayId,
       reservation.date,
       reservation.timeSlot,
     )
-    if (slotStatus.value[key] !== 'HOLDING') {
-      return false // 충돌 — 재선택 유도
+    const { $apiFetch } = useNuxtApp()
+    const base = useRuntimeConfig().public.apiBase
+    try {
+      // userId는 서버가 JWT(uid)에서 도출하므로 바디에 싣지 않는다
+      await $apiFetch(`${base}/reservations/confirm`, {
+        method: 'POST',
+        body: {
+          storeId: reservation.storeId,
+          bayId: reservation.bayId,
+          date: reservation.date,
+          timeSlot: reservation.timeSlot,
+          managerId: reservation.managerId,
+          carType: reservation.carType,
+          serviceType: reservation.serviceType,
+          amount: reservation.amount,
+        },
+      })
+      slotStatus.value[key] = 'RESERVED'
+      reservations.value.push({ ...reservation, status: 'RESERVED' })
+      return true
+    } catch {
+      // 서버 409(타인이 선점) — 그리드에 점유 반영하고 재선택 유도
+      slotStatus.value[key] = 'RESERVED'
+      return false
     }
-    slotStatus.value[key] = 'RESERVED'
-    reservations.value.push({ ...reservation, status: 'RESERVED' })
-    return true
   }
 
   // 점유(HOLDING) 해제 → AVAILABLE 복귀 (취소/충돌 시)

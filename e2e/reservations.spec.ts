@@ -39,7 +39,8 @@ async function createReservation(page: Page, dateVal: string, timeVal: string) {
 }
 
 test('예약 목록: RESERVED로 표시되고 세차완료로 전이된다', async ({ page }) => {
-  await createReservation(page, '2026-06-26', '11:00')
+  // 2단계: 슬롯은 서버 전역 1회 예약 자원 → reserve.spec 정상흐름(06-26 11:00)과 겹치지 않는 날짜 사용
+  await createReservation(page, '2026-06-28', '11:00')
   await page.getByTestId('nav-reservations').click()
   await expect(page).toHaveURL(/\/reservations$/)
 

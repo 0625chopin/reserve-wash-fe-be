@@ -11,7 +11,30 @@
           AND `date` = #{date} AND time_slot = #{timeSlot}
     </select>
 
-    <!-- 낙관적 락: version 일치 시에만 갱신, 영향 행 수로 충돌 판정(Phase 4) -->
+    <!-- 희소 슬롯 점유 — INSERT HOLDING. 동시 INSERT는 uk_slot UNIQUE가 1건만 통과(최종 방어선) -->
+    <insert id="insertHold">
+        INSERT INTO slot (store_id, bay_id, `date`, time_slot, status, version)
+        VALUES (#{storeId}, #{bayId}, #{date}, #{timeSlot}, 'HOLDING', 0)
+    </insert>
+
+    <!-- 비관적 락 — 트랜잭션 내 행 잠금(인기 슬롯 시연 경로) -->
+    <select id="findForUpdate" resultType="com.carwash.domain.Slot">
+        SELECT id, store_id, bay_id, `date`, time_slot, status, version
+        FROM slot
+        WHERE store_id = #{storeId} AND bay_id = #{bayId}
+          AND `date` = #{date} AND time_slot = #{timeSlot}
+        FOR UPDATE
+    </select>
+
+    <!-- 매장·날짜 단위 점유 슬롯 배치 조회 (희소) -->
+    <select id="findByStoreAndDate" resultType="com.carwash.domain.Slot">
+        SELECT id, store_id, bay_id, `date`, time_slot, status, version
+        FROM slot
+        WHERE store_id = #{storeId} AND `date` = #{date}
+        ORDER BY bay_id, time_slot
+    </select>
+
+    <!-- 낙관적 락: version 일치 시에만 갱신, 영향 행 수로 충돌 판정 -->
     <update id="updateStatusWithVersion">
         UPDATE slot
         SET status = #{status}, version = version + 1

@@ -148,9 +148,9 @@ export const useReservationDraftStore = defineStore('reservationDraft', () => {
     return `rsv-${seq}`
   }
 
-  // 예약 확정 — 미점유면 낙관적 점유 시도 후 확정 직전 충돌 재검사 (require 7.1)
+  // 예약 확정 — 미점유면 낙관적 점유 시도 후 서버 확정(reservation.confirmReservation 위임, require 7장)
   // 성공 시 lastReservation 요약을 채우고 true, 충돌이면 false(호출부에서 재선택 토스트)
-  function confirm(): boolean {
+  async function confirm(): Promise<boolean> {
     if (!canConfirm.value) return false
     const slot = currentSlot(bayId.value as string)
     if (reservation.getStatus(slot) !== 'HOLDING') {
@@ -170,7 +170,7 @@ export const useReservationDraftStore = defineStore('reservationDraft', () => {
       amount: price.value ?? 0,
       status: 'RESERVED',
     }
-    if (!reservation.confirmReservation(newReservation)) return false
+    if (!(await reservation.confirmReservation(newReservation))) return false
     heldSlot.value = null
     lastReservation.value = {
       store: approvedStores.find((s) => s.id === storeId.value)?.name ?? '',

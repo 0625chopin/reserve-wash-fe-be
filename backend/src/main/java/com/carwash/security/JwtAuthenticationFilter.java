@@ -30,11 +30,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Claims claims = tokenProvider.parse(token);
-                String email = claims.getSubject();
+                String uid = claims.get("uid", String.class);   // principal = 사용자 id(@AuthenticationPrincipal로 주입)
                 String role = claims.get("role", String.class);
                 // 역할은 ROLE_ 접두 권한으로 — hasRole 인가와 정합
                 var authentication = new UsernamePasswordAuthenticationToken(
-                        email, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                        uid, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (Exception e) {
                 // 무효/만료 토큰 → 인증 미설정(이후 인가에서 401/403)
