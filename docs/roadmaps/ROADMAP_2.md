@@ -1155,12 +1155,12 @@ public void approveL2() {
 1차의 후기/평점(ROADMAP_1 Phase 7)을 **서버 API**로 교체하고, BO 측 **관리자 후기 확인(S6)** 과 **매출 집계(S8)** 를 구현한다. 후기 작성 자격(세차완료 사용자만, require 9.1)은 서버에서 검증한다.
 
 #### 태스크 체크리스트
-- [ ] `POST /api/reviews` — 후기 작성, 작성 자격(COMPLETED + 본인 + 중복 방지) 서버 검증(require 9.1)
-- [ ] `GET /api/reviews/stores/{id}/average`·`/managers/{id}/average` — 평균 평점 집계
-- [ ] `GET /api/admin/stores/{id}/reviews` — 관리자 매장별 후기 확인(S6, require 11.1)
-- [ ] `GET /api/admin/stores/{id}/sales` — 매장별 매출 집계(S8) — COMPLETED 예약 금액 합산
-- [ ] FE `app/pages/review/[reservationId].vue`·`reservations.vue`를 서버 API로 교체
-- [ ] FE BO 화면(신규): 관리자 후기 확인·매출 대시보드
+- [x] `POST /api/reviews` — 후기 작성, 작성 자격(COMPLETED + 본인 + 중복 방지) 서버 검증(require 9.1) *(P8-2·P8-3)*
+- [x] `GET /api/reviews/stores/{id}/average`·`/managers/{id}/average` — 평균 평점 집계 *(Java 집계, AverageRatingResponse)*
+- [x] `GET /api/admin/stores/{id}/reviews` — 관리자 매장별 후기 확인(S6, require 11.1)
+- [x] `GET /api/admin/stores/{id}/sales` — 매장별 매출 집계(S8) — COMPLETED 예약 금액 합산 *(findByStore 재사용)*
+- [x] FE `review/[reservationId].vue`를 서버 API(POST /reviews, serverId)로 교체 + 서버 매장 평균 표시 — `reservations.vue`는 로컬 미러 유지(additive)
+- [x] FE BO 화면(신규): 관리자 후기 확인·매출 대시보드(`admin/sales.vue`)
 
 #### 생성·수정 파일
 `controller/ReviewController.java`, `controller/AdminReviewController.java`, `controller/SalesController.java`, `service/ReviewService.java`, `service/SalesService.java`, `dto/ReviewRequest.java`, `dto/AverageRatingResponse.java`, `dto/SalesResponse.java`, FE `app/pages/review/[reservationId].vue`(교체), FE `app/pages/admin/sales.vue`(신규)
@@ -1209,12 +1209,17 @@ public SalesResponse storeSales(Long storeId) {
 ```
 
 #### 완료기준 (DoD)
-- [ ] COMPLETED가 아닌/타인/중복 후기 작성이 **서버에서 차단**된다(require 9.1)
-- [ ] 평점(1~5) 범위를 벗어나면 거부된다(Bean Validation)
-- [ ] 매장/매니저 평균 평점이 서버 집계로 표시된다
-- [ ] 관리자가 매장별 후기(S6)·매출(S8)을 조회할 수 있다(권한 인가)
-- [ ] **1차 후기 E2E 회귀**(자격 가드·평점 제출·평균)가 서버 API로도 통과한다
-- [ ] `./gradlew build`, `npm run test:e2e` 통과
+- [x] COMPLETED가 아닌/타인/중복 후기 작성이 **서버에서 차단**된다(require 9.1) *(ReviewApiTest 미완료400·타인404·중복409)*
+- [x] 평점(1~5) 범위를 벗어나면 거부된다(Bean Validation) *(`평점_범위_초과는_400`, `@Min(1)@Max(5)`)*
+- [x] 매장/매니저 평균 평점이 서버 집계로 표시된다 *(GET .../average + review 페이지 avg-store)*
+- [x] 관리자가 매장별 후기(S6)·매출(S8)을 조회할 수 있다(권한 인가) *(ADMIN 200·USER 403, admin/sales.vue)*
+- [x] **1차 후기 E2E 회귀**(자격 가드·평점 제출·평균)가 서버 API로도 통과한다 *(review.spec 2건 — 서버 POST 위임 후 로컬 미러 표시)*
+- [x] `./gradlew build`(후기/매출 8건 포함 green)·`npm run test:e2e`(31건) 통과
+
+#### 구현 메모 (📌)
+- 📌 **후기 식별 = 예약 serverId**: 후기는 BE 예약 id(`serverId`)를 `reservationId`로 POST해 서버가 `reservationMapper.findById`로 자격(COMPLETED·본인=JWT uid·중복=`countByReservationId`)을 검증. 미존재/타인 404, 미완료 400, 중복 409, 평점 범위 400(Bean Validation). FE 표시 id(`rsv-N`)와 분리(Phase 5 `serverId` 재사용).
+- 📌 **로컬 미러 유지(additive)**: 서버 POST 성공 시 기존 클라이언트 `reviewStore`에도 add해 1차 표시 로직(`avg-overall`/`my-rating`/`my-review-text`/`reviewed-*`, `review-guard`, `reservations.vue`)을 무변경 유지 → review.spec 회귀 그린. 서버 집계는 매장 평균(`avg-store`)으로 **추가** 표시.
+- 📌 **매출 집계(S8) = 기존 매퍼 재사용**: `SalesService`가 `ReservationMapper.findByStore`(Phase 6)에서 COMPLETED 예약 `amount`를 Java로 합산 — 별도 집계 SQL 없이 구현. 후기 평균도 `findByStore`/`findByManager` 목록을 Java 집계.
 
 ---
 

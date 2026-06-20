@@ -32,9 +32,40 @@ function setRating(n: number) {
   rating.value = n
 }
 
-function onSubmit() {
+// 서버 매장 평균(2단계) — 후기 작성 후 서버 집계로 표시 (require 9.1)
+const storeAvg = ref<number | undefined>()
+async function loadStoreAverage() {
+  const t = target.value
+  if (!t) return
+  const { $apiFetch } = useNuxtApp()
+  const base = useRuntimeConfig().public.apiBase
+  try {
+    const res = await $apiFetch<{ average: number; count: number }>(
+      `${base}/reviews/stores/${t.storeId}/average`,
+    )
+    storeAvg.value = res.count > 0 ? res.average : undefined
+  } catch {
+    storeAvg.value = undefined
+  }
+}
+
+// 후기 등록 — 서버(POST /api/reviews)가 자격(COMPLETED·본인·중복·평점)을 최종 검증.
+// 성공 시 로컬 미러에도 반영(작성완료 화면 표시는 기존 로컬 로직 유지) + 서버 매장 평균 갱신.
+async function onSubmit() {
   const t = target.value
   if (!t || !canSubmit.value) return
+  const { $apiFetch } = useNuxtApp()
+  const base = useRuntimeConfig().public.apiBase
+  try {
+    // reservationId는 BE 예약 id(serverId) — 서버가 이 키로 예약 자격을 검증
+    await $apiFetch(`${base}/reviews`, {
+      method: 'POST',
+      body: { reservationId: t.serverId, rating: rating.value, text: text.value },
+    })
+  } catch {
+    // 서버 자격 거부(가드 선검증으로 정상 경로에선 미발생) — 로컬 미반영
+    return
+  }
   review.addReview({
     id: review.nextReviewId(),
     reservationId,
@@ -45,6 +76,7 @@ function onSubmit() {
     text: text.value,
     createdAt: new Date().toISOString(),
   })
+  await loadStoreAverage()
 }
 
 // 통합(전체) 평균 평점 (require 9.1) — 매장/매니저 구분 없는 서비스 전체 평균
@@ -81,6 +113,10 @@ const myReview = computed(() => review.reviewOf(reservationId))
         <dt class="text-[--color-content-muted]">통합 평균 평점</dt>
         <dd data-testid="avg-overall" class="font-medium text-[--color-content-strong]">
           ★ {{ fmtAvg(overallAvg) }}
+        </dd>
+        <dt class="text-[--color-content-muted]">매장 평균(서버 집계)</dt>
+        <dd data-testid="avg-store" class="font-medium text-[--color-content-strong]">
+          ★ {{ fmtAvg(storeAvg) }}
         </dd>
       </dl>
 

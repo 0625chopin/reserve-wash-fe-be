@@ -16,6 +16,17 @@
         WHERE store_id = #{storeId} ORDER BY created_at DESC
     </select>
 
+    <!-- 매니저별 후기 — 평균 평점 집계(Phase 8) -->
+    <select id="findByManager" resultType="com.carwash.domain.Review">
+        SELECT <include refid="columns"/> FROM review
+        WHERE manager_id = #{managerId} ORDER BY created_at DESC
+    </select>
+
+    <!-- 예약당 중복 작성 방지(require 9.1) -->
+    <select id="countByReservationId" resultType="int">
+        SELECT COUNT(*) FROM review WHERE reservation_id = #{reservationId}
+    </select>
+
     <insert id="insert">
         INSERT INTO review
             (id, reservation_id, user_id, store_id, manager_id, rating, `text`, created_at)

@@ -2218,6 +2218,281 @@
       "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우. 2차 배치(P7-5~P7-8): 컨트롤러+세분 인가, BE 결재 상태머신 통합테스트(하드 DoD 게이트), FE 결재 화면, 게이트+ROADMAP. 앞선 P7-1~P7-4(enum/도메인/스키마/매퍼/DTO/서비스)에 의존. 인가: approve-l1만 STORE_ADMIN 세분 매처를 일반 /api/manager/** 앞에 배치, /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409. 시드 STORE_ADMIN 유저(storeadmin@test.com) 추가됨. 슬롯 비활성 = 확정 휴무가 카탈로그(CONFIRMED 필터)→isManagerOffAt 게이팅. FE: role-guard 재사용, manager/dayoffs.vue·admin/approvals.vue 신규(AppNav 무수정). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용. Phase 7 DoD 게이트=BE 결재 상태머신 통합테스트(+1차 E2E 회귀·type-check). M7/S3(가입 승인)은 동일 패턴 재사용 명시 후 이연.",
       "summary": "P7-8 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — ApprovalApiTest 7건 포함 전건 0실패(16클래스). (2) npm run type-check 0 에러. (3) e2e/approval.spec.ts 2건(매니저 상신→storeadmin 1차→admin 2차 확정 풀 플로우, USER role-guard 리다이렉트). 하이드레이션 레이스는 워밍업 클릭+매니저 옵션 게이트로 방어, 행 식별은 고유 날짜 filter+DESC 정렬 first로 해결. npm run test:e2e 전건 31건(1차 25 + BO 4 + 결재 2) 통과. (4) ROADMAP_2 Phase 7 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(상태머신 4상태·APPROVED_L2 collapse, 슬롯 비활성=확정휴무 카탈로그 반영→isManagerOffAt, approve-l1 STORE_ADMIN 세분 인가, M7/S3 이연) 기록.",
       "completedAt": "2026-06-20T19:33:34.002Z"
+    },
+    {
+      "id": "311a98a1-4a37-4513-985f-538289f97629",
+      "name": "P8-1 BE ReviewMapper 보강 + 후기/매출 DTO 4종",
+      "description": "후기 자격검증/집계용 매퍼 추가와 DTO 4종 생성.",
+      "notes": "existsByReservationId는 int count 반환 후 서비스에서 >0 판정해도 무방. 평균은 Java 집계(빈 목록 count=0 average=0).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:40:57.440Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReviewMapper.java",
+          "type": "TO_MODIFY",
+          "description": "exists/findByManager",
+          "lineStart": 9,
+          "lineEnd": 15
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ReviewMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "쿼리 추가",
+          "lineStart": 14,
+          "lineEnd": 24
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ReviewRequest.java",
+          "type": "CREATE",
+          "description": "후기 작성 요청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ReviewResponse.java",
+          "type": "CREATE",
+          "description": "후기 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/AverageRatingResponse.java",
+          "type": "CREATE",
+          "description": "평균 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/SalesResponse.java",
+          "type": "CREATE",
+          "description": "매출 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "(1) ReviewMapper.java(+XML): boolean existsByReservationId(String reservationId)(SELECT COUNT(*)>0 또는 SELECT count→int), List<Review> findByManager(String managerId)(WHERE manager_id=#{managerId} ORDER BY created_at DESC). 기존 findById/findByStore/insert 보존. (2) dto/ReviewRequest.java: record(@NotBlank reservationId, @Min(1) @Max(5) int rating, String text). (3) dto/ReviewResponse.java: record(id,reservationId,userId,storeId,managerId,rating,text,createdAt) + from(Review). (4) dto/AverageRatingResponse.java: record(double average, int count). (5) dto/SalesResponse.java: record(String storeId, long total). jakarta.validation.",
+      "verificationCriteria": "existsByReservationId·findByManager 동작. 4 DTO 컴파일. rating @Min/@Max 적용. 빌드 통과.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-1 완료. ReviewMapper에 countByReservationId(int, 중복검증)·findByManager(매니저 후기) 추가(+XML). DTO 4종: ReviewRequest(reservationId @NotBlank, rating @Min1@Max5, text), ReviewResponse(8필드 + from(Review)), AverageRatingResponse(average,count), SalesResponse(storeId,total). 기존 findById/findByStore/insert 보존. ReviewApiTest 8건이 중복409·평점범위400 경로 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:40:57.436Z"
+    },
+    {
+      "id": "4233d231-ade6-4fc5-a25a-1e14efc9e56d",
+      "name": "P8-2 BE ReviewService + SalesService",
+      "description": "후기 작성 자격검증·평균집계 서비스와 매출 합산 서비스.",
+      "notes": "평균은 ratings.stream().mapToInt().average().orElse(0). ReservationStatus.COMPLETED enum 비교. ResponseStatusException/HttpStatus import.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "311a98a1-4a37-4513-985f-538289f97629"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:41:08.805Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReviewService.java",
+          "type": "CREATE",
+          "description": "후기 서비스",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/SalesService.java",
+          "type": "CREATE",
+          "description": "매출 서비스",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "service/ReviewService.java(@Service, 주입 ReviewMapper, ReservationMapper). addReview(ReviewRequest req, String userId): Reservation r=reservationMapper.findById(req.reservationId()); if(r==null) throw ResponseStatusException(404). if(!r.getUserId().equals(userId)) throw 404(존재비노출). if(r.getStatus()!=COMPLETED) throw 400('세차완료 예약만'). if(reviewMapper.existsByReservationId(req.reservationId())) throw 409('이미 작성'). Review review=Review.builder().id(\"rv-\"+UUID).reservationId(req.reservationId()).userId(userId).storeId(r.getStoreId()).managerId(r.getManagerId()).rating(req.rating()).text(req.text()).createdAt(java.time.Instant.now().toString()).build(); reviewMapper.insert(review); return ReviewResponse.from(review). storeAverage(storeId)/managerAverage(managerId)=findByStore/findByManager→ratings 평균·count(빈 0). listStoreReviews(storeId)=findByStore→ReviewResponse 리스트(S6). \n service/SalesService.java(@Service @Transactional(readOnly=true), 주입 ReservationMapper): storeSales(storeId)=findByStore(storeId).stream().filter(status==COMPLETED).mapToLong(amount).sum()→SalesResponse(storeId,total).",
+      "verificationCriteria": "addReview가 COMPLETED+본인+미중복+평점유효일 때만 insert. 404/400/409 분기. storeAverage/managerAverage 정확. storeSales=COMPLETED amount 합.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-2 완료. ReviewService(@Service): addReview=reservationMapper.findById→null/타인 404·미완료 400·중복(countByReservationId>0) 409 후 Review.builder(rv-UUID, Instant.now ISO) insert. storeAverage/managerAverage=findByStore/findByManager→ratings mapToInt average orElse 0 + count. listStoreReviews(S6). SalesService(@Service readOnly): storeSales=findByStore COMPLETED amount mapToLong sum→SalesResponse. ReviewApiTest 8건이 404/400/409/평균/매출 분기 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:41:08.801Z"
+    },
+    {
+      "id": "88780968-5e84-4268-9830-bab61eddd24a",
+      "name": "P8-3 BE 컨트롤러 3종",
+      "description": "후기 작성/평균(ReviewController), 관리자 후기 확인(AdminReviewController, S6), 매출(SalesController, S8).",
+      "notes": "AdminReviewController·SalesController 모두 /api/admin 하위라 ADMIN 인가 자동. 후기 작성 userId는 JWT uid.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4233d231-ade6-4fc5-a25a-1e14efc9e56d"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:41:21.644Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/ReviewController.java",
+          "type": "CREATE",
+          "description": "후기 작성/평균",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminReviewController.java",
+          "type": "CREATE",
+          "description": "관리자 후기(S6)",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/SalesController.java",
+          "type": "CREATE",
+          "description": "매출(S8)",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "controller/ReviewController.java(@RequestMapping(\"/api/reviews\")): @PostMapping ReviewResponse create(@AuthenticationPrincipal String userId, @Valid @RequestBody ReviewRequest req){ return reviewService.addReview(req, userId); }; @GetMapping(\"/stores/{id}/average\") AverageRatingResponse storeAvg(@PathVariable String id){...}; @GetMapping(\"/managers/{id}/average\") AverageRatingResponse managerAvg(@PathVariable String id){...}. controller/AdminReviewController.java(@RequestMapping(\"/api/admin\")): @GetMapping(\"/stores/{id}/reviews\") List<ReviewResponse> reviews(@PathVariable String id){ return reviewService.listStoreReviews(id); }. controller/SalesController.java(@RequestMapping(\"/api/admin\")): @GetMapping(\"/stores/{id}/sales\") SalesResponse sales(@PathVariable String id){ return salesService.storeSales(id); }. /api/reviews/**=authenticated(기존 anyRequest), /api/admin/**=ADMIN(기존). 추가 SecurityConfig 변경 불필요.",
+      "verificationCriteria": "POST /api/reviews(인증)·GET 평균·관리자 후기/매출(ADMIN) 동작. 빌드 통과.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-3 완료. ReviewController(/api/reviews: POST create(@AuthenticationPrincipal uid)·GET /stores/{id}/average·/managers/{id}/average), AdminReviewController(/api/admin/stores/{id}/reviews S6), SalesController(/api/admin/stores/{id}/sales S8). /api/reviews/**=anyRequest authenticated, /api/admin/**=ADMIN(기존 경로 인가 재사용, SecurityConfig 무변경). ReviewApiTest: 작성 인증·평균·관리자 매출 200·USER 매출 403 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:41:21.642Z"
+    },
+    {
+      "id": "ad9ef154-5442-43fd-bcaa-d689d764aaac",
+      "name": "P8-4 BE 후기/매출 통합테스트",
+      "description": "자격가드·중복·평점범위·평균·매출·역할 인가 검증.",
+      "notes": "complete는 PATCH /api/reservations/{serverId}/complete(user1). 매출은 COMPLETED 예약 누적이라 >0. 기존 ReservationApiTest/BoApiTest 패턴 재사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "88780968-5e84-4268-9830-bab61eddd24a"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:41:32.546Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/review/ReviewApiTest.java",
+          "type": "CREATE",
+          "description": "후기/매출 통합테스트",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "test/.../review/ReviewApiTest.java(@SpringBootTest @AutoConfigureMockMvc, JwtTokenProvider). 헬퍼: user1 confirm 예약(고유 슬롯)→id 캡처→PATCH complete→COMPLETED. 시나리오: (1) 작성 성공 — POST /api/reviews{reservationId:id,rating:5,text}→200 + jsonPath rating=5. (2) 중복 — 같은 예약 재작성→409. (3) 미완료 — confirm만(complete 안 함)→작성→400. (4) 타인 — user2 토큰으로 user1 예약 작성→404. (5) 평점범위 — rating:6→400(Bean Validation). (6) 평균 — GET /api/reviews/stores/store1/average→average>=값,count>=1. (7) 매출 S8 — ADMIN GET /api/admin/stores/store1/sales→total>0. (8) 역할 — USER가 /api/admin/stores/store1/sales→403. 고유 날짜/슬롯로 격리.",
+      "verificationCriteria": "작성성공/중복409/미완료400/타인404/평점범위400/평균/매출/역할403 전 시나리오 통과. ./gradlew test 전건 green.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-4 완료. ReviewApiTest 8건(@SpringBootTest+MockMvc): confirm(user1)→complete 헬퍼로 COMPLETED 예약 준비 후 — 작성 성공(rating=5·storeId), 중복 409, 미완료(complete 생략) 400, 타인(user2) 404, 평점범위(6) 400, 매장 평균 조회, 관리자 매출 S8 200(total), USER 매출 403. 고유 날짜(2026-12-10~16)·store1-A2로 슬롯 격리. ./gradlew test 전건 green(17클래스, 후기 8건 failures=0).",
+      "completedAt": "2026-06-20T19:41:32.541Z"
+    },
+    {
+      "id": "d0f13a09-2112-4238-8aa7-6db87a7d233e",
+      "name": "P8-5 FE review 페이지 서버 POST + 서버 평균 표시",
+      "description": "후기 작성을 서버 API로 위임(serverId 사용)하고, 서버 매장 평균을 표시. 기존 로컬 표시(avg-overall/my-rating/reviewed-*)는 미러로 유지(E2E 그린).",
+      "notes": "serverId 없으면 정상경로 아님(가드가 COMPLETED 보장, confirm 시 serverId 채워짐). reservations.vue·review-guard 무변경(로컬 미러). type-check 통과.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "88780968-5e84-4268-9830-bab61eddd24a"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:42:36.994Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/review/[reservationId].vue",
+          "type": "TO_MODIFY",
+          "description": "서버 POST + 매장 평균",
+          "lineStart": 35,
+          "lineEnd": 96
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "REFERENCE",
+          "description": "serverId 보유 확인",
+          "lineStart": 60,
+          "lineEnd": 73
+        }
+      ],
+      "implementationGuide": "app/pages/review/[reservationId].vue onSubmit을 async로: const t=target.value; if(!t||!canSubmit.value) return; $apiFetch POST `${base}/reviews` {reservationId:t.serverId, rating:rating.value, text:text.value} try/catch(실패 시 return). 성공 후 기존 review.addReview(local) 호출 유지 + await loadStoreAverage(). 서버 매장 평균 표시: storeAvg ref + loadStoreAverage()=$apiFetch GET `${base}/reviews/stores/${t.storeId}/average`→{average,count}; count>0이면 storeAvg=average. 템플릿 작성완료 영역에 avg-store element(data-testid=avg-store, count 0이면 '-') 추가. $apiFetch=useNuxtApp().$apiFetch, base=useRuntimeConfig().public.apiBase. 기존 avg-overall/my-rating/my-review-text/별점/textarea 마크업 유지.",
+      "verificationCriteria": "npm run type-check 통과. onSubmit이 POST /reviews(serverId) 후 로컬 미러 add. 서버 매장 평균 표시. review.spec 회귀 그린.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-5 완료. review/[reservationId].vue onSubmit을 async로 전환 — POST /api/reviews{reservationId:t.serverId,rating,text} 후 성공 시에만 기존 review.addReview(local 미러) 호출 + loadStoreAverage(). storeAvg ref + loadStoreAverage(GET /reviews/stores/{storeId}/average, count>0이면 average). 템플릿 작성완료 영역에 avg-store element 추가(count 0이면 '-'). 기존 avg-overall/my-rating/my-review-text/별점/textarea 마크업·review-guard·reservations.vue 무변경. npm run type-check 0 에러.",
+      "completedAt": "2026-06-20T19:42:36.989Z"
+    },
+    {
+      "id": "b85594d9-562a-4bc7-bd88-7c53c7d40b8a",
+      "name": "P8-6 FE 관리자 매출·후기 대시보드",
+      "description": "관리자 매장별 매출(S8)·후기(S6) 확인 페이지 신규. role-guard ADMIN.",
+      "notes": "ROADMAP admin/sales.vue 단일 페이지에 S6(후기)+S8(매출) 통합. AppNav 무수정(E2E는 직접 goto).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "88780968-5e84-4268-9830-bab61eddd24a"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:42:50.137Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/admin/sales.vue",
+          "type": "CREATE",
+          "description": "매출·후기 대시보드",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/manager/dayoffs.vue",
+          "type": "REFERENCE",
+          "description": "관리자 페이지 패턴",
+          "lineStart": 1,
+          "lineEnd": 60
+        }
+      ],
+      "implementationGuide": "app/pages/admin/sales.vue: definePageMeta({middleware:['auth','role-guard'], roles:['ADMIN']}). 매장 select(getApprovedStores) → 선택 시 GET /api/admin/stores/{id}/sales(SalesResponse{storeId,total})·GET /api/admin/stores/{id}/reviews(ReviewResponse[]) 로드. 매출 총액(testid=admin-sales-total) + 후기 목록(testid=admin-review-row-{id}: rating·text·date). $apiFetch/base. bo-input/.card/.btn 스타일 재사용. watch(storeId)로 재조회.",
+      "verificationCriteria": "npm run type-check 통과. 매장 선택 시 매출 총액·후기 목록 표시. role-guard ADMIN 적용. 기존 페이지/AppNav diff 없음.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-6 완료. admin/sales.vue(roles ADMIN): 매장 select(getApprovedStores)→watch로 GET /admin/stores/{id}/sales(SalesResponse)·/reviews(ReviewResponse[]) 로드. 매출 총액(admin-sales-total, ko-KR 원 표기) + 후기 목록(admin-review-row-{id}: rating/text/createdAt). role-guard ADMIN, bo-input/.card 스타일 재사용. AppNav 무수정. npm run type-check 0 에러.",
+      "completedAt": "2026-06-20T19:42:50.133Z"
+    },
+    {
+      "id": "a5e7e924-07ba-4ce7-8e2c-efbe47b98179",
+      "name": "P8-7 Phase 8 게이트 + ROADMAP",
+      "description": "Phase 8 DoD 게이트. BE 빌드(후기/매출 테스트)·type-check·1차 후기 E2E 회귀·전체 E2E 통과. ROADMAP_2 Phase 8 체크리스트/DoD 갱신.",
+      "notes": "review.spec 그린이 핵심 회귀. 서버 POST가 complete 후 COMPLETED 예약에 대해 성공해야 함(타이밍은 Playwright 자동 대기).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "ad9ef154-5442-43fd-bcaa-d689d764aaac"
+        },
+        {
+          "taskId": "d0f13a09-2112-4238-8aa7-6db87a7d233e"
+        },
+        {
+          "taskId": "b85594d9-562a-4bc7-bd88-7c53c7d40b8a"
+        }
+      ],
+      "createdAt": "2026-06-20T19:38:56.745Z",
+      "updatedAt": "2026-06-20T19:44:01.895Z",
+      "relatedFiles": [
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 8 갱신",
+          "lineStart": 1150,
+          "lineEnd": 1218
+        },
+        {
+          "path": "e2e/review.spec.ts",
+          "type": "REFERENCE",
+          "description": "후기 회귀",
+          "lineStart": 1,
+          "lineEnd": 78
+        }
+      ],
+      "implementationGuide": "(1) JAVA_HOME export 후 cd backend && ./gradlew build. (2) npm run type-check. (3) npm run test:e2e — review.spec(자격가드/평점제출/avg-overall) 서버 POST로도 회귀 그린 + BO/결재/예약 전건 통과. 실패 시 수정(서버 POST 타이밍·serverId). (선택) e2e에 관리자 매출 확인 시나리오 추가 가능. (4) docs/roadmaps/ROADMAP_2.md Phase 8 체크리스트/DoD [x] 갱신 + 구현 메모(reservationId=serverId 후기, 서버 자격검증 404/400/409, 매출=COMPLETED 합산 findByStore 재사용, 로컬 미러 유지 이유). 게이트 통과 후 커밋·푸시는 사용자 확인.",
+      "verificationCriteria": "./gradlew build BUILD SUCCESSFUL(후기/매출 테스트 포함). type-check 0. test:e2e 전건 통과(후기 회귀 포함). ROADMAP_2 Phase 8 DoD 체크 반영.",
+      "analysisResult": "2차 Phase 8 — 후기/평점 API + BO 확인(S6)·매출(S8). 1차 클라이언트 후기를 서버 API로 교체(자격검증 서버화), 관리자 후기 확인·매출 집계 추가.\n\n[핵심 설계]\n- 후기 reservationId = BE 예약 id(serverId). FE review 페이지가 target.serverId로 POST /api/reviews → 서버가 reservationMapper.findById로 예약 조회 후 COMPLETED·본인(JWT uid)·중복(existsByReservationId)·평점 1~5 검증. 성공 시 FE는 기존 로컬 reviewStore에도 add(1차 표시 로직 avg-overall/my-rating/my-review-text/reviewed-* 유지 → review.spec 그린) + 서버 매장 평균 표시(추가 element). 가드(review-guard)·reservations.vue 표시는 로컬 미러 유지(additive).\n- 평균: AverageRatingResponse{average,count}. storeAverage=findByStore 평균, managerAverage=findByManager 평균(Java 집계). 매출(S8): SalesService가 reservationMapper.findByStore(storeId)에서 COMPLETED amount 합산(기존 매퍼 재사용, 신규 SQL 불필요).\n- 인가: POST /api/reviews·GET /api/reviews/** = anyRequest().authenticated()(로그인 사용자). 관리자 후기(S6)·매출(S8) = /api/admin/** = ADMIN(기존 경로 인가 재사용). 미존재 404·자격미달 400·중복 409·평점범위 400(Bean Validation)·권한외 403.\n\n[현재 코드 사실 — 검증 완료]\n- Review 도메인{id,reservationId,userId,storeId,managerId,rating:int,text,createdAt}(@Builder). ReviewMapper{findById,findByStore,insert}+XML — existsByReservationId·findByManager 없음(추가). review 테이블 컬럼 일치.\n- 예약: reservationMapper.findById(BE id)·findByStore(Phase 6) 보유. Phase 5 complete()로 COMPLETED 전이. FE reservation 스토어 객체에 serverId(BE id) 보유(Phase 5).\n- FE review/[reservationId].vue: target=reservation.reservations.find(id=route param 표시 id). onSubmit=review.addReview(local). review-guard=COMPLETED+owner 로컬 검증. review.spec: test1 미완료→리다이렉트(가드), test2 complete→star-5+text+submit→review-done/avg-overall '5.0'/my-rating '5'/my-review-text→reservations에서 reviewed-rsv-1.\n- 시드 users: user1/user2(USER), manager1(MANAGER), storeadmin1(STORE_ADMIN), admin1(ADMIN), BCrypt('password'). SecurityConfig 경로 인가(admin/**=ADMIN, manager/**=MANAGER·STORE_ADMIN, approve-l1=STORE_ADMIN) + anyRequest authenticated + 401 entrypoint.\n- 공유 H2 mem DB 멀티컨텍스트 — 신규 테스트는 고유 슬롯/날짜로 격리(reservation insert 충돌 회피).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용. DoD: COMPLETED아님/타인/중복 차단·평점1~5·서버 평균 표시·관리자 S6/S8·1차 후기 E2E 회귀·build/test:e2e.",
+      "summary": "P8-7 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — ReviewApiTest 8건 포함 전건 0실패(17클래스). (2) npm run type-check 0 에러. (3) npm run test:e2e 전건 31건 통과 — review.spec 2건(자격 가드·평점 제출·avg-overall)이 서버 POST 위임(serverId) 후에도 로컬 미러 표시로 회귀 그린, BO/결재/예약 전건 통과. (4) ROADMAP_2 Phase 8 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(후기=예약 serverId, 서버 자격검증 404/400/409, 로컬 미러 유지 이유, 매출/평균 기존 findByStore/findByManager Java 집계) 기록.",
+      "completedAt": "2026-06-20T19:44:01.893Z"
     }
   ]
 }
