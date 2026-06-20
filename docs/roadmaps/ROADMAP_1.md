@@ -1,6 +1,6 @@
 # 자동차 세차 예약 서비스 (MVP) 개발 로드맵 — 1차 FO + 프론트 더미 데이터
 
-> **문서 버전**: v1.4 (예약 3단계 위저드 분할 & 진행상태 스토어 반영)
+> **문서 버전**: v1.5 (일반 회원가입(FW1) Phase 3.1 신설 — 1차 누락분 보강)
 > **작성일**: 2026-06-20
 > **작성자**: PM/PL
 > **대상 독자**: 주니어 ~ 시니어 프론트엔드 개발자
@@ -12,6 +12,8 @@
 > **🔄 v1.3 변경 요약**: require_v1.md v1.3의 **예약 규칙 2건**을 최소 변경(additive)으로 반영했습니다. ① 매니저 휴무 모델을 전일(`FULL_DAY`)/**3교대 기반 교대조 단위 부분 휴무**(`SHIFT_1`/`SHIFT_2`/`SHIFT_3`)로 확장 — Phase 1 도메인 타입·더미데이터, Phase 5 슬롯 비활성 로직에 반영. ② **베이 슬롯 점유 시 선택 불가**(RESERVED/COMPLETED 베이는 해당 시간대 미니 그리드에서 비활성) — 선택 순서(매장→매니저→차종→베이→날짜/시간)는 유지하는 하이브리드 UI로 Phase 5에 반영. Phase 구성·공수·표 스타일·문서 톤은 그대로 유지했습니다(require 5.5·6.1·7장 연계).
 >
 > **🔄 v1.4 변경 요약**: require_v1.md v1.4의 **예약 3단계 위저드 분할**을 최소 변경(additive)으로 반영했습니다. 예약 플로우를 `/reserve`(1p 매장·매니저·차종·서비스·가격) → `/reserve/slot`(2p 날짜·시간·베이 그리드·확정) → `/reserve/done`(3p 완료 요약) **3개 라우트로 분할**하고, 단계 간 진행 데이터를 **`reservationDraft` Pinia 스토어(1단계 in-memory)** 에 보관합니다. 베이 선택은 **버튼 그리드 단일 방식**으로 통일(베이 SearchableSelect 폐지)하며, 미완료 단계 직접 진입을 막는 **`reservationWizardGuard` 미들웨어**(auth와 체이닝)를 도입합니다. 기존 Phase 5 본문(슬롯 그리드·동시성·교대조 휴무·베이 점유)은 그대로 유지하고, **Phase 5.1**(Phase 5 완료 이후 증분)을 신설했습니다. 슬롯 점유의 진실은 기존 `reservation` 스토어가 계속 소유합니다(require 6.5·12.3·12.4 연계).
+>
+> **🔄 v1.5 변경 요약**: require_v1.md **4장의 일반 회원가입(FW1)** 을 1차 누락분으로 보강했습니다. 기존 로드맵은 로그인(FW2)만 다루고 **회원가입(FW1)을 누락**했으므로, **Phase 3.1**(Phase 3 로그인 완료 이후 증분)을 신설하여 **일반 사용자(USER) 회원가입**을 추가합니다. 구현 깊이는 **즉시 가입(더미)** — 폼 검증·이메일 중복 체크 → in-memory `users` 추가 → **즉시 활성**(자동 로그인 또는 `/login` 이동)이며, 상태머신(`REQUESTED`/`EMAIL_VERIFIED` 등)은 1차에 도입하지 않습니다. **이메일 인증·SMTP, 매니저(M1)/관리자(S1) 가입, 관리자 승인 UI(S3)는 2차(ROADMAP_2, require 13.2·2.2)** 로 명시합니다. Phase 5.1과 동일한 additive 방식으로 **기존 Phase 번호·본문은 건드리지 않고**(표의 누적/총계 수치만 갱신) Phase 3과 Phase 4 사이에 삽입했습니다(require 4.1·4.3·4.4·11.1 연계).
 
 ---
 
@@ -44,16 +46,17 @@
 | **1** | 도메인 타입 & 더미 데이터 레이어 | `app/types/`, `app/data/`, 슬롯·가격 유틸 (Manager 휴무 모델 교대조 구조화) | 5·10장 | 2.0 | 2.5 |
 | **2** | 라우팅 & 레이아웃 골격 | 파일 기반 라우트 4종, 레이아웃, 미들웨어 가드 스텁 | 12.4 | 1.5 | 4.0 |
 | **3** | 인증 / 로그인 (FW2) | `auth` 스토어, 로그인 폼, 가드 연동 | 4장 | 2.0 | 6.0 |
-| **4** | 매장/매니저 선택 + 검색 UX (FW3/FW4) | `SearchableSelect`, 필터 검색 | 6.3 | 2.5 | 8.5 |
-| **5** | 예약 페이지 & 슬롯 그리드 + 동시성 시뮬레이션 (FW5) | 슬롯 그리드, 낙관적 갱신, 가격 계산 | 5·6·7장 | 4.0 | 12.5 |
-| **5.1** | 예약 위저드 3분할 & 진행상태 스토어 | `reservationDraft` 스토어, `reserve/{index,slot,done}.vue`, 위저드 가드 | 6.5·12.3·12.4 | 2.0 | 14.5 |
-| **6** | 예약 확정/취소/세차완료 (FW6/FW7) | 예약 목록, 상태 전이, 취소 2케이스 | 11.3 | 2.5 | 17.0 |
-| **7** | 후기/평점 (1차 확장) | 후기 작성, 평점 집계 | 9장 | 2.0 | 19.0 |
-| **8** | E2E 테스트 & 마무리 | Playwright 시나리오, 린트/타입 통과 | 6장(본 문서) | 2.0 | 21.0 |
+| **3.1** | 회원가입 (FW1, 일반 사용자) | `signup.vue`·게스트 가드·`auth.signup` | 4장 | 1.5 | 7.5 |
+| **4** | 매장/매니저 선택 + 검색 UX (FW3/FW4) | `SearchableSelect`, 필터 검색 | 6.3 | 2.5 | 10.0 |
+| **5** | 예약 페이지 & 슬롯 그리드 + 동시성 시뮬레이션 (FW5) | 슬롯 그리드, 낙관적 갱신, 가격 계산 | 5·6·7장 | 4.0 | 14.0 |
+| **5.1** | 예약 위저드 3분할 & 진행상태 스토어 | `reservationDraft` 스토어, `reserve/{index,slot,done}.vue`, 위저드 가드 | 6.5·12.3·12.4 | 2.0 | 16.0 |
+| **6** | 예약 확정/취소/세차완료 (FW6/FW7) | 예약 목록, 상태 전이, 취소 2케이스 | 11.3 | 2.5 | 18.5 |
+| **7** | 후기/평점 (1차 확장) | 후기 작성, 평점 집계 | 9장 | 2.0 | 20.5 |
+| **8** | E2E 테스트 & 마무리 | Playwright 시나리오, 린트/타입 통과 | 6장(본 문서) | 2.0 | 22.5 |
 | — | **데이터 2단계** (Spring Boot 더미) | *개요만* — 서비스 추상화, UNIQUE+락 | 7·12장 | (별도) | — |
 | — | **데이터 3단계** (MySQL) | *개요만* — 트랜잭션 + 유니크 인덱스 | 7·12장 | (별도) | — |
 
-> **총 예상 공수: 약 21일** (주니어 기준 넉넉하게 산정. 리뷰·수정 버퍼 포함. v1.4에서 Phase 5.1 +2일 반영). 2·3단계는 별도 로드맵으로 분리 예정.
+> **총 예상 공수: 약 22.5일** (주니어 기준 넉넉하게 산정. 리뷰·수정 버퍼 포함. v1.4에서 Phase 5.1 +2일, **v1.5에서 회원가입 Phase 3.1 +1.5일** 반영). 2·3단계는 별도 로드맵으로 분리 예정.
 >
 > 🔄 **v1.3 데이터 레이어 영향(Phase 1)**: 매니저 휴무 모델이 기존 `dayoffDates: string[]`(전일만 표현) → **교대조 정보를 포함한 구조**(`{ date, type: 'FULL_DAY' | 'SHIFT_1' | 'SHIFT_2' | 'SHIFT_3' }[]`)로 확장됩니다. Phase 1의 도메인 타입(`Manager`)·더미 데이터(`app/data/managers.ts`)가 영향받으며, Phase 5의 슬롯 비활성 판정이 이를 소비합니다(require 5.5 참조). 공수·Phase 구성 변동 없음(additive).
 >
@@ -393,6 +396,7 @@ Nuxt 파일 기반 라우팅에서 **파일 경로가 곧 URL**입니다. 동적
 | 화면 | 라우트 URL | 파일 경로 (`app/pages/`) | 가드 |
 |---|---|---|---|
 | 로그인 (FW2) | `/login` | `login.vue` | — |
+| 회원가입 (FW1) | `/signup` | `signup.vue` | `middleware: 'guest'` |
 | 예약 (FW3~FW5) | `/reserve` | `reserve.vue` | `middleware: 'auth'` |
 | 예약 목록/취소/완료 (FW6/FW7) | `/reservations` | `reservations.vue` | `middleware: 'auth'` |
 | 후기 작성 | `/review/:reservationId` | `review/[reservationId].vue` | `middleware: 'auth'` |
@@ -521,6 +525,110 @@ export default defineNuxtRouteMiddleware((to) => {
 - [ ] 미인증 상태로 `/reserve` 접근 시 `/login`으로 리다이렉트
 - [ ] 로그아웃 후 보호 라우트 접근 불가
 - [ ] `npm run type-check`, `npm run lint` 통과
+
+---
+
+### Phase 3.1 — 회원가입 (FW1, 일반 사용자) *(v1.5 신설)*
+
+> **공수: 1.5일** · **선행조건: Phase 3** · **require_v1.md 참조: 4.1·4.3·4.4, 11.1(FW1)**
+
+#### 목표
+일반 사용자(USER) 회원가입을 추가한다. **폼 검증 → 이메일 중복 체크 → in-memory `users` 등록 → 즉시 활성**(자동 로그인 또는 `/login` 이동)까지의 즉시 가입(더미)을 구현한다. **매니저(M1)/관리자(S1) 가입·이메일 인증·SMTP·관리자 승인 UI(S3)는 2차** 범위이며, 상태머신(`REQUESTED`/`EMAIL_VERIFIED`/`PENDING_APPROVAL` 등 require 4.4)은 1차에서 도입하지 않는다(승인 불필요한 일반 사용자는 require 4.4 단서대로 곧장 `ACTIVE`로 간주).
+
+> 💡 **Phase 3와의 관계(증분)**: Phase 3의 `auth` 스토어·게스트 진입 패턴·로그인 폼 검증(필수값→이메일 정규식→인증)을 **그대로 재사용**합니다. 본 Phase 3.1은 그 위에 **회원가입 화면·`signup` 액션·게스트 가드**를 얹는 작업으로, 기존 Phase 3·4·5 본문은 변경하지 않습니다(additive).
+
+#### 태스크 체크리스트
+- [ ] `app/pages/signup.vue` — 이메일·비밀번호·비밀번호확인·이름 폼. **login.vue 검증 패턴 재사용**(필수값 → 이메일 정규식 `/^[^@\s]+@[^@\s]+\.[^@\s]+$/` → 비밀번호 일치 → 이메일 중복). data-testid: `signup-email`·`signup-password`·`signup-password-confirm`·`signup-name`·`signup-submit`·`signup-error`. `definePageMeta({ middleware: 'guest' })`
+- [ ] `app/middleware/guest.ts` — 게스트 전용 가드. **로그인 상태면 `/reserve`로 리다이렉트**. 미들웨어 키 `guest`(파일명 kebab-case)
+- [ ] `app/stores/auth.ts` — `signup(payload)` 액션 추가: **이메일 중복 검사 → users in-memory 추가(role `'USER'`) → 자동 로그인**(또는 결과 반환). 2차 교체 지점에 `// TODO(2단계: authService/$fetch)` 주석
+- [ ] `app/data/users.ts` — 1차 비밀번호 더미 처리 방침 1줄 명시(가입 비번 in-memory 보관 또는 기존 통일 더미 비번 `'password'` 유지)
+- [ ] `app/components/AppNav.vue` — 미인증 시 "회원가입" 링크 노출(`data-testid="nav-signup"`)
+- [ ] `app/pages/login.vue` — "회원가입" 링크 추가(로그인 ↔ 가입 상호 이동)
+- [ ] `e2e/auth.spec.ts` — 회원가입 시나리오 보강(가입 성공·중복 이메일·비번 불일치·게스트 가드)
+
+> ⚠️ **SSR 주의 (Nuxt 기본 SSR)**: 게스트 가드는 서버 렌더 단계에서도 인증 상태를 읽어야 하므로 `auth` 스토어가 `useCookie` 기반(Phase 3 구현)임을 전제로 동작합니다. 클라이언트 전용 분기는 `import.meta.client` 가드 안에서 처리하세요.
+
+#### 생성·수정 파일
+`app/pages/signup.vue`(신규), `app/middleware/guest.ts`(신규), `app/stores/auth.ts`(수정 — `signup` 추가), `app/components/AppNav.vue`(수정 — 회원가입 링크), `app/pages/login.vue`(수정 — 회원가입 링크), `e2e/auth.spec.ts`(수정 — 시나리오 보강)
+
+#### 구현 예시 (oxfmt 스타일 — 세미콜론 없음, 작은따옴표)
+
+`app/stores/auth.ts` — `signup` 액션 (이메일 중복 검사 → users push → 자동 로그인)
+```ts
+// 일반 사용자(USER) 즉시 가입 — 이메일 중복 검사 → in-memory 등록 → 자동 로그인 (1단계, require 4.3)
+// TODO(2단계: authService/$fetch): SMTP 이메일 인증·승인 분기(require 4.4)로 교체
+function signup(payload: { email: string; password: string; name: string }): boolean {
+  // 이메일 중복 검사 — 이미 가입된 이메일이면 실패
+  const exists = users.some((u) => u.email === payload.email)
+  if (exists) {
+    return false
+  }
+  // in-memory users 등록 (role 'USER' 고정, 승인 불필요 → 즉시 활성)
+  const created: User = {
+    id: `user${users.length + 1}`,
+    email: payload.email,
+    name: payload.name,
+    role: 'USER',
+  }
+  users.push(created)
+  // 즉시 활성 — 자동 로그인 (또는 false 반환 후 /login 이동 정책으로 대체 가능)
+  currentUser.value = created
+  return true
+}
+```
+
+`app/middleware/guest.ts` — 게스트 전용 가드
+```ts
+// 게스트 전용 가드 — 이미 로그인했다면 회원가입 화면 진입을 막고 /reserve로 (require 4.1)
+export default defineNuxtRouteMiddleware(() => {
+  const auth = useAuthStore()
+  if (auth.isLoggedIn) {
+    return navigateTo('/reserve')
+  }
+})
+```
+
+`app/pages/signup.vue` — 검증 핵심 발췌 (login.vue 패턴 재사용)
+```ts
+function onSubmit() {
+  error.value = ''
+  // 필수값 검증
+  if (!email.value || !password.value || !passwordConfirm.value || !name.value) {
+    error.value = '모든 항목을 입력하세요'
+    return
+  }
+  // 이메일 형식 검증(login.vue와 동일 정규식)
+  const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value)
+  if (!emailOk) {
+    error.value = '이메일 형식이 올바르지 않습니다'
+    return
+  }
+  // 비밀번호 일치 검증
+  if (password.value !== passwordConfirm.value) {
+    error.value = '비밀번호가 일치하지 않습니다'
+    return
+  }
+  // 이메일 중복 → signup이 false 반환
+  if (!auth.signup({ email: email.value, password: password.value, name: name.value })) {
+    error.value = '이미 가입된 이메일입니다'
+    return
+  }
+  // 즉시 활성(자동 로그인) → 예약 화면으로 (또는 '/login' 이동 정책 선택 가능)
+  navigateTo('/reserve')
+}
+```
+
+#### 완료기준 (DoD)
+- [ ] 올바른 입력으로 가입 성공 시 자동 로그인되어 `/reserve`로 이동한다(또는 `/login` 이동 정책 시 로그인 화면으로 이동)
+- [ ] 이미 가입된 이메일로 가입 시도 시 "이미 가입된 이메일입니다" 에러가 노출된다(`signup-error`)
+- [ ] 비밀번호와 비밀번호확인이 다르면 "비밀번호가 일치하지 않습니다" 에러가 노출된다
+- [ ] 로그인 상태로 `/signup` 진입 시 `/reserve`로 리다이렉트된다(게스트 가드)
+- [ ] `npm run type-check`, `npm run lint`, `npm run test:e2e` 통과
+
+> 📌 **구현 메모**
+> - 이메일 인증/SMTP·관리자 승인(S3)·매니저(M1)/관리자(S1) 가입은 **2차(ROADMAP_2, require 13.2·2.2)** 과제입니다. 본 Phase는 **일반 사용자(USER) 즉시 가입**만 다룹니다.
+> - in-memory `users` 배열에 push하므로 **브라우저 새로고침 시 가입 데이터가 초기화**됩니다(1단계 한계 — require 12.3 교체 경계에서 서버/DB로 영속화 예정).
+> - ⚠️ **SSR 주의**: 게스트 가드는 `useCookie` 기반 인증 상태를 SSR/클라이언트 모두에서 읽으며, 클라이언트 전용 로직은 `import.meta.client` 가드 안에서 처리해 hydration mismatch를 방지하세요.
 
 ---
 
@@ -1227,6 +1335,7 @@ feat(phase5): 슬롯 그리드 낙관적 갱신 구현
 | Phase 1 | 도메인 타입·더미 데이터·가격 | 5장, 10장 | — |
 | Phase 2 | 라우팅·레이아웃 골격 | 12.4 | — |
 | Phase 3 | 로그인 | 4장 | **FW2** |
+| Phase 3.1 | 회원가입(일반 사용자) | 4장 | **FW1** |
 | Phase 4 | 매장/매니저 선택 + 검색 | 6.3 | **FW3, FW4** |
 | Phase 5 | 예약·슬롯 그리드·동시성 1단계 (매니저 교대/휴무·베이 점유 선택불가 포함) | 5장(5.2·**5.5**)·6장(**6.1**)·7장 | **FW5** |
 | Phase 5.1 | 예약 위저드 3분할·진행상태 스토어·위저드 가드·베이 그리드 단일화 | **6.5**·12.3·12.4 | **FW5** |
@@ -1241,4 +1350,4 @@ feat(phase5): 슬롯 그리드 낙관적 갱신 구현
 
 ---
 
-> **문서 끝.** 본 로드맵은 require_v1.md v1.1을 기준으로 작성되어 **v1.4**(매니저 3교대 부분 휴무·베이 슬롯 점유 선택불가 규칙 + 예약 3단계 위저드 분할·진행상태 Pinia 스토어·베이 버튼 그리드 단일화)까지 반영했으며, 1차 FO + 프론트 더미 데이터 단계에 집중합니다.
+> **문서 끝.** 본 로드맵은 require_v1.md v1.1을 기준으로 작성되어 **v1.5**(매니저 3교대 부분 휴무·베이 슬롯 점유 선택불가 규칙 + 예약 3단계 위저드 분할·진행상태 Pinia 스토어·베이 버튼 그리드 단일화 + **일반 회원가입(FW1) Phase 3.1 신설 — 즉시 가입 더미**)까지 반영했으며, 1차 FO + 프론트 더미 데이터 단계에 집중합니다. 이메일 인증/SMTP·매니저/관리자 가입·관리자 승인 UI는 2차(ROADMAP_2, require 13.2·2.2) 과제입니다.
