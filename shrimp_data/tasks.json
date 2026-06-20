@@ -458,6 +458,250 @@
       "analysisResult": "require_v1.md v1.3 / ROADMAP.md v1.3에 추가된 예약 규칙 2건을 코드에 반영. (1) 매니저 휴무를 전일(FULL_DAY) 또는 3교대 기반 교대조 단위(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00 익일)로 모델링 — 운영은 24시간 유지, 교대조 휴무면 해당 시간대 30분 슬롯만 비활성, 전일이면 그날 전체 비활성. (2) 베이 슬롯 점유 시 선택 불가 — 특정 베이가 (날짜,시간) 슬롯에 RESERVED/COMPLETED면 그 슬롯에서 비활성. 선택 순서는 현행(매장→매니저→차종→베이→날짜/시간) 유지, 날짜·시간 선택 후 미니 SlotGrid에서 예약된 베이 disabled(하이브리드 결정). 규칙(shrimp-rules.md): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/명시 import 규칙, services 단방향(스토어/컴포넌트는 services 경유), SSR 안전, 슬롯키 UNIQUE=(storeId|bayId|date|timeSlot), 도메인 정본=require_v1.md, 예약 UI 동작 정본=예약_규칙_명세_v1.md, 주석/커밋 한국어. 본 태스크들은 기존 Phase 5 태스크(T1~T7)를 보강한다(베이 충돌은 T2/T4/T5의 슬롯 status·미니그리드와 연계).",
       "summary": "NR5 완료: e2e/reserve.spec.ts에 시나리오 2건 추가. 시나리오C — 김매니저(강남점) 오전조(SHIFT_1) 휴무일 2026-06-23 선택 → 시간 휠 08:00은 toHaveClass(/disabled/), 14:00은 not.toHaveClass(/disabled/)로 교대 시간대만 비활성·그 외 선택 가능 단정. 시나리오D — 시드 RESERVED 베이(A1, 2026-06-25 10:00) 선택 시 bay-occupied-notice 노출, 같은 시간대 A2(slot-store1-store1-A2-10:00) data-status=AVAILABLE→클릭 후 HOLDING, 안내 사라짐(toHaveCount 0) 단정. NR2 더미 휴무·NR4 점유 시드·data-testid 일치. lint·e2e 11/11 결정적 통과.",
       "completedAt": "2026-06-20T08:14:44.287Z"
+    },
+    {
+      "id": "278f1c5a-c148-4815-bb8d-cabc6fd2d5c4",
+      "name": "W1: reservationDraft Pinia 스토어 (진행상태 + 전이)",
+      "description": "예약 위저드 진행 데이터를 소유하는 setup 스토어를 신규 작성한다. 현 reserve.vue 로컬 상태·watch·확정 로직을 이관한다. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유한다(역할 분리).",
+      "notes": "data 직접 import 금지(services 경유). nextReservationId 시퀀스도 스토어로 이관. import.meta.client 가드 불필요(순수 상태). 기존 reservation.ts·useToast는 변경 없음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:49:41.414Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/reservationDraft.ts",
+          "type": "CREATE",
+          "description": "위저드 진행상태 스토어"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "REFERENCE",
+          "description": "이관 대상 상태/watch/onReserve/onHoldSlot"
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "DEPENDENCY",
+          "description": "슬롯 점유/확정 위임"
+        },
+        {
+          "path": "app/services/storeService.ts",
+          "type": "DEPENDENCY",
+          "description": "휴무 판정 함수"
+        }
+      ],
+      "implementationGuide": "app/stores/reservationDraft.ts 신규(Pinia setup). 상태: storeId/managerId/carType/serviceType/bayId/date/time(ref), heldSlot(Slot|null), lastReservation(요약). getter: price(getPrice), canProceedToSlot(store&manager&car&service), canConfirm(+bay&date&time), selectedBayOccupied(reservation.getStatus가 RESERVED/COMPLETED). 내부 watch로 NFR-1 cascade 이관(매장→manager/bay 초기화, 차종→bay+releaseHeld, manager/date/time→releaseHeld+휴무 시간검증). 액션: holdBay(bayId)=현 onHoldSlot, confirm()=현 onReserve(미점유면 holdSlot→reservation.confirmReservation→성공 시 lastReservation 채우고 true), reset(), releaseHeld(). reservation(자동임포트)·storeService(isManagerOffAt/isManagerFullDayOff)·priceService(getPrice 명시 import) 재사용. currentSlot 헬퍼 포함.",
+      "verificationCriteria": "canProceedToSlot/canConfirm/price/selectedBayOccupied 정상 동작. holdBay→reservation HOLDING, confirm→성공 시 lastReservation·reservation.confirmReservation 호출·true, 충돌 시 false. cascade 초기화·releaseHeld 동작. npm run type-check 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W1 완료: app/stores/reservationDraft.ts 신규(Pinia setup). 진행 선택 7종(storeId/managerId/carType/serviceType/bayId/date/time)+heldSlot+lastReservation 상태. getter: selectedManager·storeBays·price·priceLabel·canProceedToSlot·canConfirm·selectedBayOccupied. 내부 watch로 NFR-1 cascade 이관(매장→manager/bay, 차종→bay+releaseHeld, manager→date/time+releaseHeld, date→releaseHeld+휴무 시간검증, time→releaseHeld). 액션: holdBay(낙관적 점유), confirm(미점유 시 holdSlot→reservation.confirmReservation→성공 시 lastReservation 채우고 true, 충돌 false), reset, releaseHeld. reservation/auth 스토어 자동임포트 위임, storeService·getPrice 재사용, data 직접 import 없음(단방향). type-check·lint 통과.",
+      "completedAt": "2026-06-20T08:49:41.411Z"
+    },
+    {
+      "id": "cd250c3a-1569-485f-8d1a-578030efe794",
+      "name": "W2: 위저드 가드 미들웨어 + 라우트 3분할 골격",
+      "description": "예약 위저드 라우트 디렉터리와 진입 가드를 만든다. 기존 reserve.vue를 삭제하고 reserve/ 디렉터리로 대체한다.",
+      "notes": "AppNav의 to=/reserve 링크는 index.vue가 수신(변경 불필요). 미들웨어는 자동임포트. SSR에서 navigateTo 안전.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "278f1c5a-c148-4815-bb8d-cabc6fd2d5c4"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:51:46.037Z",
+      "relatedFiles": [
+        {
+          "path": "app/middleware/reservationWizardGuard.ts",
+          "type": "CREATE",
+          "description": "단계 진입 가드"
+        },
+        {
+          "path": "app/pages/reserve/index.vue",
+          "type": "CREATE",
+          "description": "1page 골격"
+        },
+        {
+          "path": "app/pages/reserve/slot.vue",
+          "type": "CREATE",
+          "description": "2page 골격"
+        },
+        {
+          "path": "app/pages/reserve/done.vue",
+          "type": "CREATE",
+          "description": "3page 골격"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "OTHER",
+          "description": "삭제 대상(디렉터리로 대체)"
+        },
+        {
+          "path": "app/middleware/auth.ts",
+          "type": "REFERENCE",
+          "description": "미들웨어 패턴"
+        }
+      ],
+      "implementationGuide": "app/middleware/reservationWizardGuard.ts 신규(defineNuxtRouteMiddleware): const draft=useReservationDraftStore(); to.path==='/reserve/slot'&&!draft.canProceedToSlot→navigateTo('/reserve'); to.path==='/reserve/done'&&!draft.lastReservation→navigateTo('/reserve'). app/pages/reserve.vue 삭제. app/pages/reserve/index.vue·slot.vue·done.vue 골격 생성(각 definePageMeta middleware: index='auth', slot/done=['auth','reservationWizardGuard']). 라우트 충돌(reserve.vue↔reserve/index.vue) 방지 위해 reserve.vue 반드시 제거.",
+      "verificationCriteria": "/reserve·/reserve/slot·/reserve/done 라우트 등록. reserve.vue 제거(라우트 충돌 없음). /reserve/slot 직접 진입 시 미완료면 /reserve 리다이렉트. npm run type-check·lint 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W2 완료: 위저드 라우트 3분할 골격 + 진입 가드. app/pages/reserve.vue 제거(git rm), app/pages/reserve/{index,slot,done}.vue 골격 생성(index=auth, slot/done=['auth','reservation-wizard-guard']). 가드 미들웨어 신규 — 이슈 해결: Nuxt가 미들웨어 파일명을 kebab-case 키로 등록하므로 파일명을 reservation-wizard-guard.ts로, 키도 'reservation-wizard-guard'로 맞춤(camelCase는 TS2820 에러). 가드는 /reserve/slot 진입 시 !canProceedToSlot, /reserve/done 진입 시 !lastReservation이면 navigateTo('/reserve'). eslint app/pages/**/*.vue 글롭이 중첩 단어1개 파일명 허용. type-check·lint 통과, 임시 E2E로 가드 리다이렉트 통과 확인.",
+      "completedAt": "2026-06-20T08:51:46.032Z"
+    },
+    {
+      "id": "683984cf-5d8d-493a-9896-0c4956e1a8aa",
+      "name": "W3: 1page reserve/index.vue (매장·매니저·차종·서비스·가격)",
+      "description": "위저드 1페이지를 구현한다. 매장→매니저→차종→서비스 선택과 가격 표시, 다음 단계 이동.",
+      "notes": "storeManagers/storeBays 등 파생은 storeService 호출 computed로 페이지에 둔다. 색 토큰만 사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cd250c3a-1569-485f-8d1a-578030efe794"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:55:09.502Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reserve/index.vue",
+          "type": "TO_MODIFY",
+          "description": "1page 구현"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "REFERENCE",
+          "description": "재사용 마크업(삭제 전 참조)"
+        }
+      ],
+      "implementationGuide": "app/pages/reserve/index.vue. 기존 reserve.vue의 매장/매니저/차종/서비스 SearchableSelect 마크업·가격 표시(price-display·현장결제 안내) 재사용. v-model을 draft 상태에 바인딩(useReservationDraftStore, storeToRefs 또는 computed get/set). 베이 SearchableSelect는 포함하지 않음(폐지). '다음' 버튼 data-testid=reserve-next: draft.canProceedToSlot일 때 활성→navigateTo('/reserve/slot'). definePageMeta({middleware:'auth'}).",
+      "verificationCriteria": "매장·매니저·차종·서비스 선택 시 가격 자동 표시. 4개 선택 완료 시 다음 버튼 활성→/reserve/slot 이동. npm run type-check·lint 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W3 완료: app/pages/reserve/index.vue 1페이지 구현. 매장/매니저/차종/서비스 SearchableSelect를 draft 스토어 상태에 v-model 바인딩, storeManagers는 페이지 computed(getManagersByStore). 가격(draft.price/priceLabel) + 현장결제 안내(price-display) 표시. 베이 SearchableSelect 미포함(폐지). '다음' 버튼(reserve-next): draft.canProceedToSlot일 때 활성→navigateTo('/reserve/slot'). definePageMeta auth. type-check·lint 통과.",
+      "completedAt": "2026-06-20T08:55:09.501Z"
+    },
+    {
+      "id": "3a391a05-8030-4b7f-b5d2-69053d382357",
+      "name": "W4: 2page reserve/slot.vue (날짜·시간 → 베이 그리드 → 확정)",
+      "description": "위저드 2페이지를 구현한다. 날짜·시간 선택 후 그 시간대 베이 버튼 그리드에서 베이 선택, 예약하기로 확정(충돌 토스트). 베이 SearchableSelect는 사용하지 않는다.",
+      "notes": "SearchableSelect 베이 완전 제거. SlotGrid·WheelPicker·useToast 자동임포트. SSR 안전.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cd250c3a-1569-485f-8d1a-578030efe794"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:55:19.673Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reserve/slot.vue",
+          "type": "TO_MODIFY",
+          "description": "2page 구현"
+        },
+        {
+          "path": "app/components/SlotGrid.vue",
+          "type": "DEPENDENCY",
+          "description": "베이 그리드(@hold)"
+        },
+        {
+          "path": "app/components/WheelPicker.vue",
+          "type": "DEPENDENCY",
+          "description": "날짜/시간 휠"
+        }
+      ],
+      "implementationGuide": "app/pages/reserve/slot.vue. WheelPicker 날짜/시간(휴무 disabled 유지, dateItems/timeItems는 draft 상태+storeService로 computed). date&&time 선택 시 SlotGrid 노출, @hold=(bayId)=>draft.holdBay(bayId)로 베이 선택 유일 경로. selectedBayOccupied 안내(bay-occupied-notice) 유지. '예약하기'(reserve-submit): draft.canConfirm일 때 활성→draft.confirm() 성공 시 navigateTo('/reserve/done'), 실패 시 useToast 충돌 토스트(data-testid=toast)+잔류. '이전' 링크→/reserve. ClientOnly로 휠/그리드 감싸기. definePageMeta({middleware:['auth','reservationWizardGuard']}).",
+      "verificationCriteria": "날짜·시간 선택 후 베이 그리드 노출·점유 베이 비활성, 그리드 클릭으로만 베이 선택. 예약하기 확정 성공→/reserve/done, 시드 점유 슬롯 확정 시도→충돌 토스트·잔류. SearchableSelect 베이 없음. npm run type-check·lint 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W4 완료: app/pages/reserve/slot.vue 2페이지 구현. 날짜/시간 WheelPicker(draft.date/time 바인딩, dateItems=isManagerFullDayOff·timeItems=isManagerOffAt disabled, mgr 로컬 캡처로 내로잉). date&&time 선택 시 SlotGrid 노출, @hold=(bayId)=>draft.holdBay(bayId)로 베이 선택 유일 경로(SearchableSelect 완전 제거). selectedBayOccupied 안내(bay-occupied-notice). '예약하기'(reserve-submit): draft.canConfirm 시 draft.confirm()→성공 navigateTo('/reserve/done'), 실패 시 useToast 충돌 토스트(data-testid=toast). '이전' NuxtLink /reserve. ClientOnly로 휠/그리드 감쌈. type-check·lint 통과.",
+      "completedAt": "2026-06-20T08:55:19.670Z"
+    },
+    {
+      "id": "8b02c598-d5cc-4716-84a0-c9a93d9f454e",
+      "name": "W5: 3page reserve/done.vue (완료 요약)",
+      "description": "위저드 3페이지를 구현한다. 확정된 예약 요약을 전체 페이지 카드로 표시하고 후속 링크를 제공한다.",
+      "notes": "lastReservation 없으면 가드가 이미 /reserve로 보냄. 색 토큰만 사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cd250c3a-1569-485f-8d1a-578030efe794"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:55:27.413Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reserve/done.vue",
+          "type": "TO_MODIFY",
+          "description": "3page 구현"
+        },
+        {
+          "path": "app/pages/reserve.vue",
+          "type": "REFERENCE",
+          "description": "성공 카드 마크업 참조"
+        }
+      ],
+      "implementationGuide": "app/pages/reserve/done.vue. draft.lastReservation 요약을 기존 성공 토스트 카드 마크업을 페이지로 승격해 표시(data-testid=reserve-result, 매장·매니저·차종·베이·서비스·일시·금액·현장결제). '예약 목록 보기'→NuxtLink /reservations, '새 예약'→@click draft.reset() 후 navigateTo('/reserve'). definePageMeta({middleware:['auth','reservationWizardGuard']}).",
+      "verificationCriteria": "확정 후 /reserve/done에서 예약 요약 카드 표시. 새 예약 클릭 시 draft 초기화·/reserve 이동. lastReservation 없이 직접 진입 시 /reserve 리다이렉트. npm run type-check·lint 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W5 완료: app/pages/reserve/done.vue 3페이지 구현. draft.lastReservation 요약을 전체 페이지 카드(reserve-result)로 표시(매장·매니저·차종·베이·서비스·일시·금액·현장결제), 기존 성공 토스트 카드 스타일을 페이지로 승격(@theme 토큰만). '예약 목록 보기' NuxtLink /reservations, '새 예약' 버튼→draft.reset() 후 navigateTo('/reserve'). 가드(reservation-wizard-guard)가 lastReservation 없으면 /reserve로 리다이렉트. v-if 내로잉으로 type-check 통과, lint 통과.",
+      "completedAt": "2026-06-20T08:55:27.406Z"
+    },
+    {
+      "id": "e2e0d2c9-fead-41bc-a023-e4fed96774aa",
+      "name": "W6: e2e/reserve.spec.ts 3페이지 흐름 재작성",
+      "description": "기존 단일 페이지 기준 E2E를 3페이지 위저드 흐름으로 재작성한다. data-testid·고정 더미값 결정적 단정.",
+      "notes": "WheelPicker [data-value] 클릭·SlotGrid data-status 단정 패턴 재사용. 페이지 전환은 navigateTo/링크 클릭 후 toHaveURL 단정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "683984cf-5d8d-493a-9896-0c4956e1a8aa"
+        },
+        {
+          "taskId": "3a391a05-8030-4b7f-b5d2-69053d382357"
+        },
+        {
+          "taskId": "8b02c598-d5cc-4716-84a0-c9a93d9f454e"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:57:55.885Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "3페이지 흐름 재작성"
+        }
+      ],
+      "implementationGuide": "e2e/reserve.spec.ts 갱신. 시나리오: ①정상-1p(매장·매니저·차종·서비스·가격 확인)→다음→2p(날짜/시간 휠 [data-value] 클릭→베이 그리드 slot-... 클릭 HOLDING→예약하기)→3p reserve-result 단정. ②가드-/reserve/slot 직접 goto 시 /reserve 리다이렉트, /reserve/done 직접 goto 시 /reserve 리다이렉트. ③충돌-시드 RESERVED 슬롯(2026-06-25 10:00 store1-A1) 베이 그리드 disabled·예약하기 시 toast. ④교대조 휴무(김매니저 2026-06-23 SHIFT_1) 시간대 비활성. 기존 매장/매니저/검색 필터 테스트는 1p 기준으로 유지.",
+      "verificationCriteria": "1→2→3 정상 흐름·가드 리다이렉트·충돌·교대조 휴무 시나리오 결정적 통과. npm run test:e2e 전체 통과.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W6 완료: e2e/reserve.spec.ts를 3페이지 위저드 흐름으로 전면 재작성. login/completeStep1/pickDateTime 헬퍼. 시나리오: 1p 승인매장·검색필터·매니저한정, 가드(미완료 시 /reserve/slot·/reserve/done→/reserve), 정상흐름(1p 가격12,000 확인→다음→2p 날짜/시간 휠 [data-value]→베이 그리드 A1 클릭 HOLDING→예약하기→3p reserve-result 외부세차·현장결제), 차종별 그리드(대형→A3만·A1 toHaveCount 0), 교대조 휴무(김매니저 2026-06-23 08:00 disabled·14:00 enabled), 점유 베이(시드 2026-06-25 10:00 A1 RESERVED·disabled→A2 선택→확정→done). 설계 변경 반영: 베이 그리드 단일화로 점유 베이는 그리드 disabled가 차단(UI 충돌토스트 경로는 서버단계 방어코드로 잔존). 전체 e2e 14/14·lint 통과.",
+      "completedAt": "2026-06-20T08:57:55.882Z"
+    },
+    {
+      "id": "947072b8-f9f1-4f91-b5de-f824b30af2c7",
+      "name": "W7: ROADMAP Phase 5.1 DoD 동기화",
+      "description": "구현 완료에 맞춰 docs/ROADMAP.md Phase 5.1 태스크 체크리스트·DoD를 [x]로 갱신한다(문서만).",
+      "notes": "커밋 메시지 한국어. 6.2 Playwright 시나리오 추가분과 정합 확인.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e2e0d2c9-fead-41bc-a023-e4fed96774aa"
+        }
+      ],
+      "createdAt": "2026-06-20T08:46:26.785Z",
+      "updatedAt": "2026-06-20T08:59:23.263Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 5.1 체크리스트·DoD 갱신"
+        }
+      ],
+      "implementationGuide": "docs/ROADMAP.md Phase 5.1 절의 태스크 체크리스트·DoD 항목을 실제 구현 상태로 [x] 갱신. 필요 시 1줄 구현 메모(베이 그리드 단일화·in-memory 한계) 추가. 코드/정본(require_v1.md) 미변경.",
+      "verificationCriteria": "Phase 5.1 체크리스트·DoD가 실제 구현과 일치([x]). 코드/정본 미변경.",
+      "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
+      "summary": "W7 완료: docs/ROADMAP.md Phase 5.1 태스크 체크리스트 9항목·DoD 8항목을 실제 구현 상태로 [x] 갱신. 미들웨어 파일명/키를 reservation-wizard-guard(kebab)로 정정 반영, 상태 필드명 실제(storeId/managerId/carType/serviceType/bayId)로 정합. 구현 메모 추가: 베이 그리드 단일화로 점유 베이 사전 비활성→confirm 충돌 분기·bay-occupied-notice는 2·3단계 서버 검증 대비 방어 코드로 잔존(현재는 그리드 disabled가 점유 차단). 6.2 Playwright 위저드 흐름·진입 가드 2항목 [x]. 코드/정본(require_v1.md) 미변경, e2e 14/14·type-check·lint 통과 상태와 일치.",
+      "completedAt": "2026-06-20T08:59:23.261Z"
     }
   ]
 }
