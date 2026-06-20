@@ -45,11 +45,11 @@ test('예약 목록: RESERVED로 표시되고 세차완료로 전이된다', asy
 
   // 생성된 예약(rsv-1)이 '예약 확정'으로 표시
   await expect(page.getByTestId('status-rsv-1')).toContainText('예약 확정')
-  // 세차완료 전이 → '세차 완료', 취소 버튼 사라지고 후기 작성 노출
+  // 세차완료 전이 → '세차 완료', 취소 버튼 사라지고 완료 안내 문구 노출
   await page.getByTestId('complete-rsv-1').click()
   await expect(page.getByTestId('status-rsv-1')).toContainText('세차 완료')
   await expect(page.getByTestId('cancel-rsv-1')).toHaveCount(0)
-  await expect(page.getByTestId('review-rsv-1')).toBeVisible()
+  await expect(page.getByTestId('completed-rsv-1')).toContainText('세차가 완료')
 })
 
 test('예약 취소 시 CANCELED로 전이되고 슬롯이 다시 AVAILABLE로 release된다', async ({ page }) => {

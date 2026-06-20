@@ -115,14 +115,13 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
               예약 취소
             </button>
           </template>
-          <NuxtLink
+          <span
             v-else-if="r.status === 'COMPLETED'"
-            :data-testid="`review-${r.id}`"
-            :to="`/review/${r.id}`"
-            class="btn btn-primary"
+            :data-testid="`completed-${r.id}`"
+            class="text-sm font-medium text-[--color-brand-accent]"
           >
-            후기 작성
-          </NuxtLink>
+            세차가 완료되었습니다.
+          </span>
           <span v-else class="text-sm text-[--color-content-muted]">취소된 예약입니다.</span>
         </div>
       </li>
