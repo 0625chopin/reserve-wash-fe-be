@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // BO 일반매장매니저 휴가/반차·매장휴일 신청(M6) — require v1.7 §8.2.
 //   승인(M8)은 매장매니저관리자 전용 /store-admin/dayoff-approvals 에서 처리(역할별 페이지 분리 §12.4).
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { getApprovedStores, getManagersByStore } from '~/services/storeService'
 import type { DayoffType } from '~/types/enums'
 
 definePageMeta({ middleware: ['auth', 'role-guard'], roles: ['MANAGER', 'STORE_ADMIN'] })
 
+const auth = useAuthStore()
 const stores = getApprovedStores()
 
 // BE DayoffApprovalResponse와 일치
@@ -31,7 +32,9 @@ const STATUS_LABEL: Record<string, string> = {
   REJECTED: '반려',
 }
 
-const storeId = ref('')
+// 매니저 계열은 본인 소속 매장으로 고정(변경 불가) — require v1.7 §12.4
+const storeId = ref(auth.currentUser?.storeId ?? '')
+const myStore = computed(() => stores.find((s) => s.id === storeId.value) ?? null)
 const managerId = ref('')
 const dayoffDate = ref('')
 const dayoffType = ref<DayoffType | ''>('')
@@ -65,6 +68,9 @@ watch(storeId, () => {
   managerId.value = ''
   loadDayoffs()
 })
+
+// 매장이 본인 소속으로 고정되어 watch 초기 트리거가 없으므로 진입 시 1회 로드
+onMounted(loadDayoffs)
 
 async function submitDayoff() {
   if (!managerId.value || !dayoffDate.value || !dayoffType.value) return
@@ -122,10 +128,10 @@ async function resubmit(id: number) {
 
     <div class="card space-y-5 p-6 sm:p-8">
       <div>
-        <label class="field-label" for="dayoff-store">매장</label>
-        <select id="dayoff-store" v-model="storeId" data-testid="dayoff-store" class="bo-input">
-          <option value="" disabled>선택</option>
-          <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
+        <label class="field-label" for="dayoff-store">매장 <span class="text-xs text-[--color-content-muted]">(본인 소속 고정)</span></label>
+        <select id="dayoff-store" v-model="storeId" data-testid="dayoff-store" class="bo-input" disabled>
+          <option v-if="myStore" :value="myStore.id">{{ myStore.name }}</option>
+          <option v-else value="">소속 매장 없음</option>
         </select>
       </div>
 

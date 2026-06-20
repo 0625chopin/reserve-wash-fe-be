@@ -14,13 +14,17 @@ import type { CarType, ServiceType } from '~/types/enums'
 
 definePageMeta({ middleware: ['auth', 'role-guard'], roles: ['MANAGER', 'STORE_ADMIN'] })
 
+const auth = useAuthStore()
 const stores = getApprovedStores()
 const carTypeOptions = getCarTypes()
 const serviceTypeOptions = getServiceTypes()
 
+// 매니저 계열은 본인 소속 매장으로 고정(변경 불가) — require v1.7 §12.4
+const storeId = ref(auth.currentUser?.storeId ?? '')
+const myStore = computed(() => stores.find((s) => s.id === storeId.value) ?? null)
+
 // 대행 입력 상태
 const customerEmail = ref('')
-const storeId = ref('')
 const managerId = ref('')
 const carType = ref<CarType | ''>('')
 const serviceType = ref<ServiceType | ''>('')
@@ -119,10 +123,16 @@ async function onSubmit() {
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label class="field-label" for="proxy-store">매장</label>
-          <select id="proxy-store" v-model="storeId" data-testid="proxy-store" class="bo-input">
-            <option value="" disabled>선택</option>
-            <option v-for="s in stores" :key="s.id" :value="s.id">{{ s.name }}</option>
+          <label class="field-label" for="proxy-store">매장 <span class="text-xs text-[--color-content-muted]">(본인 소속 고정)</span></label>
+          <select
+            id="proxy-store"
+            v-model="storeId"
+            data-testid="proxy-store"
+            class="bo-input"
+            disabled
+          >
+            <option v-if="myStore" :value="myStore.id">{{ myStore.name }}</option>
+            <option v-else value="">소속 매장 없음</option>
           </select>
         </div>
         <div>

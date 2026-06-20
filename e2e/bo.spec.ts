@@ -13,12 +13,13 @@ async function loginAs(page: Page, email: string) {
   await expect(page).toHaveURL(/\/reserve$/)
 }
 
-// 매니저 대행 폼 채우고 제출 (강남점·김매니저·소형·외부세차·A2)
+// 매니저 대행 폼 채우고 제출 (매장=본인 소속 고정, 김매니저·소형·외부세차·A2)
 // 하이드레이션 레이스 회피: select 먼저 → 텍스트 입력 → 이메일을 마지막에 채우고 값/활성 확인 후 제출
 async function proxyReserve(page: Page, date: string, time: string) {
   await page.goto('/manager/reserve')
   await expect(page.getByTestId('page-manager-reserve')).toBeVisible()
-  await page.getByTestId('proxy-store').selectOption({ label: '강남점' })
+  // 매장은 본인 소속(강남점)으로 고정·disabled — 매니저 옵션이 채워질 때까지 대기
+  await expect(page.getByTestId('proxy-manager')).toContainText('김매니저')
   await page.getByTestId('proxy-manager').selectOption({ label: '김매니저' })
   await page.getByTestId('proxy-cartype').selectOption({ label: '소형' })
   await page.getByTestId('proxy-service').selectOption({ label: '외부세차' })

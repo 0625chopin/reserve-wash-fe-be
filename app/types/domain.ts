@@ -15,6 +15,7 @@ export interface User {
   email: string
   name: string
   role: UserRole
+  storeId?: string | null // 매니저 계열 소속 매장(USER/ADMIN은 null) — BO 매장 고정용
 }
 
 // 매장 (require 5.1)

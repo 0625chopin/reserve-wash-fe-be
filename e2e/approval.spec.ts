@@ -14,13 +14,11 @@ async function loginAs(page: Page, email: string) {
   await expect(page).toHaveURL(/\/reserve$/)
 }
 
-// 신청 페이지에서 강남점 선택(하이드레이션 워밍업: 첫 상호작용 레이스 회피)
+// 신청 페이지 진입 — 매장은 본인 소속(강남점)으로 고정·disabled, 매니저 옵션이 채워질 때까지 대기
 async function openDayoffsForGangnam(page: Page) {
   await page.goto('/manager/dayoffs', { waitUntil: 'networkidle' })
   await expect(page.getByTestId('page-manager-dayoffs')).toBeVisible()
-  await page.getByTestId('dayoff-store').click() // 워밍업
-  await page.getByTestId('dayoff-store').selectOption({ label: '강남점' })
-  // 매장 선택이 하이드레이션 후에도 유지되어 매니저 옵션이 채워졌는지 확인(게이트)
+  // 매장 고정 후 매니저 옵션이 채워졌는지 확인(게이트)
   await expect(page.getByTestId('dayoff-manager')).toContainText('이매니저')
 }
 

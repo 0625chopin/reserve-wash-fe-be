@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
     name             VARCHAR(100) NOT NULL,
     role             VARCHAR(20)  NOT NULL,   -- UserRole enum 문자열
     password_hash    VARCHAR(100) NOT NULL,   -- BCrypt 해시 (Phase 3 인증)
-    approval_status  VARCHAR(30)  NOT NULL DEFAULT 'ACTIVE'   -- UserApprovalStatus enum (ACTIVE만 로그인 가능)
+    approval_status  VARCHAR(30)  NOT NULL DEFAULT 'ACTIVE',   -- UserApprovalStatus enum (ACTIVE만 로그인 가능)
+    store_id         VARCHAR(64)              -- 매니저 계열 소속 매장(USER/ADMIN은 NULL) — BO 매장 고정용
 );
 
 -- 매장 (require 5.1)
