@@ -29,6 +29,13 @@ mybatis:
 server:
   port: 8080
 
+# 로깅 레벨 설정 — 루트는 INFO 기본, 앱 코드/SQL만 자세히
+logging:
+  level:
+    root: INFO                  # 전체 기본값 (Spring 내부·라이브러리)
+    com.carwash: DEBUG          # 앱 코드
+    com.carwash.mapper: TRACE   # MyBatis SQL/파라미터 (매퍼 인터페이스 패키지)
+
 # JWT 인증 설정 (Phase 3) — HS256 대칭키(32byte 이상), 만료
 jwt:
   secret: carwash-dev-secret-key-please-change-in-production-0123456789

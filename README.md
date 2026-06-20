@@ -80,6 +80,7 @@ npm run test:e2e:ui     # UI 모드
 | [`docs/예약_규칙_명세_v1.md`](docs/예약_규칙_명세_v1.md) | 예약 순서·차종↔베이 규칙 보강 명세 |
 | [`shrimp-rules.md`](shrimp-rules.md) | AI Agent 작업 규칙 |
 | [`CLAUDE.md`](CLAUDE.md) | 프로젝트 가이드(언어·스택·린트 파이프라인) |
+| [`backend/README.md`](backend/README.md) | 백엔드(Spring Boot) 명령어·**IDE 설정(IntelliJ + Lombok)** |
 
 ## 디렉터리 개요
 
