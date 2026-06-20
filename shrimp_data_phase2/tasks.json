@@ -497,6 +497,247 @@
       "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
       "summary": "T8 완료 — Phase 1 DoD 종합 게이트 충족. (1) ./gradlew build BUILD SUCCESSFUL(컴파일+bootJar+테스트 17건 전부 통과). (2) H2 스키마 무결성을 스크립트로 단정하는 SchemaIntegrityTest 추가(JdbcTemplate): INFORMATION_SCHEMA 기준 BASE TABLE 10종 = 10, uk_slot_store_bay_date_time UNIQUE 제약 1건 존재, price 20행. 수동 H2 콘솔보다 재현·CI 가능한 검증으로 대체. (3) 필드명 대조: FE app/types/domain.ts ↔ BE 도메인 POJO 9종(User/Store/Bay/Manager/ManagerDayoff/Slot/Price/Reservation/Review) 필드명 불일치 0건(StoreHoliday는 FE 미정의 BE 전용, Slot.id/version은 내부 surrogate 의도). (4) enum 대조: 7종 상수명 글자 일치(BaySize는 T7로 BE=FE 4값 일치 SMALL/MID/LARGE/XLARGE). (5) ROADMAP_2 Phase 1 DoD·태스크 체크리스트 체크박스를 완료(증빙 명시)로 갱신. Phase 1(백엔드 도메인 모델 & DB 스키마) 종료 — Phase 2(서비스 추상화 교체) 진행 가능.",
       "completedAt": "2026-06-20T17:22:07.364Z"
+    },
+    {
+      "id": "6b9d2075-eebe-4a0a-9350-41be594e5df3",
+      "name": "P2-1 BE 매퍼 list-all 보강",
+      "description": "카탈로그 1회 로드용 전체 조회를 ManagerMapper·BayMapper에 추가. Manager.dayoffs는 기존 <collection> resultMap 재사용.",
+      "notes": "dayoffs collection 조립 유지(N+1 회피). namespace=FQN.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:39:30.848Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ManagerMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findAll 추가"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ManagerMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "findAll(collection)"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/BayMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findAll 추가"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/BayMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "findAll"
+        }
+      ],
+      "implementationGuide": "ManagerMapper.java에 List<Manager> findAll() 추가, ManagerMapper.xml에 <select id=\"findAll\" resultMap=\"managerWithDayoffs\"> — 기존 LEFT JOIN manager_dayoff 쿼리에서 WHERE 제거, ORDER BY m.id, md.`date`. BayMapper.java에 List<Bay> findAll(), BayMapper.xml에 <select id=\"findAll\" resultType> ORDER BY store_id, code. Store/PriceMapper는 findApproved/findAll 기보유.",
+      "verificationCriteria": "./gradlew test 통과. ManagerMapper.findAll 4명·dayoffs 매핑(mgr1 3건), BayMapper.findAll 9건(XLARGE 포함) 단정.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-1 완료. 카탈로그 캐시 1회 로드용 전체 조회 추가. ManagerMapper.java에 findAll(), ManagerMapper.xml에 <select id=findAll resultMap=managerWithDayoffs>(기존 LEFT JOIN manager_dayoff에서 WHERE 제거, ORDER BY m.id,md.date — dayoffs <collection> 재사용으로 N+1 회피). BayMapper.java에 findAll(), BayMapper.xml에 <select id=findAll> ORDER BY store_id,code. Store/PriceMapper는 findApproved/findAll 기보유라 무수정. 테스트 보강: ManagerMapperTest.findAll_전체_매니저_4명_dayoffs_조립(mgr1 3건 collection), BayMapperTest.findAll_전체_베이_9개_XLARGE_포함. ./gradlew test BUILD SUCCESSFUL — ManagerMapper 4건·BayMapper 4건 전부 통과. namespace=FQN 유지.",
+      "completedAt": "2026-06-20T17:39:30.847Z"
+    },
+    {
+      "id": "fddaa8af-9b72-4664-ad8b-6866d276ebd5",
+      "name": "P2-2 BE DTO 5종(record)",
+      "description": "조회 응답 DTO를 Java record + 정적 from(domain)으로 정의. FE app/types/domain.ts 필드명 무변환 일치(id=String).",
+      "notes": "ManagerResponse.isStoreAdmin은 @JsonProperty(\"isStoreAdmin\")로 JSON 키 고정(storeAdmin 변형 방지). id=String 유지(Long 미사용).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:45:33.503Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto",
+          "type": "CREATE",
+          "description": "DTO record 5종"
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "필드명 무변환 기준"
+        }
+      ],
+      "implementationGuide": "backend/.../dto/: StoreResponse(String id,String name,int bayCount,boolean approved), BayResponse(String id,String storeId,String code,BaySize size), PriceResponse(CarType carType,ServiceType serviceType,int amount), DayoffResponse(String date,DayoffType type), ManagerResponse(String id,String storeId,String name,@JsonProperty(\"isStoreAdmin\") boolean isStoreAdmin,List<DayoffResponse> dayoffs). 각 record에 static from(domain) 팩토리. enum은 Jackson 기본 name 직렬화.",
+      "verificationCriteria": "./gradlew compileJava 통과. record 필드명이 FE domain.ts와 일치, isStoreAdmin @JsonProperty 적용.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-2 완료. BE 응답 DTO 5종을 Java record + 정적 from(domain)으로 생성(com.carwash.dto): StoreResponse(id,name,bayCount,approved), BayResponse(id,storeId,code,size:BaySize), PriceResponse(carType,serviceType,amount), DayoffResponse(date,type), ManagerResponse(id,storeId,name,isStoreAdmin,dayoffs:List<DayoffResponse>). FE app/types/domain.ts 필드명 무변환 일치(id=String). enum은 Jackson 기본 name 직렬화. ManagerResponse.isStoreAdmin에 @JsonProperty(\"isStoreAdmin\")로 JSON 키 고정 — CatalogApiTest의 jsonPath $[0].isStoreAdmin=true 단정으로 키 변형(storeAdmin) 방지 검증. compileJava·build 통과.",
+      "completedAt": "2026-06-20T17:45:33.499Z"
+    },
+    {
+      "id": "67e040e0-5b1c-4ee0-a558-730f74d424cf",
+      "name": "P2-3 BE 서비스 4종",
+      "description": "매퍼 호출 + DTO from 변환을 수행하는 서비스 계층. @Service, 조회는 @Transactional(readOnly=true).",
+      "notes": "BayService.findBaysForCar는 만들지 않음(YAGNI, Phase 6). 도메인→DTO 변환은 record from에 위임.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "6b9d2075-eebe-4a0a-9350-41be594e5df3"
+        },
+        {
+          "taskId": "fddaa8af-9b72-4664-ad8b-6866d276ebd5"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:45:45.289Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service",
+          "type": "CREATE",
+          "description": "서비스 4종"
+        }
+      ],
+      "implementationGuide": "backend/.../service/: StoreService.findApprovedStores()=storeMapper.findApproved()→StoreResponse.from, ManagerService.findAll()=managerMapper.findAll()→ManagerResponse.from, BayService.findAll()=bayMapper.findAll()→BayResponse.from, PriceService.findAll()=priceMapper.findAll()→PriceResponse.from. 생성자 주입.",
+      "verificationCriteria": "./gradlew build 통과. 각 서비스가 매퍼 결과를 DTO 리스트로 반환.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-3 완료. BE 서비스 계층 4종 생성(com.carwash.service, @Service + 생성자 주입 + @Transactional(readOnly=true)): StoreService.findApprovedStores()=storeMapper.findApproved()→StoreResponse.from, ManagerService.findAll()=managerMapper.findAll()→ManagerResponse.from(dayoffs 포함), BayService.findAll()=bayMapper.findAll()→BayResponse.from, PriceService.findAll()=priceMapper.findAll()→PriceResponse.from. 도메인→DTO 변환은 record from에 위임(서비스는 오케스트레이션만). BayService.findBaysForCar는 미생성(YAGNI, Phase 6 M3에서). ./gradlew build 통과(CatalogApiTest가 각 서비스 경유 응답 검증).",
+      "completedAt": "2026-06-20T17:45:45.282Z"
+    },
+    {
+      "id": "e381d406-e22f-444a-b9d4-8b53c0f1a278",
+      "name": "P2-4 BE 조회 컨트롤러 4종",
+      "description": "@RestController 조회 엔드포인트 + MockMvc 테스트. DTO만 노출.",
+      "notes": "도메인 직접 반환 금지(DTO만). PathVariable 미사용(list-all).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "67e040e0-5b1c-4ee0-a558-730f74d424cf"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:46:02.256Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller",
+          "type": "CREATE",
+          "description": "컨트롤러 4종"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/controller",
+          "type": "CREATE",
+          "description": "MockMvc 테스트"
+        }
+      ],
+      "implementationGuide": "backend/.../controller/: StoreController @GetMapping /api/stores → storeService.findApprovedStores(), ManagerController /api/managers, BayController /api/bays, PriceController /api/prices. MockMvc(@WebMvcTest 또는 @SpringBootTest+MockMvc): /api/stores 승인 2건(판교점 제외), /api/managers dayoffs 포함 4건, /api/prices 20건, /api/bays 9건. isStoreAdmin JSON 키 확인.",
+      "verificationCriteria": "./gradlew build 통과. GET /api/stores 승인만(2건), /api/managers dayoffs·isStoreAdmin 키 정상, /api/prices 20, /api/bays 9. ROADMAP DoD #1 충족.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-4 완료. BE 조회 컨트롤러 4종(@RestController, DTO만 노출): StoreController(GET /api/stores→승인만), ManagerController(/api/managers), BayController(/api/bays), PriceController(/api/prices). PathVariable 미사용(list-all). MockMvc 통합테스트 CatalogApiTest 4건: /api/stores 승인 2건(판교점 제외, jsonPath length=2), /api/managers 4건 + $[0]=mgr1 isStoreAdmin=true(키 고정 검증) + dayoffs 3건, /api/bays 9건(XLARGE 필터 exists), /api/prices 20건. ./gradlew build 통과(총 23건 0실패). 부수 수정: 다중 Spring 컨텍스트(@SpringBootTest webEnvironment 차이)가 공유 H2 mem DB(jdbc:h2:mem:carwash;DB_CLOSE_DELAY=-1)에 data.sql을 재실행해 store PK 충돌 발생 → schema.sql에 DROP TABLE IF EXISTS 10종 추가로 멱등 재생성(AUTO_INCREMENT 리셋) 해결. bootRun 단일 컨텍스트에도 무해. ROADMAP_2 Phase 2 DoD #1(GET /api/stores 승인만) 충족.",
+      "completedAt": "2026-06-20T17:46:02.254Z"
+    },
+    {
+      "id": "fcef4671-534a-4a79-9547-21838e7043af",
+      "name": "P2-5 FE 카탈로그 캐시 스토어",
+      "description": "부팅 시 4 엔드포인트를 1회 로드해 보관하는 Pinia setup 스토어.",
+      "notes": "loaded 가드로 idempotent. 실패 시 빈 배열 폐기·loaded=false(더미 silent fallback 금지). setup 스토어 문법만.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e381d406-e22f-444a-b9d4-8b53c0f1a278"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:51:34.938Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/catalog.ts",
+          "type": "CREATE",
+          "description": "카탈로그 캐시 스토어"
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "타입"
+        }
+      ],
+      "implementationGuide": "app/stores/catalog.ts: defineStore('catalog', () => { const approvedStores=ref<Store[]>([]); managers=ref<Manager[]>([]); bays=ref<Bay[]>([]); prices=ref<Price[]>([]); loaded=ref(false); async function load(){ if(loaded.value) return; const base=useRuntimeConfig().public.apiBase; try{ const [s,m,b,p]=await Promise.all([$fetch(`${base}/stores`),$fetch(`${base}/managers`),$fetch(`${base}/bays`),$fetch(`${base}/prices`)]); approvedStores.value=s; managers.value=m; bays.value=b; prices.value=p; loaded.value=true }catch(e){ console.warn('카탈로그 로드 실패', e) } } return {...} }). 타입은 ~/types/domain. oxfmt 규칙(세미콜론 없음·작은따옴표).",
+      "verificationCriteria": "npm run type-check 통과. load() 병렬 $fetch + loaded 가드 + try/catch. 타입 domain.ts 일치.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-5 완료. 카탈로그 캐시 구현. [설계 보정] Pinia 스토어 대신 app/services/catalogCache.ts(서비스 내부 모듈)로 구현 — README 단방향 의존 계약('services가 stores를 역import 금지')을 지키기 위함. 결과(서버 하이드레이트·동기 읽기)는 동일. Nuxt useState로 SSR payload 직렬화(서버에서 채우고 client는 hydration 복원, 재요청 없음). state: catalog:stores/managers/bays/prices/loaded. 동기 접근자 catalogStores()/catalogManagers()/catalogBays()/catalogPrices(). loadCatalog(): 4 엔드포인트 병렬 $fetch(useRuntimeConfig().public.apiBase) + loaded 가드(idempotent) + try/catch(실패 시 빈 배열·loaded=false 유지, 더미 silent fallback 금지). useState/$fetch/useRuntimeConfig는 Nuxt 자동임포트라 import 미작성. 타입 ~/types/domain 일치. npm run type-check 통과.",
+      "completedAt": "2026-06-20T17:51:34.934Z"
+    },
+    {
+      "id": "df6357e6-1bb8-439c-88a3-19bb03e43306",
+      "name": "P2-6 FE 부트스트랩 플러그인",
+      "description": "렌더 이전 카탈로그를 await 로드하는 async Nuxt 플러그인.",
+      "notes": "플러그인 파일명만으로 자동 등록. SSR/CSR 양쪽 실행되나 loaded 가드+payload로 중복 차단.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "fcef4671-534a-4a79-9547-21838e7043af"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:51:49.414Z",
+      "relatedFiles": [
+        {
+          "path": "app/plugins/catalog.ts",
+          "type": "CREATE",
+          "description": "부트스트랩 플러그인"
+        }
+      ],
+      "implementationGuide": "app/plugins/catalog.ts: export default defineNuxtPlugin(async () => { await useCatalogStore().load() }). Nuxt가 async 플러그인을 렌더 전 await → reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. SSR payload로 client 재요청 없음.",
+      "verificationCriteria": "npm run type-check 통과. 기동 시 1회 로드, SSR hydration 후 client 재요청 없음.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-6 완료. app/plugins/catalog.ts — defineNuxtPlugin(async () => { await loadCatalog() }). [P2-5 보정 반영] Pinia 스토어 대신 services/catalogCache의 loadCatalog를 import해 호출. Nuxt가 async 플러그인을 렌더 이전 await하므로 어떤 페이지/스토어 setup(reservationDraft가 setup 최상위에서 getApprovedStores 동기 호출)보다 먼저 캐시 채워짐 보장. loaded 가드 + useState payload로 SSR→client 중복 로드 차단. 파일명만으로 자동 등록. defineNuxtPlugin은 Nuxt 자동임포트. npm run type-check 통과.",
+      "completedAt": "2026-06-20T17:51:49.409Z"
+    },
+    {
+      "id": "8a02a40b-b69c-4b50-9315-bd7fd0c18098",
+      "name": "P2-7 FE 서비스 내부 교체",
+      "description": "storeService·priceService 내부를 캐시 동기 읽기로 교체(시그니처·동기성 유지). 컴포넌트/스토어 무변경.",
+      "notes": "반환 타입(동기 배열/값) 동일 유지가 핵심. SIZE_RANK·carTypes는 FE 유지. data/* 직접 import 제거.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "fcef4671-534a-4a79-9547-21838e7043af"
+        },
+        {
+          "taskId": "df6357e6-1bb8-439c-88a3-19bb03e43306"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:52:06.343Z",
+      "relatedFiles": [
+        {
+          "path": "app/services/storeService.ts",
+          "type": "TO_MODIFY",
+          "description": "캐시 동기 읽기로 교체"
+        },
+        {
+          "path": "app/services/priceService.ts",
+          "type": "TO_MODIFY",
+          "description": "getPrice 캐시 find"
+        }
+      ],
+      "implementationGuide": "storeService.ts: data/* import 제거, getApprovedStores=useCatalogStore().approvedStores, getManagersByStore=managers.filter(storeId), getManager=managers.find, getBaysByStore=bays.filter, getBaysForCar=bays.filter(SIZE_RANK 누적 — carTypes는 FE 정적 유지), getCarTypes/getServiceTypes/isManagerOffAt/isManagerFullDayOff 무변경. priceService.ts: getPrice=prices.find, 없으면 throw 유지. reservationService.ts 무변경. useCatalogStore()는 각 함수 본문 lazy 호출(모듈 최상위 금지). oxfmt 준수.",
+      "verificationCriteria": "npm run type-check 통과. 서비스 시그니처·동기 반환 동일, data/* 직접 import 제거, 컴포넌트/스토어 무변경.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-7 완료. storeService.ts·priceService.ts 내부를 서버 하이드레이트 캐시(catalogCache) 동기 읽기로 교체. 시그니처·동기 반환 타입 전부 유지 → 컴포넌트/스토어/computed 무변경(git status로 확인: app/services/{store,price}Service.ts 수정 + 신규 catalogCache.ts/plugins/catalog.ts만 변경, reservationService·reservation·reservationDraft·components·pages 무변경). storeService: ~/data/stores·managers 직접 import 제거, getApprovedStores=catalogStores(), getManagersByStore/getManager=catalogManagers() 필터/find, getBaysByStore/getBaysForCar=catalogBays()(SIZE_RANK 누적 유지), getCarTypes/getServiceTypes·isManagerOffAt/isManagerFullDayOff·toMinutes/isInShift 무변경(carTypes/serviceTypes FE 정적). priceService: ~/data/prices 제거, getPrice=catalogPrices().find, 미발견 시 throw 유지. reservationService.ts 무변경(슬롯 라이브는 Phase 4). 캐시 접근자는 함수 본문에서 호출(모듈 최상위 아님). oxfmt(세미콜론 없음·작은따옴표) 준수. npm run type-check 통과. 잔여: 런타임 서버데이터 회귀는 P2-8(BE 동시 기동 E2E)에서 검증.",
+      "completedAt": "2026-06-20T17:52:06.341Z"
+    },
+    {
+      "id": "a9b29675-6919-4ef0-bdca-6bd7e461d79e",
+      "name": "P2-8 E2E 회귀 게이트(BE 동시 기동)",
+      "description": "playwright가 BE도 기동하도록 구성하고, 1차 E2E 25건을 서버 데이터로 회귀 통과시킨다.",
+      "notes": "H2 인메모리라 별도 DB 불필요. JAVA_HOME 필요. 서버 데이터 회귀 진실성 확인.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8a02a40b-b69c-4b50-9315-bd7fd0c18098"
+        }
+      ],
+      "createdAt": "2026-06-20T17:38:16.480Z",
+      "updatedAt": "2026-06-20T17:56:29.905Z",
+      "relatedFiles": [
+        {
+          "path": "playwright.config.ts",
+          "type": "TO_MODIFY",
+          "description": "webServer 배열화(FE+BE)"
+        }
+      ],
+      "implementationGuide": "playwright.config.ts webServer를 배열로: [{command:'npm run dev',url:'http://localhost:3000',reuseExistingServer:!process.env.CI}, {command:'cd backend && gradlew.bat bootRun'(Windows) 또는 ./gradlew bootRun,url:'http://localhost:8080/api/health',timeout:180000,reuseExistingServer:!process.env.CI}]. BE·FE 동시 기동 후 reserve.spec(승인필터·매니저필터·가격 12000·베이 그리드·휴무) 서버 데이터로 통과 확인. 사전: data.sql ↔ FE 더미 값집합 대조.",
+      "verificationCriteria": "./gradlew build·npm run type-check 통과. BE+FE 동시 기동 하에 npm run test:e2e 25건 전부 통과(서버 데이터). Phase 2 DoD 충족.",
+      "analysisResult": "2차 Phase 2 — 서비스 추상화 교체(FE↔BE 연동). 방침: Option A 서버 하이드레이트 캐시(additive). 부팅 시 카탈로그(매장/매니저/베이/가격)를 1회 비동기 로드해 Pinia 캐시에 담고, 기존 동기 FE 서비스 함수는 캐시를 동기 읽기로 내부만 교체 → 컴포넌트/스토어/computed 무변경. 핵심 결정: (1) app/plugins/catalog.ts async 플러그인에서 await useCatalogStore().load() — reservationDraft setup 최상위 동기 호출보다 먼저 캐시 보장. (2) BE 엔드포인트 list-all 4종: GET /api/stores(승인만)·/api/managers(전체,dayoffs)·/api/bays(전체)·/api/prices(전체). per-store/carType 예시는 동기 computed 충돌로 기각. (3) getBaysForCar는 FE 동기 계산 유지(캐시 bays + SIZE_RANK 누적). BE BayService.findBaysForCar 미생성(YAGNI). (4) getSeededSlotStatus/reservationService/reservation 스토어는 Phase 4 범위라 무변경. (5) DTO는 Java record + from(domain), FE domain.ts 필드명 무변환 일치(id=String), ManagerResponse.isStoreAdmin은 @JsonProperty 키 고정. (6) carTypes/serviceTypes FE 정적 유지. 위험: BE 미기동 SSR 부팅(load try/catch+빈배열 폴백), E2E 시 BE 동시 기동 필요(playwright webServer 배열화). 2차이므로 shrimp-task-manager-phase2 서버만 사용. 한 건씩 execute_task 진행. Phase 1(T0~T8) 완료·커밋·푸시됨.",
+      "summary": "P2-8 완료. playwright.config.ts webServer를 배열화(FE npm run dev :3000 + BE Spring Boot :8080). BE 명령은 플랫폼 분기: Windows는 'cd backend && .\\gradlew.bat bootRun'(이 시스템은 cmd의 현재 디렉터리 실행이 비활성이라 .\\ 접두 필수 — 실측으로 발견·수정), 그 외 './gradlew bootRun'. BE ready 대기는 http://localhost:8080/api/health(timeout 180s). BE+FE 동시 기동 하에 npm run test:e2e 25건 전부 통과(8.6s) — 서버 데이터로 회귀: 승인 매장만(판교점 제외, /api/stores), 매장별 매니저(/api/managers), 대형 차종 베이 노출(/api/bays + SIZE_RANK), 매니저 휴무 비활성(서버 dayoffs), 가격 표시(/api/prices) 모두 동일. 시드 RESERVED 슬롯은 FE 더미 유지(getSeededSlotStatus, Phase 4). 게이트: ./gradlew build(23건)·npm run type-check·npm run test:e2e(25건) 전부 통과. ROADMAP_2 Phase 2 체크리스트·DoD 갱신. Phase 2(서비스 추상화 교체) 종료 — Phase 3(인증/인가) 진행 가능.",
+      "completedAt": "2026-06-20T17:56:29.901Z"
     }
   ]
 }

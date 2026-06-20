@@ -490,13 +490,13 @@ public interface SlotMapper {
 
 > 💡 **Phase 2의 핵심 검증**: "1차 화면이 그대로 동작하는데, 데이터 출처만 더미 → 서버로 바뀌었다"가 성공 기준입니다. ROADMAP_1 5.1의 "준비 작업(서비스 추상화)"이 여기서 결실을 맺습니다.
 
-#### 태스크 체크리스트
-- [ ] BE 조회 API: `GET /api/stores`(승인 매장만), `GET /api/stores/{id}/managers`, `GET /api/stores/{id}/bays?carType=`, `GET /api/prices`
-- [ ] `dto/StoreResponse`·`ManagerResponse`·`BayResponse`·`PriceResponse`(FE 타입과 필드 일치)
-- [ ] FE `app/services/storeService.ts` 내부를 `$fetch(apiBase + '/stores')`로 교체(시그니처 유지)
-- [ ] FE `app/services/priceService.ts`의 `getPrice`를 `/api/prices` 조회(또는 캐시) 기반으로 교체
-- [ ] FE 베이 노출(`getBaysForCar`)을 `GET /api/stores/{id}/bays?carType=`로 위임(Phase 0 Q3 누적 로직 서버화)
-- [ ] **1차 Playwright E2E 회귀 통과 확인**(매장 검색·매니저 휴무·가격 표시가 서버 데이터로도 동일)
+#### 태스크 체크리스트 — ✅ 2026-06-21 완료
+- [x] BE 조회 API: `GET /api/stores`(승인 매장만)·`GET /api/managers`(전체, dayoffs)·`GET /api/bays`(전체)·`GET /api/prices`(전체) — *list-all 채택(캐시 1회 로드용). per-store/`?carType=`는 동기 computed 충돌로 기각*
+- [x] `dto/StoreResponse`·`ManagerResponse`(+`DayoffResponse`)·`BayResponse`·`PriceResponse`(record, FE 타입과 필드 일치, `isStoreAdmin` `@JsonProperty` 키 고정)
+- [x] FE `app/services/storeService.ts` 내부를 서버 하이드레이트 캐시(`catalogCache`) 동기 읽기로 교체(시그니처 유지)
+- [x] FE `app/services/priceService.ts`의 `getPrice`를 캐시(`/api/prices` 로드) 기반으로 교체
+- [x] FE 베이 노출(`getBaysForCar`)은 캐시된 bays + `SIZE_RANK` 누적 로직을 **FE 동기 계산 유지**(서버 위임 시 computed 충돌 — 방침 변경)
+- [x] **1차 Playwright E2E 회귀 통과 확인**(매장 검색·매니저 휴무·가격 표시가 서버 데이터로도 동일) — BE+FE 동시 기동 25건 통과
 
 #### 생성·수정 파일
 `controller/StoreController.java`, `controller/PriceController.java`, `service/StoreService.java`, `service/PriceService.java`, `service/BayService.java`, `dto/StoreResponse.java`, `dto/ManagerResponse.java`, `dto/BayResponse.java`, `dto/PriceResponse.java`, FE `app/services/storeService.ts`(내부 교체), FE `app/services/priceService.ts`(내부 교체)
@@ -571,11 +571,13 @@ export function getBaysForCar(storeId: string, carType: CarType): Promise<Bay[]>
 }
 ```
 
-#### 완료기준 (DoD)
-- [ ] `GET /api/stores`가 승인 매장만 반환한다(`approved=false` 미노출, require 6.1)
-- [ ] FE 예약 1페이지(`/reserve`)가 **서버 데이터**로 매장·매니저·차종·가격을 표시한다(화면 무변경)
-- [ ] **1차 Playwright E2E 회귀**(매장 검색 필터·가격 자동 표시)가 서버 데이터로도 통과한다
-- [ ] `./gradlew build`, `npm run type-check`, `npm run test:e2e` 통과
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(Phase 2 완료)
+- [x] `GET /api/stores`가 승인 매장만 반환한다(`approved=false` 미노출, require 6.1) (CatalogApiTest: length=2, 판교점 제외)
+- [x] FE 예약 1페이지(`/reserve`)가 **서버 데이터**로 매장·매니저·차종·가격을 표시한다(화면 무변경) (catalogCache 서버 하이드레이트, 컴포넌트/스토어 무변경)
+- [x] **1차 Playwright E2E 회귀**(매장 검색 필터·가격 자동 표시)가 서버 데이터로도 통과한다 (BE+FE 동시 기동, 25건 통과)
+- [x] `./gradlew build`(23건), `npm run type-check`, `npm run test:e2e`(25건) 통과
+
+> 📌 **2차 구현 방침(additive)**: 서비스 동기 소비(computed/setup)를 보존하기 위해 services를 Promise화하지 않고, 부팅 시 카탈로그를 1회 로드하는 **서버 하이드레이트 캐시**(`app/services/catalogCache.ts`, Nuxt `useState`)를 도입해 기존 동기 서비스가 캐시를 읽도록 내부만 교체했다. BE는 list-all 4종(`/api/stores`·`/api/managers`·`/api/bays`·`/api/prices`)으로 구성. 슬롯 라이브 상태(getSeededSlotStatus)는 Phase 4에서 서버화.
 
 #### 구현 메모 (📌)
 - 📌 **무수정 목표의 현실**: 더미가 동기 반환이던 함수가 `Promise`로 바뀌므로, 호출부에 `await`가 없던 곳은 최소 수정이 필요할 수 있습니다. 이 정도는 "서비스 계층 추상화의 합리적 비용"으로 간주하고, **컴포넌트 마크업·스토어 구조 변경 0**을 진짜 성공 기준으로 삼으세요.

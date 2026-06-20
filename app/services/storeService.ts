@@ -1,29 +1,30 @@
 import type { Bay, Manager, Store } from '~/types/domain'
 import type { BaySize, CarType, DayoffType } from '~/types/enums'
-import { bays, stores } from '~/data/stores'
-import { managers } from '~/data/managers'
 import { carTypes, type CarTypeOption } from '~/data/carTypes'
 import { serviceTypes, type ServiceTypeOption } from '~/data/serviceTypes'
+import { catalogBays, catalogManagers, catalogStores } from '~/services/catalogCache'
 
 // 크기 등급 순서 — 큰 베이가 작은 차도 수용 (2차 Q1: 특대형 XLARGE 신설)
 const SIZE_RANK: Record<BaySize, number> = { SMALL: 1, MID: 2, LARGE: 3, XLARGE: 4 }
 
-// 매장/매니저 데이터 접근 추상화 (단방향 의존: services → data·types, README 계약)
-// TODO(2단계): stores/managers import를 $fetch/useFetch 서버 호출로 교체(시그니처 유지)
+// 매장/매니저/베이 데이터 접근 추상화 (단방향 의존: services → catalogCache·data·types, README 계약)
+// 2단계 교체: 1차의 ~/data 직접 import → 서버 하이드레이트 캐시(catalogCache) 동기 읽기.
+//   시그니처·동기 반환 타입을 유지하여 컴포넌트/스토어/computed 무변경(additive).
+//   carTypes/serviceTypes는 순수 프레젠테이션 카탈로그라 FE 정적 유지.
 
-// 승인된 매장만 반환 — 미승인 매장은 예약 목록에서 제외 (require 6.1)
+// 승인된 매장만 반환 — 서버가 이미 승인 매장만 응답(require 6.1)
 export function getApprovedStores(): Store[] {
-  return stores.filter((s) => s.approved)
+  return catalogStores()
 }
 
 // 특정 매장의 매니저만 반환 (require 6.3 매니저 선택)
 export function getManagersByStore(storeId: string): Manager[] {
-  return managers.filter((m) => m.storeId === storeId)
+  return catalogManagers().filter((m) => m.storeId === storeId)
 }
 
 // 매니저 id로 조회 — 선택 매니저 휴무(dayoffs) 컨텍스트용 (require 6.1)
 export function getManager(id: string): Manager | undefined {
-  return managers.find((m) => m.id === id)
+  return catalogManagers().find((m) => m.id === id)
 }
 
 // 3교대 근무 시간 경계 (require 5.5) — 'HH:mm' → 분 단위로 변환
@@ -58,23 +59,23 @@ export function isManagerFullDayOff(manager: Manager, date: string): boolean {
 
 // 특정 매장의 베이만 반환 (require 5.1, 5.2 — 슬롯 = 매장×베이×날짜×시간)
 export function getBaysByStore(storeId: string): Bay[] {
-  return bays.filter((b) => b.storeId === storeId)
+  return catalogBays().filter((b) => b.storeId === storeId)
 }
 
-// 차종 카탈로그 (require 10.1)
+// 차종 카탈로그 (require 10.1) — FE 정적 유지
 export function getCarTypes(): CarTypeOption[] {
   return carTypes
 }
 
-// 서비스 카탈로그 (require 10.2)
+// 서비스 카탈로그 (require 10.2) — FE 정적 유지
 export function getServiceTypes(): ServiceTypeOption[] {
   return serviceTypes
 }
 
-// 차 크기에 맞는 베이만 반환 — 차가 요구하는 크기 이상을 수용하는 베이
+// 차 크기에 맞는 베이만 반환 — 차가 요구하는 크기 이상을 수용하는 베이 (누적 로직, 캐시된 bays 기준)
 export function getBaysForCar(storeId: string, carType: CarType): Bay[] {
   const car = carTypes.find((c) => c.code === carType)
   if (!car) return []
   const min = SIZE_RANK[car.size]
-  return bays.filter((b) => b.storeId === storeId && SIZE_RANK[b.size] >= min)
+  return catalogBays().filter((b) => b.storeId === storeId && SIZE_RANK[b.size] >= min)
 }

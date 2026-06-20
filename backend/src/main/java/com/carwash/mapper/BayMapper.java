@@ -8,6 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface BayMapper {
 
+    // 카탈로그 캐시용 전체 조회(Phase 2)
+    List<Bay> findAll();
+
     List<Bay> findByStore(String storeId);
 
     Bay findById(String id);

@@ -16,6 +16,15 @@
         </collection>
     </resultMap>
 
+    <!-- 카탈로그 캐시용 전체 조회(Phase 2) — dayoffs collection 동일 재사용 -->
+    <select id="findAll" resultMap="managerWithDayoffs">
+        SELECT m.id, m.store_id, m.name, m.is_store_admin,
+               md.`date` AS dayoff_date, md.dayoff_type
+        FROM manager m
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id
+        ORDER BY m.id, md.`date`
+    </select>
+
     <select id="findByStore" resultMap="managerWithDayoffs">
         SELECT m.id, m.store_id, m.name, m.is_store_admin,
                md.`date` AS dayoff_date, md.dayoff_type

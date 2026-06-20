@@ -8,6 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface ManagerMapper {
 
+    // 카탈로그 캐시용 전체 조회(Phase 2) — dayoffs collection 포함
+    List<Manager> findAll();
+
     List<Manager> findByStore(String storeId);
 
     Manager findById(String id);

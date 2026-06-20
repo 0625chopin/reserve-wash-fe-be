@@ -3,6 +3,20 @@
 -- id 정책(Phase 0 확정): 마스터(users/store/bay/manager)·reservation·review = VARCHAR 문자열 무변환,
 --   slot/manager_dayoff/store_holiday = 내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), price = 복합 PK.
 -- 예약어 회피: `date`·`text` 컬럼은 백틱 인용(H2 MySQL 모드·MySQL 공통).
+-- 멱등 재생성: H2 mem DB(jdbc:h2:mem:carwash;DB_CLOSE_DELAY=-1)는 JVM 전역 공유라
+--   테스트에서 여러 Spring 컨텍스트가 spring.sql.init을 재실행하면 data.sql INSERT가 중복된다.
+--   매 초기화 시 DROP 후 CREATE로 깨끗이 재생성(AUTO_INCREMENT도 리셋)하여 시드 중복을 방지한다.
+
+DROP TABLE IF EXISTS store_holiday;
+DROP TABLE IF EXISTS review;
+DROP TABLE IF EXISTS reservation;
+DROP TABLE IF EXISTS price;
+DROP TABLE IF EXISTS slot;
+DROP TABLE IF EXISTS manager_dayoff;
+DROP TABLE IF EXISTS manager;
+DROP TABLE IF EXISTS bay;
+DROP TABLE IF EXISTS store;
+DROP TABLE IF EXISTS users;
 
 -- 사용자 (require 3.1)
 CREATE TABLE IF NOT EXISTS users (

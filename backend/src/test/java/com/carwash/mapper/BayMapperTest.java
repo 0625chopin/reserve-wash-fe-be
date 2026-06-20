@@ -31,6 +31,14 @@ class BayMapperTest {
     }
 
     @Test
+    void findAll_전체_베이_9개_XLARGE_포함() {
+        List<Bay> all = bayMapper.findAll();
+
+        assertThat(all).hasSize(9);   // 원본 8 + store1-A4(XLARGE)
+        assertThat(all).extracting(Bay::getSize).contains(BaySize.XLARGE);
+    }
+
+    @Test
     void findById_특대형_베이_등급_매핑() {
         Bay xlarge = bayMapper.findById("store1-A4");
 

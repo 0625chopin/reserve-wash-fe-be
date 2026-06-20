@@ -3,6 +3,11 @@
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.carwash.mapper.BayMapper">
 
+    <!-- 카탈로그 캐시용 전체 조회(Phase 2) -->
+    <select id="findAll" resultType="com.carwash.domain.Bay">
+        SELECT id, store_id, code, size FROM bay ORDER BY store_id, code
+    </select>
+
     <select id="findByStore" resultType="com.carwash.domain.Bay">
         SELECT id, store_id, code, size FROM bay WHERE store_id = #{storeId} ORDER BY code
     </select>
