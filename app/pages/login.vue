@@ -31,6 +31,27 @@ async function onSubmit() {
   const redirect = route.query.redirect
   navigateTo(typeof redirect === 'string' ? redirect : '/reserve')
 }
+
+// 개발용 빠른 로그인 — 역할별 시드 계정으로 즉시 로그인(비번 공통 'password').
+// import.meta.dev 가드로 프로덕션 빌드에는 노출되지 않음(테스트 계정 보호).
+const isDev = import.meta.dev
+const quickAccounts = [
+  { key: 'user', label: '일반사용자', email: 'user@test.com' },
+  { key: 'manager', label: '매니저', email: 'manager@test.com' },
+  { key: 'admin', label: '관리자', email: 'admin@test.com' },
+] as const
+
+async function quickLogin(loginEmail: string) {
+  error.value = ''
+  email.value = loginEmail
+  password.value = 'password'
+  if (!(await auth.login(loginEmail, 'password'))) {
+    error.value = '빠른 로그인 실패 — 백엔드(:8080) 기동 여부를 확인하세요'
+    return
+  }
+  const redirect = route.query.redirect
+  navigateTo(typeof redirect === 'string' ? redirect : '/reserve')
+}
 </script>
 
 <template>
@@ -99,6 +120,23 @@ async function onSubmit() {
           회원가입
         </NuxtLink>
       </p>
+
+      <!-- 개발용 빠른 로그인 (dev 전용) — 역할별 시드 계정 즉시 로그인 -->
+      <div v-if="isDev" class="mt-6 border-t border-[--color-line-soft] pt-5">
+        <p class="mb-3 text-center text-xs text-[--color-content-muted]">개발용 빠른 로그인</p>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            v-for="acc in quickAccounts"
+            :key="acc.key"
+            :data-testid="`quick-login-${acc.key}`"
+            type="button"
+            class="btn btn-ghost text-sm"
+            @click="quickLogin(acc.email)"
+          >
+            {{ acc.label }}
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
