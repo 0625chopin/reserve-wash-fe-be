@@ -22,16 +22,16 @@
 | `app/stores/` | Pinia 스토어(자동 임포트) | 신규 스토어 파일을 이 디렉터리에 생성 |
 | `app/components/` | 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함) | 재사용 단위만 배치 |
 | `app/composables/` | 재사용 로직(자동 임포트) | Composition 함수 배치 |
-| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`). `auth.ts` 구현됨 | 인증 가드 등. `definePageMeta({ middleware: 'auth' })`로 적용 |
+| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`). 4개 구현: `auth.ts`(인증)·`reservation-fresh-entry.ts`(`/reserve` 진입 시 draft 초기화)·`reservation-wizard-guard.ts`(위저드 단계 순서)·`review-guard.ts`(후기 자격) | `definePageMeta({ middleware: '...' })`로 적용. **미들웨어 키는 파일명 kebab-case**. 신규 가드는 이 디렉터리에 추가 |
 | `app/layouts/` | 공통 레이아웃(자동 임포트). `default.vue` 활성(`app.vue`가 `<NuxtLayout>` opt-in) | `default.vue` 수정 또는 신규 레이아웃 추가 |
 | `app/assets/` | `base.css`·`main.css`(Tailwind 진입 + `@theme` 토큰 + `@layer components` 공통 클래스) | `nuxt.config.ts`의 `css`로 등록. **색상/공통 컴포넌트 스타일은 여기서 토큰화** |
-| `app/types/` *(Phase 1 구현됨)* | 도메인 TS 타입/인터페이스/유니언 | `enums.ts`, `domain.ts`. **명시 import 대상**(`import type`) |
-| `app/data/` *(Phase 1 구현됨)* | 더미 데이터(매장/베이/가격/매니저/사용자) | `prices.ts`·`stores.ts`·`managers.ts`·`users.ts`. **명시 import 대상** |
-| `app/services/` *(Phase 1 일부 · 계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts` 등. **명시 import 대상**. 계약: `app/services/README.md` |
+| `app/types/` | 도메인 TS 타입/인터페이스/유니언 | `enums.ts`, `domain.ts`. **명시 import 대상**(`import type`) |
+| `app/data/` | 더미 데이터(매장/베이/가격/매니저/차종/서비스/사용자) | `prices.ts`·`stores.ts`·`managers.ts`·`carTypes.ts`·`serviceTypes.ts`·`users.ts`. **명시 import 대상** |
+| `app/services/` *(계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts`·`storeService.ts`·`reservationService.ts`. **명시 import 대상**. 계약: `app/services/README.md` |
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
-- Phase 1·2가 구현 진행됨: `app/types`·`app/data`(`enums`·`domain`·`prices`·`stores`·`carTypes`·`managers`·`users`)·`app/composables`(`useSlots`)·`app/services`(`priceService`·`storeService`)가 채워졌고, **인증 흐름(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)과 레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)가 완료**됐다. 예약 흐름(`app/pages/reserve.vue`·`reservations.vue`·`review/[reservationId].vue`)과 입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`)도 구현됨. 남은 작업·DoD는 `docs/roadmaps/ROADMAP_1.md`를 정본으로 따르라.
+- **1차(ROADMAP_1) Phase 0~8 구현 완료**: `app/types`(`enums`·`domain`)·`app/data`(`prices`·`stores`·`managers`·`carTypes`·`serviceTypes`·`users`)·`app/composables`(`useSlots`·`useToast`)·`app/services`(`priceService`·`storeService`·`reservationService`)가 채워졌고, 인증(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)·레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)·**예약 위저드 3분할**(`app/pages/reserve/{index,slot,done}.vue` + `app/stores/reservationDraft.ts` + 위저드/진입 가드)·예약 목록·상태전이(`app/pages/reservations.vue` + `app/stores/reservation.ts`)·후기/평점(`app/pages/review/[reservationId].vue` + `app/stores/review.ts`)·입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`·`SlotGrid.vue`)·Playwright E2E(`e2e/`)가 모두 구현됐다. 1차 DoD는 `docs/roadmaps/ROADMAP_1.md`, **2차(Spring Boot 백엔드 + BO)는 `docs/roadmaps/ROADMAP_2.md`** 를 정본으로 따르라.
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
@@ -135,7 +135,7 @@ export default defineNuxtRouteMiddleware((to) => {
 - **도메인 모델·가격·enum의 정본은 `docs/require_v1.md`다.** `app/types/enums.ts`·`app/types/domain.ts`·`app/data/prices.ts`를 작성·수정할 때 값은 require_v1.md의 5장(도메인)·10장(가격 매트릭스)·11장(프로세스 코드 `FW/M/S`)과 **정확히 일치**시켜라. 불일치 시 require_v1.md를 따르라.
 - **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/roadmaps/ROADMAP_1.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 `roadmaps/ROADMAP_1.md`를 따르라.
 - **2차(백엔드 진화 + BO) 작업의 정본은 `docs/roadmaps/ROADMAP_2.md`(v2.0)다.** Spring Boot 백엔드·동시성 2·3단계(슬롯 UNIQUE·낙관/비관 락)·BO 프로세스(M3~M7·S3~S8)·휴일/휴무 결재·SMTP/알림·MySQL 이행은 이 문서를 정본으로 따르라. 1차 FO 자산은 그대로 유지하고 `app/services/*` 내부만 `$fetch` API로 교체하는 additive 원칙을 지켜라.
-- **예약 화면 동작(순차 선택·차종별 베이 노출·휠 날짜/시간 선택 등)의 정본은 `docs/예약_규칙_명세_v1.md`다.** `app/pages/reserve.vue`·예약 관련 컴포넌트를 수정할 때 이 명세와 일치시켜라.
+- **예약 화면 동작(순차 선택·차종별 베이 노출·휠 날짜/시간 선택 등)의 정본은 `docs/예약_규칙_명세_v1.md`다.** 예약 위저드(`app/pages/reserve/{index,slot,done}.vue`)·예약 관련 컴포넌트를 수정할 때 이 명세와 일치시켜라.
 - 화면/스토어/서비스를 구현하면 해당 `docs/roadmaps/ROADMAP_1.md` Phase의 체크리스트·DoD를 함께 갱신하라.
 
 ## 테스트(Playwright) 규칙
