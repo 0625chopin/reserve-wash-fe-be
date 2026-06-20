@@ -87,6 +87,18 @@ function onSubmit() {
           로그인
         </button>
       </form>
+
+      <!-- 회원가입 화면으로 상호 이동 -->
+      <p class="mt-5 text-center text-sm text-[--color-content-muted]">
+        아직 계정이 없으신가요?
+        <NuxtLink
+          data-testid="link-signup"
+          to="/signup"
+          class="font-medium text-[--color-brand-primary]"
+        >
+          회원가입
+        </NuxtLink>
+      </p>
     </div>
   </section>
 </template>

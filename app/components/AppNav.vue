@@ -33,14 +33,22 @@ function onLogout() {
 
         <span class="mx-1 hidden h-5 w-px bg-[--color-line] sm:block" />
 
-        <NuxtLink
-          v-if="!auth.isLoggedIn"
-          data-testid="nav-login"
-          to="/login"
-          class="btn btn-primary !px-4 !py-1.5 !text-sm"
-        >
-          로그인
-        </NuxtLink>
+        <template v-if="!auth.isLoggedIn">
+          <NuxtLink
+            data-testid="nav-signup"
+            to="/signup"
+            class="btn btn-ghost !px-4 !py-1.5 !text-sm"
+          >
+            회원가입
+          </NuxtLink>
+          <NuxtLink
+            data-testid="nav-login"
+            to="/login"
+            class="btn btn-primary !px-4 !py-1.5 !text-sm"
+          >
+            로그인
+          </NuxtLink>
+        </template>
         <template v-else>
           <span
             data-testid="nav-username"

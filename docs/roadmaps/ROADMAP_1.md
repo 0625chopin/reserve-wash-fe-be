@@ -538,13 +538,13 @@ export default defineNuxtRouteMiddleware((to) => {
 > 💡 **Phase 3와의 관계(증분)**: Phase 3의 `auth` 스토어·게스트 진입 패턴·로그인 폼 검증(필수값→이메일 정규식→인증)을 **그대로 재사용**합니다. 본 Phase 3.1은 그 위에 **회원가입 화면·`signup` 액션·게스트 가드**를 얹는 작업으로, 기존 Phase 3·4·5 본문은 변경하지 않습니다(additive).
 
 #### 태스크 체크리스트
-- [ ] `app/pages/signup.vue` — 이메일·비밀번호·비밀번호확인·이름 폼. **login.vue 검증 패턴 재사용**(필수값 → 이메일 정규식 `/^[^@\s]+@[^@\s]+\.[^@\s]+$/` → 비밀번호 일치 → 이메일 중복). data-testid: `signup-email`·`signup-password`·`signup-password-confirm`·`signup-name`·`signup-submit`·`signup-error`. `definePageMeta({ middleware: 'guest' })`
-- [ ] `app/middleware/guest.ts` — 게스트 전용 가드. **로그인 상태면 `/reserve`로 리다이렉트**. 미들웨어 키 `guest`(파일명 kebab-case)
-- [ ] `app/stores/auth.ts` — `signup(payload)` 액션 추가: **이메일 중복 검사 → users in-memory 추가(role `'USER'`) → 자동 로그인**(또는 결과 반환). 2차 교체 지점에 `// TODO(2단계: authService/$fetch)` 주석
-- [ ] `app/data/users.ts` — 1차 비밀번호 더미 처리 방침 1줄 명시(가입 비번 in-memory 보관 또는 기존 통일 더미 비번 `'password'` 유지)
-- [ ] `app/components/AppNav.vue` — 미인증 시 "회원가입" 링크 노출(`data-testid="nav-signup"`)
-- [ ] `app/pages/login.vue` — "회원가입" 링크 추가(로그인 ↔ 가입 상호 이동)
-- [ ] `e2e/auth.spec.ts` — 회원가입 시나리오 보강(가입 성공·중복 이메일·비번 불일치·게스트 가드)
+- [x] `app/pages/signup.vue` — 이메일·비밀번호·비밀번호확인·이름 폼. **login.vue 검증 패턴 재사용**(필수값 → 이메일 정규식 `/^[^@\s]+@[^@\s]+\.[^@\s]+$/` → 비밀번호 일치 → 이메일 중복). data-testid: `signup-email`·`signup-password`·`signup-password-confirm`·`signup-name`·`signup-submit`·`signup-error`. `definePageMeta({ middleware: 'guest' })`
+- [x] `app/middleware/guest.ts` — 게스트 전용 가드. **로그인 상태면 `/reserve`로 리다이렉트**. 미들웨어 키 `guest`(파일명 kebab-case)
+- [x] `app/stores/auth.ts` — `signup(payload)` 액션 추가: **이메일 중복 검사 → users in-memory 추가(role `'USER'`) → 자동 로그인**(또는 결과 반환). 2차 교체 지점에 `// TODO(2단계: authService/$fetch)` 주석
+- [x] `app/data/users.ts` — 1차 비밀번호 더미 처리 방침 1줄 명시(가입 비번 in-memory 보관 또는 기존 통일 더미 비번 `'password'` 유지)
+- [x] `app/components/AppNav.vue` — 미인증 시 "회원가입" 링크 노출(`data-testid="nav-signup"`)
+- [x] `app/pages/login.vue` — "회원가입" 링크 추가(로그인 ↔ 가입 상호 이동)
+- [x] `e2e/auth.spec.ts` — 회원가입 시나리오 보강(가입 성공·중복 이메일·비번 불일치·게스트 가드)
 
 > ⚠️ **SSR 주의 (Nuxt 기본 SSR)**: 게스트 가드는 서버 렌더 단계에서도 인증 상태를 읽어야 하므로 `auth` 스토어가 `useCookie` 기반(Phase 3 구현)임을 전제로 동작합니다. 클라이언트 전용 분기는 `import.meta.client` 가드 안에서 처리하세요.
 
@@ -619,11 +619,11 @@ function onSubmit() {
 ```
 
 #### 완료기준 (DoD)
-- [ ] 올바른 입력으로 가입 성공 시 자동 로그인되어 `/reserve`로 이동한다(또는 `/login` 이동 정책 시 로그인 화면으로 이동)
-- [ ] 이미 가입된 이메일로 가입 시도 시 "이미 가입된 이메일입니다" 에러가 노출된다(`signup-error`)
-- [ ] 비밀번호와 비밀번호확인이 다르면 "비밀번호가 일치하지 않습니다" 에러가 노출된다
-- [ ] 로그인 상태로 `/signup` 진입 시 `/reserve`로 리다이렉트된다(게스트 가드)
-- [ ] `npm run type-check`, `npm run lint`, `npm run test:e2e` 통과
+- [x] 올바른 입력으로 가입 성공 시 자동 로그인되어 `/reserve`로 이동한다(또는 `/login` 이동 정책 시 로그인 화면으로 이동)
+- [x] 이미 가입된 이메일로 가입 시도 시 "이미 가입된 이메일입니다" 에러가 노출된다(`signup-error`)
+- [x] 비밀번호와 비밀번호확인이 다르면 "비밀번호가 일치하지 않습니다" 에러가 노출된다
+- [x] 로그인 상태로 `/signup` 진입 시 `/reserve`로 리다이렉트된다(게스트 가드)
+- [x] `npm run type-check`, `npm run lint`, `npm run test:e2e` 통과
 
 > 📌 **구현 메모**
 > - 이메일 인증/SMTP·관리자 승인(S3)·매니저(M1)/관리자(S1) 가입은 **2차(ROADMAP_2, require 13.2·2.2)** 과제입니다. 본 Phase는 **일반 사용자(USER) 즉시 가입**만 다룹니다.
