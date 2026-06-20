@@ -11,7 +11,7 @@
   - 스타일링: **Tailwind CSS v4** (`@tailwindcss/vite` 플러그인을 `nuxt.config.ts`의 `vite.plugins`에 등록, `app/assets/main.css`에서 `@import 'tailwindcss'`). `tailwind.config.js`는 없다(v4는 CSS-first 설정).
   - 렌더링: **기본 SSR**. 클라이언트 전용 로직은 `import.meta.client` 가드 또는 `useCookie` 등을 사용하라.
   - E2E 테스트: **Playwright 설치됨**(`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`). 단위 테스트 러너(vitest)는 미설치.
-- **BE 스택**(2차, `docs/roadmaps/ROADMAP_2.md` 정본 — **`backend/`는 아직 미생성**, Phase 0에서 신설): **Java 21 (LTS)** + **Spring Boot 3.x** + **Gradle Wrapper**. 데이터는 2단계 **H2 in-memory**(`ddl-auto: create-drop`, 휘발성) → 3단계 **MySQL 8.x + Flyway**(`ddl-auto: validate`, 영속화). 통합테스트는 `@SpringBootTest`(`backend/src/test/...`).
+- **BE 스택**(2차, `docs/roadmaps/ROADMAP_2.md` 정본 — **`backend/`는 아직 미생성**, Phase 0에서 신설): **Java 21 (LTS)** + **Spring Boot 3.x** + **Gradle Wrapper**. **DB 접근은 MyBatis**(`mybatis-spring-boot-starter`, 매퍼 인터페이스 + XML SQL) — **JPA/Hibernate 미사용**(require_v1.md v1.5 확정). 데이터는 2단계 **H2 in-memory**(`schema.sql`로 스키마 생성, 휘발성) → 3단계 **MySQL 8.x + Flyway**(영속화). 통합테스트는 `@SpringBootTest`(`backend/src/test/...`).
 - **additive(증분) 철학(2차 최우선)**: 1차 FE 자산(화면·스토어·E2E)을 **삭제·구조 변경하지 마라**. 백엔드 연동은 **`app/services/*` 내부 구현만** 더미 import → `$fetch`/`useFetch` API 호출로 교체한다. 컴포넌트 마크업·스토어 구조 변경은 **0**을 목표로 하라.
 
 ## 프로젝트 아키텍처
@@ -32,18 +32,20 @@
 | `app/services/` *(계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts`·`storeService.ts`·`reservationService.ts`. **명시 import 대상**. 계약: `app/services/README.md`. **2차 교체 지점**: 내부만 `$fetch`로 교체(시그니처 유지) |
 | `backend/` *(2차·미생성)* | Spring Boot BE — **독립 Gradle 프로젝트** | 루트 `package.json`에 Java 빌드를 끼워넣지 마라. FE는 루트 `npm`, BE는 `cd backend && ./gradlew`로 빌드 경계를 분리하라. `backend/build/`·`backend/.gradle/`·`*.class`·IDE 산출물(`.idea/`·`*.iml`)을 루트 `.gitignore`에 추가하라 |
 
-### Spring Boot 패키지 구조 (`backend/src/main/java/com/carwash/`, 2차)
+### Spring Boot + MyBatis 패키지 구조 (`backend/src/main/java/com/carwash/`, 2차)
 
 | 패키지 | 역할 | 규칙 |
 |------|------|-----------|
-| `controller/` | `@RestController` — REST 진입점 | **DTO만 입출력**하라. 엔티티를 직접 반환·수신하지 마라 |
-| `service/` | `@Service` 비즈니스 로직 | 쓰기 메서드에 `@Transactional`, 조회에 `@Transactional(readOnly = true)`. 엔티티↔DTO 변환 수행 |
-| `repository/` | `JpaRepository` 인터페이스 | 경합 슬롯은 `@Lock(PESSIMISTIC_WRITE)` + `@Query`(`SELECT ... FOR UPDATE`) |
-| `entity/` | `@Entity` 도메인 모델 | setter 미개방. 상태 전이는 도메인 메서드(`reserve()`·`cancel()`·`complete()`·`approveL1()`)로 표현 |
+| `controller/` | `@RestController` — REST 진입점 | **DTO만 입출력**하라. 도메인 객체를 직접 반환·수신하지 마라 |
+| `service/` | `@Service` 비즈니스 로직 | 쓰기 메서드에 `@Transactional`, 조회에 `@Transactional(readOnly = true)`. 도메인↔DTO 변환 수행 |
+| `mapper/` | **MyBatis `@Mapper` 인터페이스** | SQL은 **`resources/mapper/*.xml`** 에 작성(또는 애너테이션 SQL). 경합 슬롯은 `SELECT ... FOR UPDATE` SQL을 매퍼에 직접 작성. **`JpaRepository`를 쓰지 마라** |
+| `domain/` | **순수 POJO 도메인 모델** | **JPA 애너테이션(`@Entity`·`@Id`·`@Table`·`@Version`) 금지.** setter 미개방, 상태 전이는 도메인 메서드(`reserve()`·`cancel()`·`complete()`·`approveL1()`)로 표현. MyBatis 결과 매핑용 기본 생성자(또는 `<constructor>` 매핑) 허용 |
 | `dto/` | 요청/응답 DTO | **Java `record` 권장**. FE `app/types/domain.ts` 필드명과 **정확히 일치**(무변환 매핑) |
-| `config/` | CORS·Security·Jackson·Async 설정 | FE(:3000) 교차 출처 허용은 `CorsConfig`(또는 Nuxt `devProxy`) |
+| `config/` | CORS·Security·Jackson·Async·MyBatis 설정 | FE(:3000) 교차 출처 허용은 `CorsConfig`(또는 Nuxt `devProxy`). MyBatis `map-underscore-to-camel-case: true` |
 | `security/` | JWT 필터·`UserDetails` (Phase 3) | 인가는 `SecurityConfig`/`@PreAuthorize` |
 | `exception/` | 도메인 예외 + `@RestControllerAdvice` | 409/404/400을 `ErrorResponse`로 일관 응답 |
+| `resources/mapper/` | **MyBatis 매퍼 XML** | `*Mapper.xml` — `namespace`를 매퍼 인터페이스 FQN과 일치. snake_case 컬럼 ↔ camelCase 프로퍼티 |
+| `resources/db/` | 스키마/시드 | 2단계 `schema.sql`·`data.sql`(H2), 3단계 `db/migration/V{n}__*.sql`(Flyway·MySQL). **슬롯 `UNIQUE` 제약을 DDL에 직접 작성** |
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
@@ -74,7 +76,7 @@ import { useCounterStore } from "../stores/counter";
 ### Java 코드 스타일 (2차 `backend/`)
 
 - 클래스 `PascalCase`(`ReservationService`), 메서드/필드 `camelCase`(`confirmReservation`), 상수 `UPPER_SNAKE_CASE`, 패키지 소문자(`com.carwash.service`).
-- Lombok: 엔티티는 `@Getter`·`@Builder`·`@NoArgsConstructor(access = AccessLevel.PROTECTED)`. `@Setter`·`@Data`를 엔티티에 쓰지 마라.
+- Lombok: `domain/` 객체는 `@Getter`·`@Builder` + MyBatis 매핑용 `@NoArgsConstructor`. `@Setter`·`@Data`를 도메인 객체에 쓰지 마라.
 - 주석·커밋 메시지는 **한국어**, 클래스/메서드/필드명은 영어(위 FE 규칙과 동일).
 
 ## 기능 구현 규칙
@@ -120,23 +122,32 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ## 백엔드(Spring Boot) 구현 규칙 (2차 — `docs/roadmaps/ROADMAP_2.md` 정본)
 
+### DB 접근 (MyBatis — require_v1.md v1.5 정본)
+
+- **DB 접근은 MyBatis 매퍼로만 하라.** `spring-boot-starter-data-jpa`·`@Entity`·`JpaRepository`·`@Version`·`ddl-auto`를 도입하지 마라.
+- 매퍼는 `mapper/*Mapper.java`(`@Mapper` 인터페이스) + `resources/mapper/*Mapper.xml`(SQL)로 작성하라. XML `namespace`는 인터페이스 FQN과 일치시켜라.
+- 컬럼은 snake_case, 도메인/DTO 프로퍼티는 camelCase로 두고 `map-underscore-to-camel-case: true`로 매핑하라(별칭 남발 금지).
+- 스키마는 ORM 자동 생성에 의존하지 마라. 2단계는 `schema.sql`/`data.sql`(H2), 3단계는 Flyway 마이그레이션으로 **직접 관리**하라.
+
 ### DTO 계약 (FE↔BE 경계)
 
-- **컨트롤러에서 엔티티를 직접 반환·수신하지 마라.** 요청은 `XxxRequest`, 응답은 `XxxResponse`(Java `record`)로 받고 내보내라.
-- 엔티티↔DTO 변환은 service 또는 정적 팩토리(`XxxResponse.from(entity)`)에서 수행하라.
+- **컨트롤러에서 도메인 객체를 직접 반환·수신하지 마라.** 요청은 `XxxRequest`, 응답은 `XxxResponse`(Java `record`)로 받고 내보내라.
+- 도메인↔DTO 변환은 service 또는 정적 팩토리(`XxxResponse.from(domain)`)에서 수행하라.
 - DTO 필드명을 **FE `app/types/domain.ts`(1차 정의)와 일치**시켜라(2단계 교체 비용 최소화 — 무변환 매핑).
 
-### 엔티티 (불변성 지향)
+### 도메인 객체 (불변성 지향)
 
+- `domain/`은 **순수 POJO**다. JPA 애너테이션(`@Entity`·`@Id`·`@Table`·`@Version`)을 붙이지 마라.
 - setter를 열지 마라. 상태 전이는 의미 있는 도메인 메서드(`slot.hold()`·`reservation.complete()`·`dayoff.approveL1()`)로 표현하라.
-- 기본 생성자는 `@NoArgsConstructor(access = AccessLevel.PROTECTED)`, 생성은 `@Builder`를 사용하라. `@Getter`로 읽기만 노출하라.
+- `@Getter`로 읽기만 노출하고 생성은 `@Builder`를 쓰되, **MyBatis 결과 매핑을 위한 기본 생성자(또는 매퍼 `<constructor>` 매핑)** 를 보장하라.
 - **불가능한 상태 전이는 도메인 메서드에서 예외**(`IllegalStateException`)를 던지고, `@RestControllerAdvice`가 400/409로 변환하게 하라.
 
 ### 동시성 (예약 슬롯 — require 7.3 정본)
 
-- 슬롯 `@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"store_id","bay_id","date","time_slot"}))`를 **최종 방어선**으로 항상 깔아라.
-- 기본은 **낙관적 락**(`Slot.@Version`), 경합 잦은 인기 슬롯만 **비관적 락**(`@Lock(PESSIMISTIC_WRITE)`)을 선택 적용하라.
-- 충돌(`SlotConflictException`·`OptimisticLockException`·`DataIntegrityViolationException`)은 **500이 아닌 409 Conflict**로 매핑하라. FE는 1차 `useToast` 재선택 토스트를 재사용한다(새 UX를 만들지 마라).
+- 슬롯 `UNIQUE(store_id, bay_id, date, time_slot)` 제약을 **DDL(`schema.sql`/Flyway)에 직접 작성**하여 **최종 방어선**으로 항상 깔아라.
+- 기본은 **낙관적 락**: version 컬럼을 두고 `UPDATE ... SET version = version + 1 WHERE id = ? AND version = ?` 의 **영향 행 수가 0이면 충돌**로 판정하라.
+- 경합 잦은 인기 슬롯만 **비관적 락**: 매퍼 XML에 `SELECT ... FOR UPDATE` SQL을 직접 작성하라.
+- 충돌(`SlotConflictException`·`DuplicateKeyException`/`DataIntegrityViolationException`)은 **500이 아닌 409 Conflict**로 매핑하라. FE는 1차 `useToast` 재선택 토스트를 재사용한다(새 UX를 만들지 마라).
 
 ### 인증/인가 (Phase 3)
 
@@ -158,8 +169,9 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ### MySQL 이행 (Phase 10)
 
-- 3단계는 **Flyway가 스키마 단일 소유자(SSOT)** 다. `db/migration/V{n}__{설명}.sql`로 마이그레이션하고 `ddl-auto: validate`로 검증만 하라(`create-drop` 금지).
+- MyBatis는 ORM 자동 DDL이 없으므로 스키마는 **항상 직접 관리**한다. 3단계는 **Flyway가 스키마 단일 소유자(SSOT)** 다 — `db/migration/V{n}__{설명}.sql`로 마이그레이션하라(2단계 `schema.sql`을 Flyway로 이관).
 - 슬롯 `UNIQUE(store_id, bay_id, date, time_slot)`를 DB 유니크 인덱스로 확정하라.
+- MyBatis 매퍼 SQL이 H2(2단계)·MySQL(3단계) 양쪽 방언에서 동작하는지 확인하라(특히 `FOR UPDATE`·예약어·날짜 함수).
 
 ### 백엔드 빌드·기동 명령
 
@@ -200,7 +212,8 @@ export default defineNuxtRouteMiddleware((to) => {
 - **전역 모듈/플러그인 추가 시**: 의존성 설치 → `nuxt.config.ts`의 `modules`에 등록(또는 `app/plugins/`에 플러그인 생성)을 함께 수행하라.
 - **의존성 설치 후**: `npm run postinstall`(`nuxt prepare`)로 `.nuxt` 타입을 재생성하라.
 - **npm 스크립트 추가 시**: `package.json`과 `CLAUDE.md`의 "주요 명령어" 표를 함께 갱신하라.
-- **BE API 추가·변경 시(2차)**: BE `dto/*`(필드명)와 FE `app/services/*`(`$fetch` 시그니처)·`app/types/domain.ts`를 **같은 PR에서 함께** 수정하라(모노레포 원자 변경). 컨트롤러 추가 시 `service`/`repository`/`dto`/`exception` 계층을 함께 갖춰라.
+- **BE API 추가·변경 시(2차)**: BE `dto/*`(필드명)와 FE `app/services/*`(`$fetch` 시그니처)·`app/types/domain.ts`를 **같은 PR에서 함께** 수정하라(모노레포 원자 변경). 컨트롤러 추가 시 `service`/`mapper`(+ `resources/mapper/*.xml`)/`dto`/`exception` 계층을 함께 갖춰라.
+- **DB 스키마 변경 시(2차)**: `resources/db/schema.sql`(2단계 H2)와 Flyway 마이그레이션(3단계 MySQL)을 함께 갱신하고, 영향받는 `mapper/*.xml` SQL·`domain/*`·`dto/*` 필드를 정합시켜라.
 - **BO 신규 화면 추가 시(Phase 6~8)**: FE `app/pages/`(예: `manager/`·`admin/`) 페이지 + `app/middleware/role-guard.ts`(권한 가드) + BE 인가(`@PreAuthorize`)를 함께 추가하고, `e2e/`에 BO 시나리오를 추가하라.
 
 ## 도메인/문서 정합성 규칙 (정본 우선순위)
@@ -208,8 +221,9 @@ export default defineNuxtRouteMiddleware((to) => {
 - **도메인 모델·가격·enum의 정본은 `docs/require_v1.md`다.** `app/types/enums.ts`·`app/types/domain.ts`·`app/data/prices.ts`를 작성·수정할 때 값은 require_v1.md의 5장(도메인)·10장(가격 매트릭스)·11장(프로세스 코드 `FW/M/S`)과 **정확히 일치**시켜라. 불일치 시 require_v1.md를 따르라.
 - **FE 스택·라우팅·디렉터리·명령어의 정본은 `docs/roadmaps/ROADMAP_1.md`(v1.2)다.** require_v1.md 12장의 일부 스택 표기는 구버전(Vue3+Vite) 기준이므로, 충돌 시 `roadmaps/ROADMAP_1.md`를 따르라.
 - **2차(백엔드 진화 + BO) 작업의 정본은 `docs/roadmaps/ROADMAP_2.md`(v2.0)다.** Spring Boot 백엔드·동시성 2·3단계(슬롯 UNIQUE·낙관/비관 락)·BO 프로세스(M3~M7·S3~S8)·휴일/휴무 결재·SMTP/알림·MySQL 이행은 이 문서를 정본으로 따르라. 1차 FO 자산은 그대로 유지하고 `app/services/*` 내부만 `$fetch` API로 교체하는 additive 원칙을 지켜라.
-- **명세 미해결 질문 Q1~Q8(차종↔베이 매핑 등)은 `ROADMAP_2.md` Phase 0 결정표가 SSOT다.** `entity/Bay.java`(`size`)·`entity/Price.java`·`BayService.findBaysForCar`는 결정표를 참조해 구현하라. 확정값이 권고안과 다르면 **결정표만 갱신**하면 Phase 1이 따라온다. **Phase 0 결정표가 잠기기 전 Phase 1(엔티티)을 시작하지 마라.**
-- **BE 엔티티/DTO 필드명은 `app/types/domain.ts`(1차)·`docs/require_v1.md`(5장 도메인·10장 가격 20행·11장 프로세스 코드)와 동시에 정합**시켜라. 셋 중 하나를 바꾸면 나머지 정합을 확인하라(무변환 매핑 유지).
+- **DB 접근 기술의 정본은 `docs/require_v1.md` v1.5(12.2)다 — MyBatis 사용, JPA/Hibernate 미사용.** ROADMAP_2.md의 구현 예시가 JPA로 보이면 require_v1.md v1.5를 우선하라.
+- **명세 미해결 질문 Q1~Q8(차종↔베이 매핑 등)은 `ROADMAP_2.md` Phase 0 결정표가 SSOT다.** `domain/Bay.java`(`size`)·`domain/Price.java`·`BayService.findBaysForCar`는 결정표를 참조해 구현하라. 확정값이 권고안과 다르면 **결정표만 갱신**하면 Phase 1이 따라온다. **Phase 0 결정표가 잠기기 전 Phase 1(도메인·스키마)을 시작하지 마라.**
+- **BE 도메인 객체/DTO 필드명은 `app/types/domain.ts`(1차)·`docs/require_v1.md`(5장 도메인·10장 가격 20행·11장 프로세스 코드)와 동시에 정합**시켜라. 셋 중 하나를 바꾸면 나머지 정합을 확인하라(무변환 매핑 유지).
 - **예약 화면 동작(순차 선택·차종별 베이 노출·휠 날짜/시간 선택 등)의 정본은 `docs/예약_규칙_명세_v1.md`다.** 예약 위저드(`app/pages/reserve/{index,slot,done}.vue`)·예약 관련 컴포넌트를 수정할 때 이 명세와 일치시켜라.
 - 화면/스토어/서비스를 구현하면 해당 `docs/roadmaps/ROADMAP_1.md` Phase의 체크리스트·DoD를 함께 갱신하라.
 
@@ -237,8 +251,8 @@ export default defineNuxtRouteMiddleware((to) => {
 - **컴포넌트를 어디에 둘지 모호할 때**: 라우트에 직접 매핑되는 페이지면 `app/pages/`, 여러 곳에서 재사용되면 `app/components/`에 배치하라.
 - **새 상태가 필요할 때**: 단일 컴포넌트 내부면 `ref`/`reactive`, 여러 컴포넌트 공유면 `app/stores/`에 Pinia setup 스토어를 추가하라.
 - **import 경로 선택 시**: `app/` 내부 모듈은 **`~`·`@` 별칭**을 우선 사용하라 (상대경로 `../../` 남용 금지).
-- **(2차) 슬롯 락 기법 선택 시**: 기본은 낙관적 락(`@Version`), 경합이 잦은 인기 슬롯만 비관적 락(`FOR UPDATE`). 어느 경우든 슬롯 `UNIQUE`를 최종 방어선으로 항상 깔아라.
-- **(2차) 백엔드 로직을 어디 둘지 모호할 때**: 비즈니스 규칙·트랜잭션은 `service/`, 단순 영속화는 `repository/`, 도메인 상태 전이는 `entity/` 메서드, HTTP 매핑만 `controller/`에 둬라.
+- **(2차) 슬롯 락 기법 선택 시**: 기본은 낙관적 락(version 컬럼 비교 UPDATE의 영향 행 수로 충돌 판정), 경합이 잦은 인기 슬롯만 비관적 락(매퍼 `SELECT ... FOR UPDATE`). 어느 경우든 슬롯 `UNIQUE`를 최종 방어선으로 항상 깔아라.
+- **(2차) 백엔드 로직을 어디 둘지 모호할 때**: 비즈니스 규칙·트랜잭션은 `service/`, SQL/영속화는 `mapper/`(+ `resources/mapper/*.xml`), 도메인 상태 전이는 `domain/` 메서드, HTTP 매핑만 `controller/`에 둬라.
 - **(2차) FE 변경이 필요해 보일 때**: 먼저 `app/services/*` 내부 교체로 해결 가능한지 보라. 컴포넌트/스토어 마크업을 바꿔야 한다면 additive 위반 가능성을 의심하고 재검토하라(동기→`Promise` 전환에 따른 `await` 추가 정도만 허용).
 
 ## 금지 사항 (DON'T)
@@ -255,12 +269,13 @@ export default defineNuxtRouteMiddleware((to) => {
 - SSR 단계에서 `localStorage`/`window`/`document` 직접 접근 **금지** (`import.meta.client` 가드 또는 `onMounted` 사용).
 - 컴포넌트/스토어에서 `app/data/` 더미 데이터 직접 import **금지** (`app/services/` 경유).
 - 가격/차종/서비스 enum을 `docs/require_v1.md`와 다른 값으로 작성 **금지**.
+- (2차) **JPA/Hibernate 사용 금지** — `spring-boot-starter-data-jpa`·`@Entity`·`@Id`·`@Table`·`@Version`·`JpaRepository`·`@Lock`·`ddl-auto` 도입 **금지**. DB 접근은 **MyBatis 매퍼**(require_v1.md v1.5).
 - (2차) 1차 FE 자산(컴포넌트·스토어·페이지·E2E) **삭제·구조 변경 금지**. 백엔드 연동은 `app/services/*` 내부 교체로 한정(additive).
-- (2차) 컨트롤러에서 **엔티티 직접 반환·수신 금지**(`record` DTO 경유). 엔티티 양방향 연관관계 과도 매핑 **금지**(N+1·순환 직렬화 유발).
-- (2차) 엔티티에 `@Setter`/`@Data` 부여 **금지**(도메인 전이 메서드 사용).
+- (2차) 컨트롤러에서 **도메인 객체 직접 반환·수신 금지**(`record` DTO 경유). 매퍼에서 과도한 중첩 조인/`<association>` 남용 **금지**(N+1 유발).
+- (2차) `domain/` 객체에 `@Setter`/`@Data` 부여 **금지**(도메인 전이 메서드 사용).
 - (2차) 슬롯 충돌을 500으로 응답 **금지**(반드시 409 + FE 재선택 토스트 재사용).
 - (2차) JWT를 `localStorage`에 저장 **금지**(`useCookie` 사용). 결재에 워크플로우 엔진 도입 **금지**(상태 enum 방식).
-- (2차) MySQL 운영 프로파일에서 `ddl-auto: create-drop`/`update` 사용 **금지**(`validate` + Flyway).
+- (2차) 스키마를 ORM 자동 생성에 의존 **금지** — `schema.sql`(H2)/Flyway(MySQL)로 직접 관리. 운영에서 임의 스키마 변경 **금지**.
 - (2차) 루트 `package.json`에 Java/Gradle 빌드 끼워넣기 **금지**(`backend/`는 독립 Gradle). `backend/build/`·`.gradle/`·`*.class` 커밋 **금지**.
 - 색상 hex 하드코딩 및 `@layer components` 공통 클래스와 중복되는 인라인 스타일 작성 **금지** (`main.css`의 `@theme` 토큰·공통 클래스 사용).
 - `tailwind.config.js` 생성 **금지** (Tailwind v4 CSS-first, `@theme`로 설정).
