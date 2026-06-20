@@ -14,6 +14,7 @@ definePageMeta({ middleware: 'auth' })
 
 const auth = useAuthStore()
 const reservation = useReservationStore()
+const review = useReviewStore()
 
 // 이름 매핑용 카탈로그 (services 경유)
 const stores = getApprovedStores()
@@ -115,13 +116,30 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
               예약 취소
             </button>
           </template>
-          <span
-            v-else-if="r.status === 'COMPLETED'"
-            :data-testid="`completed-${r.id}`"
-            class="text-sm font-medium text-[--color-brand-accent]"
-          >
-            세차가 완료되었습니다.
-          </span>
+          <template v-else-if="r.status === 'COMPLETED'">
+            <span
+              :data-testid="`completed-${r.id}`"
+              class="text-sm font-medium text-[--color-brand-accent]"
+            >
+              세차가 완료되었습니다.
+            </span>
+            <!-- 미작성이면 후기 작성 링크, 작성했으면 완료 표시 (require 9.1) -->
+            <NuxtLink
+              v-if="!review.hasReview(r.id)"
+              :data-testid="`review-${r.id}`"
+              :to="`/review/${r.id}`"
+              class="btn btn-ghost ml-auto"
+            >
+              후기 작성
+            </NuxtLink>
+            <span
+              v-else
+              :data-testid="`reviewed-${r.id}`"
+              class="ml-auto text-sm text-[--color-content-muted]"
+            >
+              후기 작성 완료
+            </span>
+          </template>
           <span v-else class="text-sm text-[--color-content-muted]">취소된 예약입니다.</span>
         </div>
       </li>

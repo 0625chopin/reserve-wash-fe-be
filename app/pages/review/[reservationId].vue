@@ -1,8 +1,60 @@
 <script setup lang="ts">
-// 후기 작성 (동적 라우트) — 보호 라우트. 평점/작성 자격 검증은 Phase 7
-definePageMeta({ middleware: 'auth' })
+// 후기 작성 (동적 라우트) — 세차완료·본인 예약만 (require 9장). 자격은 review-guard 미들웨어가 보장
+import { computed, ref } from 'vue'
+import { getApprovedStores, getManager } from '~/services/storeService'
+
+definePageMeta({ middleware: ['auth', 'review-guard'] })
 
 const route = useRoute()
+const reservation = useReservationStore()
+const review = useReviewStore()
+
+const reservationId = String(route.params.reservationId)
+const target = computed(() => reservation.reservations.find((r) => r.id === reservationId))
+
+const stores = getApprovedStores()
+function storeName(id: string) {
+  return stores.find((s) => s.id === id)?.name ?? id
+}
+function managerName(id: string | null) {
+  return id ? (getManager(id)?.name ?? id) : '-'
+}
+
+// 이미 작성한 예약이면 작성완료 상태로 전환 (중복 방지)
+const alreadyReviewed = computed(() => review.hasReview(reservationId))
+
+// 평점(1~5)·텍스트 입력
+const rating = ref(0)
+const text = ref('')
+const canSubmit = computed(() => rating.value >= 1 && rating.value <= 5)
+
+function setRating(n: number) {
+  rating.value = n
+}
+
+function onSubmit() {
+  const t = target.value
+  if (!t || !canSubmit.value) return
+  review.addReview({
+    id: review.nextReviewId(),
+    reservationId,
+    userId: t.userId,
+    storeId: t.storeId,
+    managerId: t.managerId,
+    rating: rating.value,
+    text: text.value,
+    createdAt: new Date().toISOString(),
+  })
+}
+
+// 매장/매니저 평균 평점 (require 9.1) — 작성 후 표시
+function fmtAvg(v: number | undefined) {
+  return v === undefined ? '-' : v.toFixed(1)
+}
+const storeAvg = computed(() => (target.value ? review.averageByStore[target.value.storeId] : undefined))
+const managerAvg = computed(() =>
+  target.value && target.value.managerId ? review.averageByManager[target.value.managerId] : undefined,
+)
 </script>
 
 <template>
@@ -10,40 +62,114 @@ const route = useRoute()
     <header class="mb-8">
       <span class="badge-accent mb-3">후기</span>
       <h1 class="text-3xl font-bold">후기 작성</h1>
-      <p class="mt-2 text-sm text-[--color-content-muted]">
-        예약 ID
-        <code
-          class="ml-1 rounded-md border border-[--color-line-soft] bg-[--color-surface-2] px-1.5 py-0.5 font-mono text-[--color-brand-primary]"
-          >{{ route.params.reservationId }}</code
-        >
+      <p v-if="target" class="mt-2 text-sm text-[--color-content-muted]">
+        {{ storeName(target.storeId) }} · {{ managerName(target.managerId) }} ·
+        {{ target.date }} {{ target.timeSlot }}
       </p>
     </header>
 
-    <!-- 의도된 빈 상태 — 평점/작성 폼은 Phase 7에서 추가 예정 -->
-    <div class="card flex flex-col items-center gap-4 px-6 py-14 text-center">
-      <div
-        class="flex h-14 w-14 items-center justify-center rounded-2xl border border-[--color-line] bg-[--color-surface-2]"
-      >
-        <svg
-          class="h-7 w-7 text-[--color-brand-accent]"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="m12 4 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 16.9l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76L12 4Z"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linejoin="round"
-          />
-        </svg>
+    <!-- 작성 완료 상태 — 평균 평점 표시 -->
+    <div v-if="alreadyReviewed" data-testid="review-done" class="card p-6 sm:p-8">
+      <div class="mb-5 flex items-center gap-3">
+        <span class="review-check" aria-hidden="true">✓</span>
+        <span class="text-lg font-semibold text-[--color-content-strong]">후기가 등록되었어요</span>
       </div>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+        <dt class="text-[--color-content-muted]">매장 평균 평점</dt>
+        <dd data-testid="avg-store" class="font-medium text-[--color-content-strong]">
+          ★ {{ fmtAvg(storeAvg) }}
+        </dd>
+        <dt class="text-[--color-content-muted]">매니저 평균 평점</dt>
+        <dd data-testid="avg-manager" class="font-medium text-[--color-content-strong]">
+          ★ {{ fmtAvg(managerAvg) }}
+        </dd>
+      </dl>
+      <div class="mt-6 border-t border-[--color-line-soft] pt-5">
+        <NuxtLink to="/reservations" class="btn btn-primary w-full">예약 목록으로</NuxtLink>
+      </div>
+    </div>
+
+    <!-- 작성 폼 -->
+    <div v-else class="card space-y-6 p-6 sm:p-8">
+      <!-- 별점 -->
       <div>
-        <p class="font-semibold text-[--color-content-strong]">곧 후기를 남길 수 있어요</p>
-        <p class="mt-1 text-sm text-[--color-content-muted]">
-          평점과 후기 작성 기능을 준비 중입니다.
+        <span class="field-label">평점</span>
+        <div class="flex gap-1" role="radiogroup" aria-label="평점 선택">
+          <button
+            v-for="n in 5"
+            :key="n"
+            :data-testid="`star-${n}`"
+            type="button"
+            class="star"
+            :class="{ 'star-on': n <= rating }"
+            :aria-label="`${n}점`"
+            :aria-pressed="n <= rating"
+            @click="setRating(n)"
+          >
+            ★
+          </button>
+        </div>
+      </div>
+
+      <!-- 후기 텍스트 -->
+      <div>
+        <span class="field-label">후기 (선택)</span>
+        <textarea
+          v-model="text"
+          data-testid="review-text"
+          rows="4"
+          class="input-field resize-none"
+          placeholder="세차 경험은 어떠셨나요?"
+        />
+      </div>
+
+      <!-- 제출 -->
+      <div class="border-t border-[--color-line-soft] pt-5">
+        <button
+          data-testid="review-submit"
+          type="button"
+          class="btn btn-primary w-full"
+          :disabled="!canSubmit"
+          @click="onSubmit"
+        >
+          후기 등록
+        </button>
+        <p v-if="!canSubmit" class="mt-2 text-center text-xs text-[--color-content-muted]">
+          평점(1~5)을 선택해 주세요.
         </p>
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+/* 별점 버튼 — 기본 muted, 선택 시 라임 accent (하드코딩 hex 금지) */
+.star {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-line);
+  cursor: pointer;
+  transition: color 0.15s var(--ease-out-soft);
+}
+.star:hover {
+  color: color-mix(in oklab, var(--color-brand-accent) 50%, var(--color-line));
+}
+.star-on {
+  color: var(--color-brand-accent);
+}
+
+/* 완료 체크 배지 */
+.review-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  background-color: var(--color-brand-accent);
+  color: var(--color-surface-base);
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+</style>

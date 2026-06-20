@@ -835,6 +835,175 @@
       "analysisResult": "Phase 6 — 예약 확정/취소/세차완료 상태 (FW6/FW7, ROADMAP 903~935, require 11.3·8장). 예약 목록 화면(reservations.vue)에서 상태 전이(RESERVED→COMPLETED, 취소→CANCELED)와 취소 시 슬롯 release를 구현. 현재 reservations.vue는 빈 상태 플레이스홀더, reservation 스토어는 reservations[](confirmReservation이 status RESERVED로 push)·slotStatus·getStatus/holdSlot/confirmReservation/releaseSlot만 보유. ReservationStatus='HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'(enums). 설계 메모: MVP는 승인(M6) 단계가 없어 목록에 HOLDING 레코드는 없음 → 취소 2케이스(승인 전/후)는 모두 취소→CANCELED+슬롯 AVAILABLE로 수렴(상태 라벨만 더미 구분, require 11.3 b/c). 슬롯 식별 키 UNIQUE=(storeId|bayId|date|timeSlot). 예약 표시 이름은 storeService 카탈로그(getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore)로 매핑, 내 예약은 auth.currentUser.id로 필터. 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전, data-testid 결정적 E2E, 색은 @theme 토큰, 주석/커밋 한국어. 기존 Phase 5·NR·W(19개)는 완료.",
       "summary": "P6-4 완료: docs/ROADMAP.md Phase 6 태스크 체크리스트 6항목·DoD 5항목을 [x]로 갱신(reservations.vue 목록·세차완료·취소2케이스·슬롯 동기화·전이 가드, type-check·lint·e2e 18/18). 구현 메모 추가: 승인(M6) 단계 부재로 HOLDING 레코드 없음→취소 2케이스 모두 CANCELED+슬롯 AVAILABLE로 수렴(라벨만 더미, require 11.3 b/c), cancelReservation은 RESERVED/HOLDING 방어적 허용, release는 런타임 맵 AVAILABLE 명시로 시드 오버라이드. 코드/정본(require_v1.md) 미변경.",
       "completedAt": "2026-06-20T09:31:39.666Z"
+    },
+    {
+      "id": "c11aaf06-16e4-4eb8-bc3c-96df4a024eb0",
+      "name": "P7-1: review Pinia 스토어 (후기 + 평균 집계)",
+      "description": "후기/평점을 소유하는 setup 스토어를 신규 작성한다. reviews 배열, addReview, 매장/매니저별 평균 집계 getter, 예약당 중복 작성 방지 조회를 제공한다.",
+      "notes": "data 직접 import 없음(순수 상태). createdAt 값 생성은 페이지(클릭 핸들러)에서 처리. averageByManager는 managerId가 null인 후기 제외.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T09:41:53.924Z",
+      "updatedAt": "2026-06-20T09:42:28.932Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/review.ts",
+          "type": "CREATE",
+          "description": "후기/평점 스토어"
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "DEPENDENCY",
+          "description": "Review 인터페이스",
+          "lineStart": 75,
+          "lineEnd": 85
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "평점 집계 예시",
+          "lineStart": 960,
+          "lineEnd": 988
+        }
+      ],
+      "implementationGuide": "app/stores/review.ts 신규(Pinia setup, ROADMAP 960~988 예시 기준).\n- import { computed, ref } from 'vue'; import { defineStore } from 'pinia'; import type { Review } from '~/types/domain'.\n- reviews = ref<Review[]>([]).\n- addReview(review: Review): void — push.\n- hasReview(reservationId: string): boolean — reviews에 해당 예약 후기 존재 여부(중복 방지).\n- averageByStore = computed(): Record<storeId, number> — sum/count.\n- averageByManager = computed(): Record<managerId, number> — managerId null 제외.\n- nextReviewId(): 'rv-N' 세션 시퀀스(현재시각/랜덤 회피).\n- return { reviews, addReview, hasReview, averageByStore, averageByManager, nextReviewId }.",
+      "verificationCriteria": "addReview로 추가 시 averageByStore/averageByManager가 정확히 평균 산출(managerId null 제외). hasReview가 중복 예약 후기 존재 여부 반환. npm run type-check 통과.",
+      "analysisResult": "Phase 7 — 후기/평점 1차 확장 (ROADMAP 941~995, require 9장). 세차완료(COMPLETED) 예약만 후기 작성, 평점 1~5 + 텍스트, 매장/매니저별 평균 집계. Review 타입(domain.ts): {id,reservationId,userId,storeId,managerId,rating(1~5),text,createdAt}. 현재 review/[reservationId].vue는 빈 상태 플레이스홀더. reservation 스토어에 reservations[](id/status/userId/storeId/managerId 등)·completeReservation/cancelReservation 존재. auth.currentUser로 본인 확인. storeService 카탈로그로 이름 매핑. 작성 자격: 해당 예약이 COMPLETED이고 본인 예약. 중복 작성 방지(예약당 1회). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전(in-memory 새로고침 초기화→가드 리다이렉트), Nuxt 미들웨어 키 kebab-case, data-testid 결정적 E2E(평점 별점 star-N, 고정값), 색은 @theme 토큰, 주석/커밋 한국어. 직전 Phase 6에서 reservations.vue COMPLETED는 '세차가 완료되었습니다.' 문구로 표시 중(후기 작성 진입점은 Phase 7에서 재도입). 기존 작업 23개 완료.",
+      "summary": "P7-1 완료: app/stores/review.ts 신규(Pinia setup). reviews ref, addReview(push), hasReview(reservationId 중복 방지), averageBy 헬퍼로 averageByStore/averageByManager computed(managerId null 제외), nextReviewId('rv-N' 시퀀스). data 직접 import 없음. type-check·lint 통과.",
+      "completedAt": "2026-06-20T09:42:28.931Z"
+    },
+    {
+      "id": "05164b93-7ece-4fa5-87ee-0910e57087a1",
+      "name": "P7-2: 후기 작성 자격 가드 미들웨어 + review/[reservationId].vue 폼",
+      "description": "COMPLETED·본인 예약만 후기 작성 화면에 진입하도록 가드하고, 평점(1~5 별점)+텍스트 입력 폼을 구현한다. 제출 시 review 스토어에 추가하고 매장/매니저 평균을 표시한다.",
+      "notes": "createdAt은 클릭 핸들러(클라이언트)에서 생성—SSR 무관. 별점 UI는 버튼 토글. 평균은 averageByStore[storeId]·averageByManager[managerId] 표시(소수 1자리 등). 가드가 자격 없는 진입을 막으므로 페이지는 target 존재 가정 가능하나 방어적 처리 권장.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c11aaf06-16e4-4eb8-bc3c-96df4a024eb0"
+        }
+      ],
+      "createdAt": "2026-06-20T09:41:53.924Z",
+      "updatedAt": "2026-06-20T09:43:41.964Z",
+      "relatedFiles": [
+        {
+          "path": "app/middleware/review-guard.ts",
+          "type": "CREATE",
+          "description": "후기 작성 자격 가드"
+        },
+        {
+          "path": "app/pages/review/[reservationId].vue",
+          "type": "TO_MODIFY",
+          "description": "평점·텍스트 폼 + 자격 검증",
+          "lineStart": 1,
+          "lineEnd": 50
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "DEPENDENCY",
+          "description": "본인 확인"
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "DEPENDENCY",
+          "description": "예약 status·소유 확인"
+        }
+      ],
+      "implementationGuide": "app/middleware/review-guard.ts 신규(defineNuxtRouteMiddleware): id=to.params.reservationId; reservation.reservations에서 찾기; 없거나 status!=='COMPLETED'이거나 userId!==auth.currentUser?.id면 navigateTo('/reservations'). 키=review-guard(kebab).\napp/pages/review/[reservationId].vue: definePageMeta({ middleware: ['auth','review-guard'] }). useRoute로 reservationId, reservation 스토어에서 target 조회. 이미 hasReview면 작성완료 상태(평균 표시), 아니면 폼: 별점 버튼 1~5(data-testid=`star-${n}`, 선택 rating 상태)·텍스트 textarea(testid=review-text)·제출 버튼(testid=review-submit, rating>=1일 때 활성). onSubmit: review.addReview({ id: review.nextReviewId(), reservationId, userId, storeId, managerId, rating, text, createdAt: new Date().toISOString() }) 후 성공 표시(testid=review-done)+매장/매니저 평균(testid=avg-store/avg-manager) 노출 또는 /reservations 이동. 색 @theme 토큰.",
+      "verificationCriteria": "COMPLETED 아님/타인/미존재 예약 id로 진입 시 /reservations 리다이렉트. COMPLETED 본인 예약은 별점·텍스트 폼 노출, rating 미선택 시 제출 비활성, 제출 시 addReview·완료 표시·평균 노출. 중복 진입 시 작성완료 상태. npm run type-check·lint 통과.",
+      "analysisResult": "Phase 7 — 후기/평점 1차 확장 (ROADMAP 941~995, require 9장). 세차완료(COMPLETED) 예약만 후기 작성, 평점 1~5 + 텍스트, 매장/매니저별 평균 집계. Review 타입(domain.ts): {id,reservationId,userId,storeId,managerId,rating(1~5),text,createdAt}. 현재 review/[reservationId].vue는 빈 상태 플레이스홀더. reservation 스토어에 reservations[](id/status/userId/storeId/managerId 등)·completeReservation/cancelReservation 존재. auth.currentUser로 본인 확인. storeService 카탈로그로 이름 매핑. 작성 자격: 해당 예약이 COMPLETED이고 본인 예약. 중복 작성 방지(예약당 1회). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전(in-memory 새로고침 초기화→가드 리다이렉트), Nuxt 미들웨어 키 kebab-case, data-testid 결정적 E2E(평점 별점 star-N, 고정값), 색은 @theme 토큰, 주석/커밋 한국어. 직전 Phase 6에서 reservations.vue COMPLETED는 '세차가 완료되었습니다.' 문구로 표시 중(후기 작성 진입점은 Phase 7에서 재도입). 기존 작업 23개 완료.",
+      "summary": "P7-2 완료: app/middleware/review-guard.ts(kebab 키)— 예약 미존재/status!=='COMPLETED'/타인이면 /reservations 리다이렉트. app/pages/review/[reservationId].vue 구현: middleware ['auth','review-guard'], useRoute로 reservationId, reservation 스토어 target 조회, storeService로 매장/매니저명 표시. alreadyReviewed(hasReview)면 작성완료 카드(review-done)+매장/매니저 평균(avg-store/avg-manager, toFixed(1)), 아니면 폼: 별점 1~5 버튼(star-N, rating>=1 시 활성), textarea(review-text), 제출(review-submit)→addReview(createdAt 클릭 시 ISO)+반응형으로 완료 상태 전환. 색 @theme 토큰. type-check·lint 통과.",
+      "completedAt": "2026-06-20T09:43:41.960Z"
+    },
+    {
+      "id": "122c2b34-cfb1-4ab9-9bb8-db36e84a5604",
+      "name": "P7-3: reservations.vue 후기 작성 진입점 재도입",
+      "description": "완료(COMPLETED) 예약 행에 후기 작성 진입점을 추가한다. 이미 작성한 예약은 '후기 작성 완료' 표시로 구분한다.",
+      "notes": "Phase 6에서 제거했던 후기 진입점을 자격 기반으로 재도입(빈 버튼 이슈 방지 위해 문구+링크 병기). 색 @theme 토큰. 기존 RESERVED/CANCELED 분기 변경 없음.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c11aaf06-16e4-4eb8-bc3c-96df4a024eb0"
+        }
+      ],
+      "createdAt": "2026-06-20T09:41:53.924Z",
+      "updatedAt": "2026-06-20T09:44:25.904Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reservations.vue",
+          "type": "TO_MODIFY",
+          "description": "COMPLETED 행 후기 작성 진입점",
+          "lineStart": 95,
+          "lineEnd": 120
+        }
+      ],
+      "implementationGuide": "app/pages/reservations.vue COMPLETED 분기 수정: 기존 '세차가 완료되었습니다.' 문구 유지하되, review.hasReview(r.id)가 false면 '후기 작성' NuxtLink(testid=`review-${r.id}`, to=`/review/${r.id}`, btn-ghost) 추가, true면 '후기 작성 완료'(testid=`reviewed-${r.id}`) 문구. useReviewStore 자동임포트.",
+      "verificationCriteria": "COMPLETED 예약에 후기 작성 링크 노출(미작성 시), 작성 후 '후기 작성 완료' 표시. RESERVED/CANCELED 분기 회귀 없음. npm run type-check·lint 통과.",
+      "analysisResult": "Phase 7 — 후기/평점 1차 확장 (ROADMAP 941~995, require 9장). 세차완료(COMPLETED) 예약만 후기 작성, 평점 1~5 + 텍스트, 매장/매니저별 평균 집계. Review 타입(domain.ts): {id,reservationId,userId,storeId,managerId,rating(1~5),text,createdAt}. 현재 review/[reservationId].vue는 빈 상태 플레이스홀더. reservation 스토어에 reservations[](id/status/userId/storeId/managerId 등)·completeReservation/cancelReservation 존재. auth.currentUser로 본인 확인. storeService 카탈로그로 이름 매핑. 작성 자격: 해당 예약이 COMPLETED이고 본인 예약. 중복 작성 방지(예약당 1회). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전(in-memory 새로고침 초기화→가드 리다이렉트), Nuxt 미들웨어 키 kebab-case, data-testid 결정적 E2E(평점 별점 star-N, 고정값), 색은 @theme 토큰, 주석/커밋 한국어. 직전 Phase 6에서 reservations.vue COMPLETED는 '세차가 완료되었습니다.' 문구로 표시 중(후기 작성 진입점은 Phase 7에서 재도입). 기존 작업 23개 완료.",
+      "summary": "P7-3 완료: reservations.vue COMPLETED 분기를 template으로 확장. '세차가 완료되었습니다.' 문구 유지 + review.hasReview(r.id) false면 후기 작성 NuxtLink(review-{id}, /review/{id}, btn-ghost), true면 '후기 작성 완료'(reviewed-{id}) 문구. useReviewStore 자동임포트 추가. RESERVED/CANCELED 분기 변경 없음. 색 @theme 토큰. type-check·lint 통과.",
+      "completedAt": "2026-06-20T09:44:25.898Z"
+    },
+    {
+      "id": "756a0a07-61e1-49fa-8646-2e566939f1b6",
+      "name": "P7-4: e2e — 후기 작성 자격·평점 제출·평균 시나리오",
+      "description": "Playwright로 후기 작성 자격 가드와 평점 제출, 작성 후 진입점 변화를 결정적으로 검증한다.",
+      "notes": "세차완료 전이는 /reservations complete-rsv-1 클릭. 자격 가드 테스트는 RESERVED 상태(완료 전) 예약으로 /review/rsv-1 goto→리다이렉트 단정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "05164b93-7ece-4fa5-87ee-0910e57087a1"
+        },
+        {
+          "taskId": "122c2b34-cfb1-4ab9-9bb8-db36e84a5604"
+        }
+      ],
+      "createdAt": "2026-06-20T09:41:53.924Z",
+      "updatedAt": "2026-06-20T09:45:33.029Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/review.spec.ts",
+          "type": "CREATE",
+          "description": "후기 자격·제출·평균 시나리오"
+        },
+        {
+          "path": "e2e/reservations.spec.ts",
+          "type": "REFERENCE",
+          "description": "예약 생성·세차완료 헬퍼 패턴"
+        }
+      ],
+      "implementationGuide": "e2e/review.spec.ts 신규. 헬퍼로 예약 생성→세차완료 전이(/reservations에서 complete) 재사용(reservations.spec 패턴).\n- 시나리오A 자격 가드: RESERVED 상태 예약 id로 /review/{id} 직접 진입 → /reservations 리다이렉트. (또는 미존재 id)\n- 시나리오B 작성: 예약 생성→세차완료→reservations에서 후기 작성 링크 클릭→/review/{id}→star-5 클릭→review-text 입력→review-submit→review-done 노출·avg-store 표시.\n- 시나리오C 진입점 변화: 작성 후 /reservations 재방문 시 해당 행 reviewed-{id} 표시.\n- data-testid·고정값. id는 fresh 컨텍스트 rsv-1.",
+      "verificationCriteria": "자격 없는 진입 리다이렉트, COMPLETED 본인 예약 후기 제출→완료·평균 표시, 작성 후 목록 진입점이 '작성 완료'로 변화 단정 통과. npm run test:e2e 전체 통과.",
+      "analysisResult": "Phase 7 — 후기/평점 1차 확장 (ROADMAP 941~995, require 9장). 세차완료(COMPLETED) 예약만 후기 작성, 평점 1~5 + 텍스트, 매장/매니저별 평균 집계. Review 타입(domain.ts): {id,reservationId,userId,storeId,managerId,rating(1~5),text,createdAt}. 현재 review/[reservationId].vue는 빈 상태 플레이스홀더. reservation 스토어에 reservations[](id/status/userId/storeId/managerId 등)·completeReservation/cancelReservation 존재. auth.currentUser로 본인 확인. storeService 카탈로그로 이름 매핑. 작성 자격: 해당 예약이 COMPLETED이고 본인 예약. 중복 작성 방지(예약당 1회). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전(in-memory 새로고침 초기화→가드 리다이렉트), Nuxt 미들웨어 키 kebab-case, data-testid 결정적 E2E(평점 별점 star-N, 고정값), 색은 @theme 토큰, 주석/커밋 한국어. 직전 Phase 6에서 reservations.vue COMPLETED는 '세차가 완료되었습니다.' 문구로 표시 중(후기 작성 진입점은 Phase 7에서 재도입). 기존 작업 23개 완료.",
+      "summary": "P7-4 완료: e2e/review.spec.ts 신규. login/step1/createReservation 헬퍼(rsv-1 결정적). 시나리오A 자격 가드: RESERVED 예약 /review/rsv-1 직접 진입·미존재 rsv-999 모두 /reservations 리다이렉트. 시나리오B+C: 예약 생성→세차완료(complete-rsv-1)→후기 작성 링크(review-rsv-1) 클릭→/review/rsv-1→star-5·review-text·review-submit→review-done 노출·avg-store '5.0'→목록 재방문 시 reviewed-rsv-1 노출·review-rsv-1 toHaveCount 0. lint·전체 e2e 20/20 통과.",
+      "completedAt": "2026-06-20T09:45:33.026Z"
+    },
+    {
+      "id": "99874287-54b6-4f89-9d95-7c225a8f5989",
+      "name": "P7-5: ROADMAP Phase 7 DoD 동기화",
+      "description": "구현 완료에 맞춰 docs/ROADMAP.md Phase 7 태스크 체크리스트·DoD를 [x]로 갱신한다(문서만).",
+      "notes": "커밋 메시지 한국어. 6.2 Playwright 후기 시나리오와 정합 확인.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "756a0a07-61e1-49fa-8646-2e566939f1b6"
+        }
+      ],
+      "createdAt": "2026-06-20T09:41:53.924Z",
+      "updatedAt": "2026-06-20T09:46:08.676Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 7 체크리스트·DoD 갱신",
+          "lineStart": 941,
+          "lineEnd": 995
+        }
+      ],
+      "implementationGuide": "docs/ROADMAP.md Phase 7 절(948~995) 체크리스트·DoD [x] 갱신. 필요 시 구현 메모(자격 가드 미들웨어 review-guard, 평균은 review 페이지 표시, 중복 작성 방지) 1~2줄. 코드/정본(require_v1.md) 미변경.",
+      "verificationCriteria": "Phase 7 체크리스트·DoD가 실제 구현과 일치([x]). 코드/정본 미변경.",
+      "analysisResult": "Phase 7 — 후기/평점 1차 확장 (ROADMAP 941~995, require 9장). 세차완료(COMPLETED) 예약만 후기 작성, 평점 1~5 + 텍스트, 매장/매니저별 평균 집계. Review 타입(domain.ts): {id,reservationId,userId,storeId,managerId,rating(1~5),text,createdAt}. 현재 review/[reservationId].vue는 빈 상태 플레이스홀더. reservation 스토어에 reservations[](id/status/userId/storeId/managerId 등)·completeReservation/cancelReservation 존재. auth.currentUser로 본인 확인. storeService 카탈로그로 이름 매핑. 작성 자격: 해당 예약이 COMPLETED이고 본인 예약. 중복 작성 방지(예약당 1회). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전(in-memory 새로고침 초기화→가드 리다이렉트), Nuxt 미들웨어 키 kebab-case, data-testid 결정적 E2E(평점 별점 star-N, 고정값), 색은 @theme 토큰, 주석/커밋 한국어. 직전 Phase 6에서 reservations.vue COMPLETED는 '세차가 완료되었습니다.' 문구로 표시 중(후기 작성 진입점은 Phase 7에서 재도입). 기존 작업 23개 완료.",
+      "summary": "P7-5 완료: docs/ROADMAP.md Phase 7 태스크 체크리스트 5항목·DoD 4항목을 [x]로 갱신(review 스토어·후기 폼·review-guard 자격가드·목록 진입점·평균 표시, type-check·lint·e2e 20/20). 구현 메모 추가: review-guard 미들웨어 자격 보장, hasReview 중복 방지, 작성 후 목록 진입점 전환, 평균은 완료 화면 표시(in-memory 1단계). 코드/정본 미변경.",
+      "completedAt": "2026-06-20T09:46:08.673Z"
     }
   ]
 }

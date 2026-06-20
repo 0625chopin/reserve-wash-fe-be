@@ -946,11 +946,13 @@ definePageMeta({ middleware: ['auth', 'reservationWizardGuard'] })
 **세차완료(COMPLETED) 예약만** 후기를 작성할 수 있게 하고, 평점(1~5)과 **매장/매니저별 평균 집계**를 표시한다.
 
 #### 태스크 체크리스트
-- [ ] `app/stores/review.ts` — `reviews`, `addReview`, `averageByStore`, `averageByManager`
-- [ ] `app/pages/review/[reservationId].vue` — 평점(1~5 별점 or select), 텍스트 입력, 작성 자격 검증
-- [ ] 작성 자격 가드: 해당 예약이 `COMPLETED`이고 본인 예약일 때만 작성 (require 9.1)
-- [ ] `app/pages/reservations.vue` 완료 예약에 "후기 작성" 링크(`<NuxtLink :to="`/review/${reservationId}`">`)
-- [ ] 매장/매니저별 평균 평점 표시(예약 화면 or 별도 영역)
+- [x] `app/stores/review.ts` — `reviews`, `addReview`, `hasReview`(중복 방지), `averageByStore`, `averageByManager`, `nextReviewId`
+- [x] `app/pages/review/[reservationId].vue` — 평점(1~5 별점 버튼), 텍스트 입력, 작성 자격 검증
+- [x] 작성 자격 가드: 해당 예약이 `COMPLETED`이고 본인 예약일 때만 작성 — `app/middleware/review-guard.ts`(kebab 키), 미충족 시 `/reservations` 리다이렉트 (require 9.1)
+- [x] `app/pages/reservations.vue` 완료 예약에 "후기 작성" 링크(미작성 시)·"후기 작성 완료" 표시(작성 시)
+- [x] 매장/매니저별 평균 평점 표시(후기 작성 완료 화면)
+
+> 📌 **구현 메모(v1.4)**: 작성 자격은 `review-guard` 미들웨어가 보장(미완료/타인/미존재 → `/reservations`). 중복 작성은 `review.hasReview(reservationId)`로 방지하며, 작성 후 목록 진입점이 "후기 작성 완료"로 전환된다. 평균 평점은 작성 완료 화면에 매장/매니저별로 표시한다. (in-memory 1단계 — 새로고침 시 초기화)
 
 > 💡 **동적 라우트 파라미터 접근**: `app/pages/review/[reservationId].vue`에서 `const route = useRoute(); const reservationId = route.params.reservationId` 로 파라미터를 읽습니다(vue-router의 `useRoute`를 Nuxt가 자동 임포트).
 
@@ -989,10 +991,10 @@ export const useReviewStore = defineStore('review', () => {
 ```
 
 #### 완료기준 (DoD)
-- [ ] COMPLETED가 아닌 예약은 후기 작성 화면에 진입할 수 없다(가드)
-- [ ] 평점 범위(1~5) 외 값은 제출 불가
-- [ ] 후기 작성 후 매장/매니저 평균 평점이 갱신된다
-- [ ] `npm run type-check`, `npm run lint` 통과
+- [x] COMPLETED가 아닌 예약은 후기 작성 화면에 진입할 수 없다(가드)
+- [x] 평점 미선택(1~5 외) 시 제출 불가
+- [x] 후기 작성 후 매장/매니저 평균 평점이 갱신·표시된다
+- [x] `npm run type-check`, `npm run lint`, `npm run test:e2e`(자격 가드·평점 제출·평균·진입점 변화, 전체 20/20) 통과
 
 ---
 
