@@ -2,6 +2,7 @@
 import type {
   BaySize,
   CarType,
+  DayoffType,
   ReservationStatus,
   ServiceType,
   SlotStatus,
@@ -32,13 +33,19 @@ export interface Bay {
   size: BaySize // 수용 가능한 차 크기 등급 (이 등급 이하의 차를 수용)
 }
 
+// 매니저 휴무 = (날짜, 휴무 유형) — 전일 또는 교대조 단위 부분 휴무 (require 5.4, 5.5)
+export interface ManagerDayoff {
+  date: string // 'YYYY-MM-DD'
+  type: DayoffType // FULL_DAY=전일 / SHIFT_1~3=교대조 단위
+}
+
 // 매니저 (require 3.1, 6.1)
 export interface Manager {
   id: string
   storeId: string
   name: string
   isStoreAdmin: boolean // 매장 최고권한 매니저 여부
-  dayoffDates: string[] // 'YYYY-MM-DD' 휴무일 (require 6.1)
+  dayoffs: ManagerDayoff[] // 휴무(전일/교대조) — Phase 5 슬롯 비활성에 사용 (require 5.5, 6.1)
 }
 
 // 슬롯 = (매장, 베이, 날짜, 30분 시간단위), UNIQUE (require 5.2)

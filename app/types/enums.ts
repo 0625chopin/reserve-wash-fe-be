@@ -21,3 +21,9 @@ export type ReservationStatus =
   | 'RESERVED' // 예약 확정(승인 후 가정)
   | 'COMPLETED' // 세차 완료
   | 'CANCELED' // 취소됨
+
+// 매니저 휴무 유형 — 운영은 24시간 유지, 근무는 3교대(require 5.5)
+// 'FULL_DAY'=전일 휴무, SHIFT_1~3=교대조 단위 부분 휴무
+//   SHIFT_1(오전조) 06:00~14:00 / SHIFT_2(오후조) 14:00~22:00 / SHIFT_3(야간조) 22:00~06:00(익일)
+// 기존 '오전/오후 반차' 개념을 3교대 기반 부분 휴무로 일반화한 것이다.
+export type DayoffType = 'FULL_DAY' | 'SHIFT_1' | 'SHIFT_2' | 'SHIFT_3'
