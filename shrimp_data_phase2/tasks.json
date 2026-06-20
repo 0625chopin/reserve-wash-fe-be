@@ -183,6 +183,320 @@
       "analysisResult": "2차 개발 환경 셋업(Phase 0 환경 부분). Nuxt 4 모노레포 루트(E:\\claudeStudy\\workspaces\\reserve-wash-fe-be)에 backend/ Spring Boot 3.x(Java 21)+MyBatis(mybatis-spring-boot-starter)+H2 in-memory 백엔드를 부트스트랩하고 FE(:3000)↔BE(:8080) CORS/헬스 계약을 수립한다. 정본: docs/roadmaps/ROADMAP_2.md 1장·Phase 0, shrimp-rules.md. 제약: JPA/Hibernate 금지(MyBatis 확정, require_v1.md v1.5), 루트 package.json에 Java 빌드 끼워넣기 금지(backend 독립 Gradle), 1차 FE 자산 무변경(additive), Java 클래스 PascalCase·주석 한국어, FE TS 세미콜론 없음·작은따옴표(oxfmt). 실측: backend/ 미존재, nuxt.config.ts runtimeConfig 없음, .gitignore에 backend 산출물 무시 규칙 없음, 로컬 JDK/Gradle 미설치(빌드·기동 검증은 호스트 JDK 21 선행조건 의존). 검증 게이트 분리: 파일/설정 생성(JDK 비의존)과 빌드/기동 검증(JDK 의존). 버전 고정: Spring Boot 3.3.5, mybatis-spring-boot-starter 3.0.4, Gradle 8.10.2.",
       "summary": "JDK 21 설치 후 ROADMAP_2 1.5/Phase 0 DoD 전부 실측 통과. (1) winget으로 Temurin 21.0.11+10 LTS 설치, java -version이 openjdk 21.0.11 LTS 출력. (2) cd backend && ./gradlew build → Gradle 8.10.2 자동 다운로드 후 BUILD SUCCESSFUL(:test 포함 HealthControllerTest 통과). (3) ./gradlew bootRun → Tomcat :8080 기동(Started CarwashApplication), GET /api/health = HTTP 200 {\"status\":\"UP\"}, /h2-console/ HTTP 200 로그인 페이지 확인. (4) FE :3000 ↔ BE :8080 동시 기동 상태에서 Playwright로 origin http://localhost:3000 브라우저에서 fetch('http://localhost:8080/api/health') 실행 → ok:true status:200 body{status:UP}, CORS 오류 없음. 서버 CORS 헤더도 ACAO=http://localhost:3000·ACAM=GET,POST,PUT,PATCH,DELETE 확인. 검증 후 BE bootRun·임시 FE 백그라운드 프로세스 정리(사용자 기존 :3000 FE는 보존).",
       "completedAt": "2026-06-20T14:52:25.664Z"
+    },
+    {
+      "id": "6106605a-bebb-42bc-8d84-5f6dd9dba499",
+      "name": "T0 Phase0 결정표 잠금(문서) — 베이 4등급·문자열 id 무변환",
+      "description": "Phase 1 착수 게이트. ROADMAP_2.md Phase 0 의사결정 결정표를 사용자 확정값으로 잠근다. (1) Q1/Q5: 베이 등급을 4등급(소SMALL/중MID/대LARGE/특대XLARGE)으로 확정, VAN_ETC→XLARGE 매핑. 기존 권고안 행을 4등급 확정으로 갱신. (2) id 정책 메모 추가: 마스터 엔티티(User/Store/Bay/Manager) id=VARCHAR 문자열 무변환, schema.sql 예시의 BIGINT AUTO_INCREMENT는 마스터에 미채택(Slot 내부 surrogate만 BIGINT). 코드 변경 없음, 문서만 수정. require/예약규칙명세는 읽기 전용이므로 수정 금지.",
+      "notes": "사용자 결정 반영. 명세 문서는 수정 금지, ROADMAP_2 결정표에만 반영.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T16:52:30.886Z",
+      "relatedFiles": [
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 0 결정표 Q1·Q5 행 확정·id 정책 메모",
+          "lineStart": 236,
+          "lineEnd": 260
+        }
+      ],
+      "implementationGuide": "docs/roadmaps/ROADMAP_2.md의 Phase 0 결정표(Q1·Q5 행)를 '확정: 4등급(XLARGE 신설), VAN_ETC→XLARGE'로 갱신하고, '잠금' 표시. id 정책 한 줄 메모(마스터=VARCHAR 무변환, Slot=내부 BIGINT) 추가. 4등급 선택의 후속 영향(FE enums/carTypes/stores 동반 수정, XLARGE 베이 시드 필요)을 메모로 남긴다.",
+      "verificationCriteria": "결정표 Q1이 4등급(XLARGE)·VAN_ETC→XLARGE로, id 정책이 마스터=VARCHAR 무변환으로 잠겼다. 코드/명세 변경 0.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T0 완료. docs/roadmaps/ROADMAP_2.md Phase 0 결정표를 사용자 확정값으로 잠금. (1) Q1 행을 '4등급 신설(SMALL/MID/LARGE/XLARGE), VAN_ETC→XLARGE, BaySize+XLARGE'로 🔒확정 갱신, 영향 파일에 FE enums/carTypes 동반 수정 명시. (2) Q5 행을 'XLARGE=VAN_ETC 연결, 가격 무변경, XLARGE 베이 ≥1 시드'로 갱신. (3) id 정책 메모 추가 — 마스터(User/Store/Bay/Manager) id=VARCHAR 문자열 무변환, schema.sql 예시 BIGINT 마스터 미채택, Slot 내부 surrogate만 BIGINT, Price 복합 PK. (4) 4등급 후속 영향(additive 예외) 메모 + 태스크 체크리스트 결정표 항목 완료 표시. 코드·명세(require/예약규칙) 변경 0, ROADMAP_2 결정표에만 반영. Phase 1 착수 게이트 해제.",
+      "completedAt": "2026-06-20T16:52:30.875Z"
+    },
+    {
+      "id": "cff5d4e7-5c47-4317-b31c-76697d091bc0",
+      "name": "T1 enums + 도메인 POJO 10종",
+      "description": "FE app/types/enums.ts·domain.ts와 무변환 일치하는 순수 POJO 10종과 enum 7종을 정의한다(JPA 애너테이션 없음). BaySize는 4값(SMALL/MID/LARGE/XLARGE). Lombok @Getter·@NoArgsConstructor·@Builder, setter 미개방. Slot은 상태전이 도메인 메서드(hold/reserve/release) 포함. enum 상수명은 FE 리터럴과 글자까지 동일(예 STORE_ADMIN, VAN_ETC, FULL_DAY).",
+      "notes": "JPA 애너테이션 금지. 필드명은 FE domain.ts와 정확히 일치. enum 상수명=FE 리터럴.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "6106605a-bebb-42bc-8d84-5f6dd9dba499"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T16:58:10.347Z",
+      "relatedFiles": [
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "POJO 필드명 정본",
+          "lineStart": 1,
+          "lineEnd": 95
+        },
+        {
+          "path": "app/types/enums.ts",
+          "type": "REFERENCE",
+          "description": "enum 상수 정본(BaySize 확장 전)",
+          "lineStart": 1,
+          "lineEnd": 60
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain",
+          "type": "CREATE",
+          "description": "도메인 POJO·enum 패키지"
+        }
+      ],
+      "implementationGuide": "backend/src/main/java/com/carwash/domain/enums/ 에 UserRole, CarType, ServiceType, BaySize(4값), SlotStatus, ReservationStatus, DayoffType. domain/ 에 User{id:String,email,name,role}, Store{id:String,name,bayCount:int,approved:boolean}, Bay{id:String,storeId:String,code:String,size:BaySize}, Manager{id:String,storeId:String,name:String,isStoreAdmin:boolean,dayoffs:List<ManagerDayoff>}, ManagerDayoff{date:String,type:DayoffType}, Slot{(내부)id:Long, storeId:String,bayId:String,date:String,timeSlot:String,status:SlotStatus,version:Long + hold()/reserve()/release()}, Price{carType:CarType,serviceType:ServiceType,amount:int}, Reservation{id:String,userId,storeId,bayId,managerId(nullable),date,timeSlot,carType,serviceType,amount:int,status}, Review{id:String,reservationId,userId,storeId,managerId(nullable),rating:int,text:String,createdAt:String}, StoreHoliday{storeId:String,date:String,approved:boolean}.",
+      "verificationCriteria": "./gradlew compileJava 통과. POJO 필드명·enum 상수명이 FE domain.ts/enums.ts(+XLARGE)와 1:1 일치. JPA 애너테이션 0건.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T1 완료. enum 7종(UserRole, CarType, ServiceType, BaySize[4값 — XLARGE 신설], SlotStatus, ReservationStatus, DayoffType)을 com.carwash.domain.enums에, 도메인 POJO 10종(User, Store, Bay, Manager, ManagerDayoff, Slot, Price, Reservation, Review, StoreHoliday)을 com.carwash.domain에 생성. enum 상수명·POJO 필드명을 FE app/types/enums.ts·domain.ts와 글자까지 1:1 일치(마스터 id=String 무변환, Slot.id/version·StoreHoliday.id는 내부 Long surrogate). JPA 애너테이션 0건. Lombok @Getter/@NoArgsConstructor/@AllArgsConstructor/@Builder 적용(setter 미개방), Slot은 ROADMAP_2 예시대로 @Builder 생성자 + hold/reserve/release 도메인 메서드. Lombok이 build.gradle에 없어 compileOnly/annotationProcessor(+test) 의존성 추가(필수 스코프 보강). cd backend && ./gradlew compileJava → BUILD SUCCESSFUL(JAVA_HOME=Temurin 21.0.11). 다음 T2(schema.sql)에서 이 타입 기준으로 DDL 작성.",
+      "completedAt": "2026-06-20T16:58:10.344Z"
+    },
+    {
+      "id": "bb5d6cca-9f6d-46f1-a1de-2efb4cc44b77",
+      "name": "T2 db/schema.sql DDL (10테이블 + slot UNIQUE)",
+      "description": "H2(MODE=MySQL) 기동 시 생성될 DDL. 마스터 PK=VARCHAR, slot UNIQUE 최종 방어선(require 5.2·7.3). 날짜 VARCHAR(10)·시간 VARCHAR(5). price 복합 PK. enum 컬럼은 VARCHAR.",
+      "notes": "MODE=MySQL이라 AUTO_INCREMENT 양립. date/time/text 컬럼명은 H2 MySQL모드 허용. 마스터 BIGINT 미채택(VARCHAR).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cff5d4e7-5c47-4317-b31c-76697d091bc0"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:00:36.440Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "CREATE",
+          "description": "10테이블 DDL + slot UNIQUE"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "schema.sql 예시",
+          "lineStart": 355,
+          "lineEnd": 369
+        }
+      ],
+      "implementationGuide": "backend/src/main/resources/db/schema.sql 에 10테이블: users(id VARCHAR PK, email, name, role), store(id VARCHAR PK, name, bay_count INT, approved BOOLEAN), bay(id VARCHAR PK, store_id VARCHAR, code, size VARCHAR), manager(id VARCHAR PK, store_id, name, is_store_admin BOOLEAN), manager_dayoff(id BIGINT AUTO_INCREMENT PK 내부용, manager_id VARCHAR, date VARCHAR(10), dayoff_type VARCHAR), slot(id BIGINT AUTO_INCREMENT PK, store_id, bay_id, date VARCHAR(10), time_slot VARCHAR(5), status VARCHAR, version BIGINT DEFAULT 0, CONSTRAINT uk_slot_store_bay_date_time UNIQUE(store_id,bay_id,date,time_slot)), price(car_type VARCHAR, service_type VARCHAR, amount INT, PRIMARY KEY(car_type,service_type)), reservation(id VARCHAR PK, user_id, store_id, bay_id, manager_id NULL, date, time_slot, car_type, service_type, amount INT, status), review(id VARCHAR PK, reservation_id, user_id, store_id, manager_id NULL, rating INT, text, created_at), store_holiday(id BIGINT AUTO_INCREMENT PK, store_id, date, approved BOOLEAN). CREATE TABLE IF NOT EXISTS + 명시적 CONSTRAINT 네이밍.",
+      "verificationCriteria": "H2 콘솔에서 10테이블 + uk_slot_store_bay_date_time 유니크 제약 존재. 마스터 PK가 VARCHAR.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T2 완료. backend/src/main/resources/db/schema.sql에 10테이블 DDL 작성. 마스터(users/store/bay/manager)·reservation·review = VARCHAR(64) PK(문자열 무변환), slot/manager_dayoff/store_holiday = BIGINT AUTO_INCREMENT 내부 surrogate, price = (car_type,service_type) 복합 PK. slot에 CONSTRAINT uk_slot_store_bay_date_time UNIQUE(store_id,bay_id,`date`,time_slot) 최종 방어선(require 5.2·7.3) + version BIGINT DEFAULT 0(Phase 4 낙관락 선반영). 날짜=VARCHAR(10)·시간=VARCHAR(5), enum 컬럼=VARCHAR. 예약어 `date`·`text`는 백틱 인용(H2 MySQL 모드·MySQL 양립). CREATE TABLE IF NOT EXISTS + 명시 CONSTRAINT 네이밍. 컬럼명은 snake_case로 POJO camelCase와 map-underscore-to-camel-case 매핑 정합. 런타임 H2 콘솔 10테이블/UNIQUE 실측은 spring.sql.init 배선(T4)·DoD 게이트(T8)에서 확인 예정.",
+      "completedAt": "2026-06-20T17:00:36.435Z"
+    },
+    {
+      "id": "1ba13d32-9fda-4dac-88c7-918dc87e3582",
+      "name": "T3 db/data.sql 시드 (1차 더미 동일 + XLARGE 베이)",
+      "description": "FE 더미와 동일 값 시드(무변환 정합 보장원). stores 3·bays 8 + XLARGE 베이 ≥1(VAN_ETC 예약 보존) · managers 4 + dayoffs · users 4 · price 20행 · slot RESERVED 1행.",
+      "notes": "XLARGE 베이 추가 시 해당 매장 bay_count 정합 확인. 가격 20행은 require 10.3과 정확히 일치.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "bb5d6cca-9f6d-46f1-a1de-2efb4cc44b77"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:02:58.137Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "CREATE",
+          "description": "시드 데이터"
+        },
+        {
+          "path": "app/data/stores.ts",
+          "type": "REFERENCE",
+          "description": "매장·베이 시드 원천"
+        },
+        {
+          "path": "app/data/prices.ts",
+          "type": "REFERENCE",
+          "description": "가격 20행 원천"
+        },
+        {
+          "path": "app/data/managers.ts",
+          "type": "REFERENCE",
+          "description": "매니저·휴무 시드"
+        }
+      ],
+      "implementationGuide": "backend/src/main/resources/db/data.sql: store(store1 강남 bay_count approved, store2 홍대 approved, store3 판교 미승인) / bay(store1-A1 SMALL, store1-A2 MID, store1-A3 LARGE, +store1-A4 XLARGE 추가→bay_count 정합 조정; store2-A1 SMALL, store2-A2 LARGE; store3-A1 MID, store3-A2 LARGE, store3-A3 LARGE) / manager(mgr1~4) + manager_dayoff(mgr1 2026-06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2) / users(user1,user2,manager1,admin1; password 컬럼은 Phase 3 전이므로 미도입 또는 nullable) / price 20행(app/data/prices.ts 그대로) / slot(store1, store1-A1, 2026-06-25, 10:00, RESERVED). enum 값은 FE 리터럴 문자열 그대로 INSERT.",
+      "verificationCriteria": "기동 후 price 20행, store 3행, bay 9행(8+XLARGE), slot RESERVED 1행. VAN_ETC가 수용 가능한 XLARGE 베이 존재.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T3 완료. backend/src/main/resources/db/data.sql 작성 — 1차 FE 더미(app/data/*)와 동일 값으로 시드. store 3행(store1 강남 bay_count=4 approved, store2 홍대 2 approved, store3 판교 3 미승인), bay 9행(원본 8 + XLARGE 신설 store1-A4 — 강남점 bay_count 3→4 정합), manager 4행(mgr1~4 is_store_admin), manager_dayoff 4행(mgr1 06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2), users 4행(user1/user2/manager1/admin1, 비번 컬럼은 Phase 3 도입), price 20행(require 10.3 확정 단가 정확 일치, VAN_ETC PREMIUM=55000), slot 1행(store1/store1-A1/2026-06-25/10:00/RESERVED, version 0). enum은 FE 리터럴 문자열 그대로 INSERT, `date` 컬럼 백틱 인용. VAN_ETC 수용 XLARGE 베이는 승인 매장(store1)에 존재해 예약 보존. 런타임 주입 실측(price 20·store 3·bay 9·slot RESERVED)은 spring.sql.init 배선(T4) 기동에서 확인. T7에서 FE stores.ts에 store1-A4 동일 반영 예정.",
+      "completedAt": "2026-06-20T17:02:58.132Z"
+    },
+    {
+      "id": "84842403-f31c-408d-95cd-5581488ac89f",
+      "name": "T4 application.yml spring.sql.init 활성화",
+      "description": "schema.sql→data.sql 자동 실행 배선. 기존 H2/MyBatis 설정 보존하고 spring.sql.init만 추가.",
+      "notes": "현재 application.yml에 spring.sql.init 미설정 상태. DataSource 초기화 기능 사용(MyBatis와 독립).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "bb5d6cca-9f6d-46f1-a1de-2efb4cc44b77"
+        },
+        {
+          "taskId": "1ba13d32-9fda-4dac-88c7-918dc87e3582"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:08:29.786Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "spring.sql.init 추가",
+          "lineStart": 1,
+          "lineEnd": 23
+        }
+      ],
+      "implementationGuide": "backend/src/main/resources/application.yml의 spring 하위에 sql.init.mode: always, schema-locations: classpath:db/schema.sql, data-locations: classpath:db/data.sql, continue-on-error: false 추가. MyBatis 설정·datasource·server.port 보존.",
+      "verificationCriteria": "./gradlew bootRun 로그에 schema/data 초기화 성공. H2 콘솔에서 테이블+시드 확인. 기동 실패 없음.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T4 완료. application.yml spring 하위에 sql.init(mode: always, schema-locations: classpath:db/schema.sql, data-locations: classpath:db/data.sql, continue-on-error: false) 추가, 기존 datasource/h2/mybatis/server.port 보존. ./gradlew bootRun 실측: 'Started CarwashApplication in 1.039 seconds', HikariPool가 jdbc:h2:mem:carwash 연결, continue-on-error:false인데도 오류 없이 기동 → schema.sql(10테이블 DDL)·data.sql(시드) 정상 실행 확인(스크립트 오류 시 기동 실패하나 정상 기동). GET /api/health → {\"status\":\"UP\"}, /h2-console 302(정상). 'No MyBatis mapper' 경고는 T5 미완 상태라 예상된 정상. 검증 후 프로세스 정상 종료(exit 1은 taskkill에 의한 것). 시드 행수 단정(price 20·store 3·bay 9·slot RESERVED)은 T6 매퍼 통합테스트에 배정. JDK는 Temurin 21.0.11(JAVA_HOME 명시 필요).",
+      "completedAt": "2026-06-20T17:08:29.783Z"
+    },
+    {
+      "id": "1af2afed-fcdb-4fad-8045-158b36420f0f",
+      "name": "T5 MyBatis 매퍼 인터페이스 + XML",
+      "description": "엔티티별 1:1 매퍼(@Mapper 인터페이스 + resources/mapper/*Mapper.xml, namespace=FQN). Phase 1 범위 최소 조회 + Slot findByKey/updateStatusWithVersion(Phase 4 선반영 시그니처). Manager.dayoffs는 <collection> 단일 조인.",
+      "notes": "묶음 매퍼 금지. 무분별한 중첩 조인(N+1) 금지 — dayoffs만 collection. JpaRepository 금지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cff5d4e7-5c47-4317-b31c-76697d091bc0"
+        },
+        {
+          "taskId": "bb5d6cca-9f6d-46f1-a1de-2efb4cc44b77"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:13:57.443Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper",
+          "type": "CREATE",
+          "description": "매퍼 인터페이스"
+        },
+        {
+          "path": "backend/src/main/resources/mapper",
+          "type": "CREATE",
+          "description": "매퍼 XML"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "SlotMapper 예시",
+          "lineStart": 418,
+          "lineEnd": 464
+        }
+      ],
+      "implementationGuide": "backend/.../mapper/ 에 StoreMapper, BayMapper, ManagerMapper, PriceMapper, SlotMapper, UserMapper, ReservationMapper, ReviewMapper, StoreHolidayMapper. resources/mapper/*Mapper.xml 1:1. map-underscore-to-camel-case=true이므로 컬럼 별칭 불필요. StoreMapper.findApproved/findById, BayMapper.findByStore, ManagerMapper.findByStore(+dayoffs <collection>), PriceMapper.findAll/findOne, SlotMapper.findByKey(storeId,bayId,date,timeSlot)·updateStatusWithVersion(id,status,version). namespace=매퍼 FQN 일치.",
+      "verificationCriteria": "./gradlew compileJava 통과. 매퍼 스캔 정상. namespace가 인터페이스 FQN과 일치.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T5 완료. MyBatis 매퍼 9종을 엔티티별 1:1로 생성(@Mapper 인터페이스 com.carwash.mapper/* + resources/mapper/*Mapper.xml, namespace=인터페이스 FQN 일치). StoreMapper(findAll/findApproved/findById), BayMapper(findByStore/findById), ManagerMapper(findByStore/findById — dayoffs <collection> LEFT JOIN 단일 조회, notNullColumn=dayoff_date로 휴무 없는 매니저 phantom 방지), PriceMapper(findAll/findOne — enum 파라미터 기본 EnumTypeHandler), SlotMapper(findByKey/updateStatusWithVersion — Phase 4 낙관락 선반영), UserMapper(findAll/findById/findByEmail), ReservationMapper·ReviewMapper·StoreHolidayMapper(findById/findByX/insert). map-underscore-to-camel-case 활용해 컬럼 별칭 최소화, `date`·`text` 예약어는 백틱 인용. 묶음 매퍼·N+1 무분별 중첩 없음(dayoffs만 collection), JpaRepository 미사용. ./gradlew bootRun 실측: Started in 1.102s, 'No MyBatis mapper found' 경고 소멸(매퍼 스캔 정상), BindingException/Invalid bound statement 없음 → 9개 XML 파싱·바인딩 성공. 개별 statement 실호출 검증은 T6 통합테스트에서 수행.",
+      "completedAt": "2026-06-20T17:13:57.440Z"
+    },
+    {
+      "id": "a958a8c4-0d44-477d-91b8-d2cde348b279",
+      "name": "T6 매퍼 통합 테스트",
+      "description": "실제 H2(시드 포함)에서 매퍼 조회/갱신 검증(ROADMAP_2 DoD 471). @SpringBootTest 또는 @MybatisTest.",
+      "notes": "시드 고정값 결정적 단정. H2 기준(Phase 10에서 MySQL 재실행).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1ba13d32-9fda-4dac-88c7-918dc87e3582"
+        },
+        {
+          "taskId": "1af2afed-fcdb-4fad-8045-158b36420f0f"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:17:06.286Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/mapper",
+          "type": "CREATE",
+          "description": "매퍼 통합테스트"
+        }
+      ],
+      "implementationGuide": "backend/src/test/java/com/carwash/mapper/*MapperTest.java: StoreMapper 승인매장 필터(approved=false 미노출), BayMapper store별 베이 수·등급, PriceMapper 20행·VAN_ETC PREMIUM=55000 단정, ManagerMapper dayoffs collection 매핑(mgr1 3건), SlotMapper findByKey(store1 RESERVED 슬롯)·updateStatusWithVersion 영향 행 수.",
+      "verificationCriteria": "./gradlew test 통과. 승인매장 필터·price 20행·VAN_ETC PREMIUM 55000·dayoffs 3건·slot RESERVED 단정 성공.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T6 완료. backend/src/test/java/com/carwash/mapper/에 매퍼 통합테스트 5종(@SpringBootTest webEnvironment=NONE — spring.sql.init 시드 로드된 H2 컨텍스트). ./gradlew test BUILD SUCCESSFUL, 매퍼 13건+헬스 1건 전부 통과(failures/errors 0). 단정 결과: StoreMapper findApproved 2건(store3 미승인 제외, require 6.1)·findById 강남점 bayCount 4·findAll 3건. BayMapper 강남점 4베이(A1~A4) + XLARGE 등급 매핑(store1-A4)·홍대점 2베이. PriceMapper findAll 20행·findOne(VAN_ETC,PREMIUM)=55000·(LIGHT,EXT)=10000(enum 파라미터 EnumTypeHandler 정상). ManagerMapper dayoffs <collection> 조립 검증 — mgr1 3건(FULL_DAY/SHIFT_1/FULL_DAY), mgr2 빈 리스트(notNullColumn phantom 방지 확인), mgr3 SHIFT_2 1건. SlotMapper 시드 RESERVED 슬롯 findByKey(id·version 0)·updateStatusWithVersion 성공 1행→version+1, 과거 version 재시도 0행(낙관락 충돌 판정, Phase 4 선검증). 시드 고정값 결정적 단정. 이로써 T2 schema/T3 seed/T5 매퍼가 실제 H2에서 종합 검증됨.",
+      "completedAt": "2026-06-20T17:17:06.283Z"
+    },
+    {
+      "id": "c3d8cda7-5d91-4ea1-b26a-0711e2dff533",
+      "name": "T7 FE 정합 companion (BaySize 4등급 반영)",
+      "description": "4등급 결정에 따른 FE 동반 수정으로 BE와 enum 값집합을 일치시키고 1차 E2E 회귀를 통과시킨다(additive 예외 — 사용자 승인). FE 단독 도메인.",
+      "notes": "BE T3 시드와 베이 id·등급을 일치시킬 것. npm run type-check·test:e2e 회귀 통과 목표.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "cff5d4e7-5c47-4317-b31c-76697d091bc0"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:19:43.458Z",
+      "relatedFiles": [
+        {
+          "path": "app/types/enums.ts",
+          "type": "TO_MODIFY",
+          "description": "BaySize +XLARGE"
+        },
+        {
+          "path": "app/data/carTypes.ts",
+          "type": "TO_MODIFY",
+          "description": "VAN_ETC→XLARGE"
+        },
+        {
+          "path": "app/data/stores.ts",
+          "type": "TO_MODIFY",
+          "description": "XLARGE 베이 추가"
+        }
+      ],
+      "implementationGuide": "app/types/enums.ts BaySize에 'XLARGE' 추가. app/data/carTypes.ts에서 VAN_ETC size를 'XLARGE'로. app/data/stores.ts에 XLARGE 베이 ≥1 추가(BE data.sql과 동일 매장·동일 베이 id로 정합, 예 store1-A4 XLARGE). oxfmt 규칙(세미콜론 없음·작은따옴표) 준수. 컴포넌트/스토어 구조 변경 없음.",
+      "verificationCriteria": "BaySize 값집합 BE=FE 일치(4값). npm run type-check 통과. npm run test:e2e 1차 회귀 통과(VAN_ETC 예약 흐름 정상).",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T7 완료. 4등급 결정에 따른 FE 동반 수정으로 BE와 enum 값집합 일치. 수정: (1) app/types/enums.ts BaySize에 'XLARGE' 추가(BE=FE 4값 일치), (2) app/data/carTypes.ts VAN_ETC size 'LARGE'→'XLARGE', (3) app/data/stores.ts 강남점 bayCount 3→4 + 베이 store1-A4(XLARGE) 추가(BE data.sql과 동일 id·등급 정합), (4) [계획 누락분 발견·보강] app/services/storeService.ts의 SIZE_RANK(Record<BaySize,number>)에 XLARGE:4 추가 — BaySize 확장 시 Record 완전성 위해 필수이며 누적 로직(size>=min)에 XLARGE 반영. oxfmt 규칙(세미콜론 없음·작은따옴표) 준수, 컴포넌트/스토어 구조 변경 0. 검증: npm run type-check 통과, npm run test:e2e 25개 전부 통과(5.4s). 대형 차종 베이 테스트(147행)는 A3 visible+A1 count0만 단정하므로 XLARGE(A4) 추가 노출에도 통과(누적 로직상 대형이 XLARGE 베이 수용 = 정상). VAN_ETC는 강남점 A4(XLARGE)에서 예약 가능 보존.",
+      "completedAt": "2026-06-20T17:19:43.453Z"
+    },
+    {
+      "id": "2cf84d1d-bf3e-4ebe-9f6c-7736e3b2e363",
+      "name": "T8 DoD 종합 게이트 (빌드·H2·필드명 정합)",
+      "description": "Phase 1 DoD 전체(ROADMAP_2 466~472) 충족 확인. 코드 변경 최소(불일치 발견 시 T1~T3 회귀 수정).",
+      "notes": "Phase 1 종료 게이트. 모든 DoD 체크박스 충족 시 Phase 2 진행 가능.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "84842403-f31c-408d-95cd-5581488ac89f"
+        },
+        {
+          "taskId": "a958a8c4-0d44-477d-91b8-d2cde348b279"
+        },
+        {
+          "taskId": "c3d8cda7-5d91-4ea1-b26a-0711e2dff533"
+        }
+      ],
+      "createdAt": "2026-06-20T16:50:25.255Z",
+      "updatedAt": "2026-06-20T17:22:07.368Z",
+      "relatedFiles": [
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "필드명 대조 기준"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "Phase 1 DoD",
+          "lineStart": 466,
+          "lineEnd": 472
+        }
+      ],
+      "implementationGuide": "1) cd backend && ./gradlew build 통과. 2) bootRun → H2 콘솔로 10테이블 + uk_slot_* 확인. 3) price 20행 require 10.3 일치 SQL 단정. 4) 도메인 POJO 필드명 ↔ app/types/domain.ts 대조표(불일치 0건). 5) enum 상수 ↔ app/types/enums.ts(+XLARGE) 대조. 불일치 시 해당 태스크로 회귀 수정.",
+      "verificationCriteria": "gradlew build 통과 + H2 10테이블/UNIQUE + price 20행 + 필드명 불일치 0건 + enum 일치. Phase 1 DoD 전 항목 충족.",
+      "analysisResult": "2차 Phase 1 — 백엔드 도메인 모델 & DB 스키마. ROADMAP_2.md Phase 1(333~477행) 정본, require_v1.md 5장(도메인)·10장(가격)·v1.5(MyBatis). 목표: 도메인 POJO 10종 + MyBatis 매퍼 + db/schema.sql(슬롯 UNIQUE) + db/data.sql 시드. JPA 미사용, 스키마 SQL 직접 관리, FE app/types/domain.ts·enums.ts와 무변환 정합. 게이트 결정(사용자 승인): (1) 베이 4등급 신설 — BaySize에 XLARGE 추가, VAN_ETC→XLARGE. FE enums.ts/carTypes.ts/stores.ts도 함께 확장(additive 예외 승인). 누적 로직(size>=min)상 VAN_ETC 예약 보존 위해 XLARGE 베이 시드 ≥1 추가. (2) 마스터 엔티티 id=문자열(VARCHAR) 무변환 — 'store1'·'store1-A1'·'mgr1'·'user1' 그대로 PK 시드. Reservation/Review는 앱이 문자열 id 부여. Slot=내부 BIGINT AUTO_INCREMENT surrogate(FE 미노출), Price=(car_type,service_type) 복합 PK. enum 상수명=FE 리터럴 글자 일치 → MyBatis 기본 EnumTypeHandler. 날짜=VARCHAR(10)·시간=VARCHAR(5). 매퍼는 엔티티별 1:1(namespace=FQN), Manager.dayoffs만 <collection>. 가격 20행(require 10.3): LIGHT 10000/10000/18000/28000, SMALL 12000/12000/22000/32000, MID 15000/15000/27000/38000, LARGE 18000/18000/33000/45000, VAN_ETC 22000/22000/40000/55000. 2차이므로 shrimp-task-manager-phase2 서버에만 등록. 한 건씩 execute_task로 순차 진행.",
+      "summary": "T8 완료 — Phase 1 DoD 종합 게이트 충족. (1) ./gradlew build BUILD SUCCESSFUL(컴파일+bootJar+테스트 17건 전부 통과). (2) H2 스키마 무결성을 스크립트로 단정하는 SchemaIntegrityTest 추가(JdbcTemplate): INFORMATION_SCHEMA 기준 BASE TABLE 10종 = 10, uk_slot_store_bay_date_time UNIQUE 제약 1건 존재, price 20행. 수동 H2 콘솔보다 재현·CI 가능한 검증으로 대체. (3) 필드명 대조: FE app/types/domain.ts ↔ BE 도메인 POJO 9종(User/Store/Bay/Manager/ManagerDayoff/Slot/Price/Reservation/Review) 필드명 불일치 0건(StoreHoliday는 FE 미정의 BE 전용, Slot.id/version은 내부 surrogate 의도). (4) enum 대조: 7종 상수명 글자 일치(BaySize는 T7로 BE=FE 4값 일치 SMALL/MID/LARGE/XLARGE). (5) ROADMAP_2 Phase 1 DoD·태스크 체크리스트 체크박스를 완료(증빙 명시)로 갱신. Phase 1(백엔드 도메인 모델 & DB 스키마) 종료 — Phase 2(서비스 추상화 교체) 진행 가능.",
+      "completedAt": "2026-06-20T17:22:07.364Z"
     }
   ]
 }

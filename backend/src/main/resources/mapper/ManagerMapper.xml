@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.ManagerMapper">
+
+    <!-- dayoffs를 LEFT JOIN 단일 조회로 조립(<collection>, N+1 회피).
+         notNullColumn으로 휴무 없는 매니저의 phantom 원소 생성을 방지. -->
+    <resultMap id="managerWithDayoffs" type="com.carwash.domain.Manager">
+        <id property="id" column="id"/>
+        <result property="storeId" column="store_id"/>
+        <result property="name" column="name"/>
+        <result property="isStoreAdmin" column="is_store_admin"/>
+        <collection property="dayoffs" ofType="com.carwash.domain.ManagerDayoff" notNullColumn="dayoff_date">
+            <result property="date" column="dayoff_date"/>
+            <result property="type" column="dayoff_type"/>
+        </collection>
+    </resultMap>
+
+    <select id="findByStore" resultMap="managerWithDayoffs">
+        SELECT m.id, m.store_id, m.name, m.is_store_admin,
+               md.`date` AS dayoff_date, md.dayoff_type
+        FROM manager m
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id
+        WHERE m.store_id = #{storeId}
+        ORDER BY m.id, md.`date`
+    </select>
+
+    <select id="findById" resultMap="managerWithDayoffs">
+        SELECT m.id, m.store_id, m.name, m.is_store_admin,
+               md.`date` AS dayoff_date, md.dayoff_type
+        FROM manager m
+        LEFT JOIN manager_dayoff md ON md.manager_id = m.id
+        WHERE m.id = #{id}
+        ORDER BY md.`date`
+    </select>
+</mapper>

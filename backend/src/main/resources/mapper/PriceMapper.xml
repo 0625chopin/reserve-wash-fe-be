@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.PriceMapper">
+
+    <!-- car_type/service_type 은 enum → 기본 EnumTypeHandler(name 문자열) 매핑 -->
+    <select id="findAll" resultType="com.carwash.domain.Price">
+        SELECT car_type, service_type, amount FROM price ORDER BY car_type, service_type
+    </select>
+
+    <select id="findOne" resultType="com.carwash.domain.Price">
+        SELECT car_type, service_type, amount
+        FROM price
+        WHERE car_type = #{carType} AND service_type = #{serviceType}
+    </select>
+</mapper>

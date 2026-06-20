@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.SlotMapper">
+
+    <!-- `date`는 예약어이므로 백틱 인용. map-underscore-to-camel-case로 컬럼 자동 매핑 -->
+    <select id="findByKey" resultType="com.carwash.domain.Slot">
+        SELECT id, store_id, bay_id, `date`, time_slot, status, version
+        FROM slot
+        WHERE store_id = #{storeId} AND bay_id = #{bayId}
+          AND `date` = #{date} AND time_slot = #{timeSlot}
+    </select>
+
+    <!-- 낙관적 락: version 일치 시에만 갱신, 영향 행 수로 충돌 판정(Phase 4) -->
+    <update id="updateStatusWithVersion">
+        UPDATE slot
+        SET status = #{status}, version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+</mapper>

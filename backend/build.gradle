@@ -28,6 +28,11 @@ dependencies {
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
     // 2단계 인메모리 DB (H2)
     runtimeOnly 'com.h2database:h2'
+    // 도메인 POJO 보일러플레이트 축소(@Getter·@Builder·@NoArgsConstructor) — 컴파일 전용 (ROADMAP_2 2.3)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
     // 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

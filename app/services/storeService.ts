@@ -5,8 +5,8 @@ import { managers } from '~/data/managers'
 import { carTypes, type CarTypeOption } from '~/data/carTypes'
 import { serviceTypes, type ServiceTypeOption } from '~/data/serviceTypes'
 
-// 크기 등급 순서 — 큰 베이가 작은 차도 수용
-const SIZE_RANK: Record<BaySize, number> = { SMALL: 1, MID: 2, LARGE: 3 }
+// 크기 등급 순서 — 큰 베이가 작은 차도 수용 (2차 Q1: 특대형 XLARGE 신설)
+const SIZE_RANK: Record<BaySize, number> = { SMALL: 1, MID: 2, LARGE: 3, XLARGE: 4 }
 
 // 매장/매니저 데이터 접근 추상화 (단방향 의존: services → data·types, README 계약)
 // TODO(2단계): stores/managers import를 $fetch/useFetch 서버 호출로 교체(시그니처 유지)

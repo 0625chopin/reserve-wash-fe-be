@@ -2,7 +2,7 @@ import type { Bay, Store } from '~/types/domain'
 
 // 매장 더미 (require 5.1). approved=false 매장은 예약 목록에서 제외(require 6.1, Phase 4 필터)
 export const stores: Store[] = [
-  { id: 'store1', name: '강남점', bayCount: 3, approved: true },
+  { id: 'store1', name: '강남점', bayCount: 4, approved: true }, // 2차 특대형 베이(A4) 추가로 3→4
   { id: 'store2', name: '홍대점', bayCount: 2, approved: true },
   { id: 'store3', name: '판교점', bayCount: 3, approved: false }, // 미승인 — 노출 제외 대상
 ]
@@ -13,6 +13,7 @@ export const bays: Bay[] = [
   { id: 'store1-A1', storeId: 'store1', code: 'A1', size: 'SMALL' },
   { id: 'store1-A2', storeId: 'store1', code: 'A2', size: 'MID' },
   { id: 'store1-A3', storeId: 'store1', code: 'A3', size: 'LARGE' },
+  { id: 'store1-A4', storeId: 'store1', code: 'A4', size: 'XLARGE' }, // 2차 특대형(VAN_ETC 수용)
   { id: 'store2-A1', storeId: 'store2', code: 'A1', size: 'SMALL' },
   { id: 'store2-A2', storeId: 'store2', code: 'A2', size: 'LARGE' },
   { id: 'store3-A1', storeId: 'store3', code: 'A1', size: 'MID' },

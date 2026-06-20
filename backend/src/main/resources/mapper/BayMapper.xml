@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.BayMapper">
+
+    <select id="findByStore" resultType="com.carwash.domain.Bay">
+        SELECT id, store_id, code, size FROM bay WHERE store_id = #{storeId} ORDER BY code
+    </select>
+
+    <select id="findById" resultType="com.carwash.domain.Bay">
+        SELECT id, store_id, code, size FROM bay WHERE id = #{id}
+    </select>
+</mapper>

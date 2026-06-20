@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.ReservationMapper">
+
+    <sql id="columns">
+        id, user_id, store_id, bay_id, manager_id, `date`, time_slot,
+        car_type, service_type, amount, status
+    </sql>
+
+    <select id="findById" resultType="com.carwash.domain.Reservation">
+        SELECT <include refid="columns"/> FROM reservation WHERE id = #{id}
+    </select>
+
+    <select id="findByUser" resultType="com.carwash.domain.Reservation">
+        SELECT <include refid="columns"/> FROM reservation
+        WHERE user_id = #{userId} ORDER BY `date`, time_slot
+    </select>
+
+    <!-- id는 앱이 부여(문자열). enum은 기본 EnumTypeHandler(name) 매핑 -->
+    <insert id="insert">
+        INSERT INTO reservation
+            (id, user_id, store_id, bay_id, manager_id, `date`, time_slot,
+             car_type, service_type, amount, status)
+        VALUES
+            (#{id}, #{userId}, #{storeId}, #{bayId}, #{managerId}, #{date}, #{timeSlot},
+             #{carType}, #{serviceType}, #{amount}, #{status})
+    </insert>
+</mapper>

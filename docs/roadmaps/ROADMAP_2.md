@@ -235,23 +235,27 @@ src/main/resources
 
 #### 의사결정 결정표 (Q1~Q8 — 질문 / 결정안 / 영향 파일)
 
-> 아래 "결정안" 열은 **기본 권고안(default proposal)** 이며, 이해관계자 확정 시 본 표를 정본으로 잠급니다. 확정값이 권고안과 다르면 본 표만 갱신하면 Phase 1이 그대로 따라옵니다.
+> 🔒 **결정표 잠금(2026-06-21 확정)**: 이해관계자 확정에 따라 본 표를 **정본으로 잠근다**. 아래 Q1·Q5는 **4등급(특대형 신설) 확정값**으로 갱신됐다(나머지 Q2·Q3·Q4·Q6·Q7·Q8은 권고안 그대로 확정). Phase 1은 본 표를 SSOT로 따른다.
 
-| ID | 질문(명세 8장) | 결정안(권고 — 확정 필요) | 영향 파일 |
+| ID | 질문(명세 8장) | 결정안(🔒 확정) | 영향 파일 |
 |----|------|------|------|
-| **Q1** | 차종 5분류 → 베이 4등급 매핑 | 경형·소형→소형(A), 준중형·중형→중형(B), 대형·SUV→대형(C), 승합·기타→특대형(D) | `domain/Bay.java`(`size`), `domain/Price.java`, `BayService` |
+| **Q1** | 차종 5분류 → 베이 4등급 매핑 | 🔒 **확정 — 4등급 신설**: 경형·소형→소형(`SMALL`), 준중형·중형→중형(`MID`), 대형·SUV→대형(`LARGE`), **승합·기타→특대형(`XLARGE` 신설)**. `BaySize`에 4번째 값 `XLARGE` 추가, `VAN_ETC→XLARGE` 매핑 | `domain/Bay.java`(`size`), `domain/enums/BaySize`(+XLARGE), `BayService`, **FE `app/types/enums.ts`·`app/data/carTypes.ts`(동반 수정)** |
 | **Q2** | 크기 등급당 베이 1개 vs 복수 | **복수 허용** — 등급은 `size` 속성, 베이 수 N은 매장별 유지(require 5.2 수용량 보존) | `domain/Bay.java`, 시드 데이터 |
 | **Q3** | 베이 노출 1:1 vs 누적 | **1차 누적 로직 유지** — 차 크기 이상을 수용하는 베이 노출(`sizeRank >= min`), 1차 `getBaysForCar` 동작 보존 | `BayService.findBaysForCar()` |
 | **Q4** | A/B/C/D 코드 ↔ 기존 매장별 일련번호 마이그레이션 | 베이에 **`size`(등급) 속성 신설**, `code`는 매장 내 식별자로 유지(코드와 등급 분리). 매장이 A~D 전 등급을 보유할 필요 없음 | `domain/Bay.java`, 시드, `dto/BayResponse` |
-| **Q5** | 특대형 ↔ 5분류 연결 & 가격표 영향 | 특대형=`VAN_ETC`(승합·기타) 등급으로 연결. **가격표(10.3)는 차종 기준 유지** — 베이 등급 신설은 노출에만 영향, 가격 무변경 | `domain/Price.java`(무변경 확인), `BayService` |
+| **Q5** | 특대형 ↔ 5분류 연결 & 가격표 영향 | 🔒 **확정**: 특대형 등급(`XLARGE`)=`VAN_ETC`(승합·기타) 차종과 연결. **가격표(10.3)는 차종 기준 유지** — 베이 등급 신설은 노출에만 영향, 가격 무변경. 누적 로직(`size>=min`)상 VAN_ETC가 수용 베이 0이 되지 않도록 **시드에 `XLARGE` 베이 ≥1 추가**(없으면 Q8 빈 상태 적용) | `domain/Price.java`(무변경 확인), `db/data.sql`(XLARGE 베이 시드), `BayService` |
 | **Q6** | 규칙 1 "매니저→차종" 직렬 엄격성 | **자유 순서 유지**(매장 이후 매니저·차종 자유, 베이만 차종 이후) — 1차 `reserve/index.vue` 동작 보존 | FE `reserve/index.vue`(무변경) |
 | **Q7** | 규칙 2를 매니저 대행(6.2)에도 적용 | **적용** — 대행 예약(M3)도 동일 베이 노출 규칙 사용(Phase 6에서 공유) | `BayService`(M3 재사용) |
 | **Q8** | 차종 대응 베이가 매장에 없을 때 처리 | 베이 목록 빈 상태 → "해당 차종 수용 베이 없음" 안내 + 예약 차단(409 아님, 선택 단계 비활성) | `BayService`, FE 빈 상태 UI |
 
 > 💡 **권고안의 일관성**: 위 결정안은 명세 8장의 "추측 후보(`?`)"와 정합하되, **1차 구현(누적 수용·매장별 베이 수)을 최대한 보존**하는 방향으로 잡았습니다(additive). 가격표는 차종 기준이므로 베이 등급 신설의 영향을 받지 않습니다(Q5).
 
+> 🔒 **id 정책 결정(2026-06-21 확정 — Phase 1 SSOT)**: **마스터 엔티티(User/Store/Bay/Manager)의 id는 문자열(`VARCHAR`) 무변환**으로 둔다. FE 1차의 `'store1'`·`'store1-A1'`·`'mgr1'`·`'user1'`을 그대로 PK로 시드하여 FE↔BE 무변환 매핑을 보장한다. 즉 **아래 `schema.sql` 예시의 마스터 `BIGINT AUTO_INCREMENT`는 채택하지 않는다**. `Reservation`/`Review`는 앱 레이어가 문자열 id를 부여한다(AUTO_INCREMENT 미사용). `Slot`·`ManagerDayoff`는 FE 타입에 id가 없으므로 내부 surrogate(`Slot.id`=`BIGINT AUTO_INCREMENT`, FE 미노출)만 두고, `Price`는 `(car_type, service_type)` 복합 PK를 쓴다.
+
+> ⚠️ **Q1 4등급 선택의 후속 영향(additive 예외 — 승인됨)**: 특대형(`XLARGE`) 신설로 BE `BaySize`가 4값이 되므로, FE도 `app/types/enums.ts`(`BaySize`+`XLARGE`)·`app/data/carTypes.ts`(`VAN_ETC→XLARGE`)·`app/data/stores.ts`(XLARGE 베이 ≥1)를 **동반 수정**하여 BE와 enum 값집합을 일치시킨다(Phase 1 T7). 1차 E2E는 회귀로 통과 유지.
+
 #### 태스크 체크리스트
-- [ ] **Q1~Q8 결정표 검토 회의** — 이해관계자와 권고안 확정/수정, 본 표 잠금
+- [x] **Q1~Q8 결정표 검토 회의** — 이해관계자와 권고안 확정/수정, 본 표 잠금 (2026-06-21 확정: Q1·Q5 4등급 신설, id 마스터=VARCHAR 무변환)
 - [ ] `backend/` Spring Boot 프로젝트 부트스트랩(Gradle, Java 21, Spring Web·**MyBatis(`mybatis-spring-boot-starter`)**·Validation·H2 의존성 — **Data JPA 추가 금지**)
 - [ ] `application.yml` 작성(1.4 H2 in-memory 기준)
 - [ ] `config/CorsConfig.java` 또는 Nuxt `devProxy`로 FE(:3000)↔BE(:8080) 계약 수립
@@ -337,15 +341,15 @@ export default defineNuxtConfig({
 #### 목표
 require 5장(도메인)·10장(가격)과 Phase 0 결정표를 기준으로 **도메인 POJO 10종 + MyBatis 매퍼**를 정의하고, `db/schema.sql`(DDL)에 슬롯 `UNIQUE(store_id, bay_id, date, time_slot)` 제약(require 5.2·7.3 최종 방어선)을 건다. 기동 시 `db/data.sql`로 시드 데이터를 주입한다. **JPA/Hibernate를 쓰지 않으므로 스키마는 SQL로 직접 관리한다.**
 
-#### 태스크 체크리스트
-- [ ] `domain/` POJO 10종 — `User`, `Store`, `Bay`, `Slot`, `Reservation`, `Manager`, `ManagerDayoff`, `StoreHoliday`, `Review`, `Price` (JPA 애너테이션 없음)
-- [ ] `Bay.size`에 **Phase 0 결정(4등급 또는 확정값)** 반영(require 5.4·명세 Q1)
-- [ ] `ManagerDayoff`에 `DayoffType`(FULL_DAY/SHIFT_1·2·3) enum 반영(require 5.5)
-- [ ] `db/schema.sql`에 10개 테이블 DDL + `slot` 테이블 `CONSTRAINT uk_slot_store_bay_date_time UNIQUE (store_id, bay_id, date, time_slot)` (require 5.2·7.3)
-- [ ] `mapper/` MyBatis 매퍼 인터페이스(`@Mapper`) + `resources/mapper/*Mapper.xml`
-- [ ] `Price` 매트릭스(차종 5 × 서비스 4 = 20행, require 10.3 확정 단가)를 `db/data.sql`에 시드
-- [ ] `db/data.sql`로 시드(매장·베이·매니저·휴무·가격·더미 사용자) 주입
-- [ ] FE `app/types/domain.ts`(1차)와 **필드명 일치 확인**(DTO 무변환 매핑 대비)
+#### 태스크 체크리스트 — ✅ 2026-06-21 완료
+- [x] `domain/` POJO 10종 — `User`, `Store`, `Bay`, `Slot`, `Reservation`, `Manager`, `ManagerDayoff`, `StoreHoliday`, `Review`, `Price` (JPA 애너테이션 없음, Lombok)
+- [x] `Bay.size`에 **Phase 0 결정(4등급: SMALL/MID/LARGE/XLARGE)** 반영(require 5.4·명세 Q1)
+- [x] `ManagerDayoff`에 `DayoffType`(FULL_DAY/SHIFT_1·2·3) enum 반영(require 5.5)
+- [x] `db/schema.sql`에 10개 테이블 DDL + `slot` 테이블 `CONSTRAINT uk_slot_store_bay_date_time UNIQUE (store_id, bay_id, date, time_slot)` (require 5.2·7.3)
+- [x] `mapper/` MyBatis 매퍼 인터페이스(`@Mapper`) 9종 + `resources/mapper/*Mapper.xml`
+- [x] `Price` 매트릭스(차종 5 × 서비스 4 = 20행, require 10.3 확정 단가)를 `db/data.sql`에 시드
+- [x] `db/data.sql`로 시드(매장·베이·매니저·휴무·가격·더미 사용자) 주입 + XLARGE 베이(store1-A4) 신설
+- [x] FE `app/types/domain.ts`(1차)와 **필드명 일치 확인**(DTO 무변환 매핑 대비) + FE 정합(BaySize 4값)
 
 #### 생성·수정 파일
 `domain/User.java`, `domain/Store.java`, `domain/Bay.java`, `domain/Slot.java`, `domain/Reservation.java`, `domain/Manager.java`, `domain/ManagerDayoff.java`, `domain/StoreHoliday.java`, `domain/Review.java`, `domain/Price.java`, 각 `mapper/*Mapper.java` + `resources/mapper/*Mapper.xml`, `enums/` (또는 도메인 내부 enum), `resources/db/schema.sql`(DDL+UNIQUE), `resources/db/data.sql`(시드)
@@ -463,13 +467,13 @@ public interface SlotMapper {
 </mapper>
 ```
 
-#### 완료기준 (DoD)
-- [ ] `./gradlew bootRun` 시 `schema.sql`로 H2에 10개 테이블이 생성된다(H2 콘솔 확인)
-- [ ] `slot` 테이블에 `uk_slot_store_bay_date_time` 유니크 제약이 존재한다(H2 콘솔 확인)
-- [ ] `price` 테이블에 20행이 시드되고 require 10.3과 정확히 일치한다
-- [ ] FE `app/types/domain.ts`의 필드명과 도메인 POJO 필드명이 일치한다(불일치 항목 0건)
-- [ ] 매퍼 단건 조회/갱신이 동작한다(매퍼 단위 통합테스트)
-- [ ] `./gradlew build` 통과
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(Phase 1 완료)
+- [x] `./gradlew bootRun` 시 `schema.sql`로 H2에 10개 테이블이 생성된다 (SchemaIntegrityTest: BASE TABLE 10종)
+- [x] `slot` 테이블에 `uk_slot_store_bay_date_time` 유니크 제약이 존재한다 (SchemaIntegrityTest: TABLE_CONSTRAINTS UNIQUE 1건)
+- [x] `price` 테이블에 20행이 시드되고 require 10.3과 정확히 일치한다 (PriceMapperTest: 20행 + VAN_ETC PREMIUM 55000)
+- [x] FE `app/types/domain.ts`의 필드명과 도메인 POJO 필드명이 일치한다(불일치 항목 0건) (대조 완료, Slot.id/version은 내부 surrogate)
+- [x] 매퍼 단건 조회/갱신이 동작한다(매퍼 단위 통합테스트) (StoreMapper 필터·SlotMapper 낙관락 영향행수 등 13건)
+- [x] `./gradlew build` 통과 (전체 17개 테스트 통과)
 
 #### 구현 메모 (📌)
 - 📌 **관계 매핑 깊이**: 1차 FE는 `storeId`/`bayId` 같은 **ID 참조** 기반이었습니다. 2차 도메인 POJO도 ID(Long) 참조로 두고(FE DTO 무변환 매핑 유지), 연관 데이터가 필요하면 **매퍼에서 JOIN 또는 별도 조회**로 조립하세요. MyBatis `<association>`/`<collection>` 중첩 매핑은 꼭 필요한 곳에만 쓰고, 무분별한 중첩 조인으로 N+1을 만들지 마세요(JPA 양방향 연관관계 자체가 없습니다).

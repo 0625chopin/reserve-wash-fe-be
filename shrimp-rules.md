@@ -11,7 +11,7 @@
   - 스타일링: **Tailwind CSS v4** (`@tailwindcss/vite` 플러그인을 `nuxt.config.ts`의 `vite.plugins`에 등록, `app/assets/main.css`에서 `@import 'tailwindcss'`). `tailwind.config.js`는 없다(v4는 CSS-first 설정).
   - 렌더링: **기본 SSR**. 클라이언트 전용 로직은 `import.meta.client` 가드 또는 `useCookie` 등을 사용하라.
   - E2E 테스트: **Playwright 설치됨**(`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`). 단위 테스트 러너(vitest)는 미설치.
-- **BE 스택**(2차, `docs/roadmaps/ROADMAP_2.md` 정본 — **`backend/`는 아직 미생성**, Phase 0에서 신설): **Java 21 (LTS)** + **Spring Boot 3.x** + **Gradle Wrapper**. **DB 접근은 MyBatis**(`mybatis-spring-boot-starter`, 매퍼 인터페이스 + XML SQL) — **JPA/Hibernate 미사용**(require_v1.md v1.5 확정). 데이터는 2단계 **H2 in-memory**(`schema.sql`로 스키마 생성, 휘발성) → 3단계 **MySQL 8.x + Flyway**(영속화). 통합테스트는 `@SpringBootTest`(`backend/src/test/...`).
+- **BE 스택**(2차, `docs/roadmaps/ROADMAP_2.md` 정본 — **`backend/` Phase 0 부트스트랩 완료**): **Java 21 (LTS)** + **Spring Boot 3.3.5** + **Gradle Wrapper**. **DB 접근은 MyBatis**(`mybatis-spring-boot-starter:3.0.4`, 매퍼 인터페이스 + XML SQL) — **JPA/Hibernate 미사용**(require_v1.md v1.5 확정). 데이터는 2단계 **H2 in-memory**(`application.yml`의 `jdbc:h2:mem:carwash;MODE=MySQL`, 휘발성 — Phase 1부터 `schema.sql`로 스키마 생성) → 3단계 **MySQL 8.x + Flyway**(영속화). 현재 부트스트랩 산출물: `CarwashApplication`·`config/CorsConfig`(`/api/**` ← :3000)·`controller/HealthController`(`GET /api/health`)·`application.yml`·`HealthControllerTest`. 통합테스트는 `@SpringBootTest`(`backend/src/test/...`).
 - **additive(증분) 철학(2차 최우선)**: 1차 FE 자산(화면·스토어·E2E)을 **삭제·구조 변경하지 마라**. 백엔드 연동은 **`app/services/*` 내부 구현만** 더미 import → `$fetch`/`useFetch` API 호출로 교체한다. 컴포넌트 마크업·스토어 구조 변경은 **0**을 목표로 하라.
 
 ## 프로젝트 아키텍처
@@ -24,13 +24,13 @@
 | `app/stores/` | Pinia 스토어(자동 임포트) | 신규 스토어 파일을 이 디렉터리에 생성 |
 | `app/components/` | 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함) | 재사용 단위만 배치 |
 | `app/composables/` | 재사용 로직(자동 임포트) | Composition 함수 배치 |
-| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`). 4개 구현: `auth.ts`(인증)·`reservation-fresh-entry.ts`(`/reserve` 진입 시 draft 초기화)·`reservation-wizard-guard.ts`(위저드 단계 순서)·`review-guard.ts`(후기 자격) | `definePageMeta({ middleware: '...' })`로 적용. **미들웨어 키는 파일명 kebab-case**. 신규 가드는 이 디렉터리에 추가 |
+| `app/middleware/` | 라우트 미들웨어(`defineNuxtRouteMiddleware`). 5개 구현: `auth.ts`(인증)·`guest.ts`(게스트 전용 — 로그인 상태면 `/reserve`로 리다이렉트, 로그인/회원가입 보호)·`reservation-fresh-entry.ts`(`/reserve` 진입 시 draft 초기화)·`reservation-wizard-guard.ts`(위저드 단계 순서)·`review-guard.ts`(후기 자격) | `definePageMeta({ middleware: '...' })`로 적용. **미들웨어 키는 파일명 kebab-case**. 신규 가드는 이 디렉터리에 추가 |
 | `app/layouts/` | 공통 레이아웃(자동 임포트). `default.vue` 활성(`app.vue`가 `<NuxtLayout>` opt-in) | `default.vue` 수정 또는 신규 레이아웃 추가 |
 | `app/assets/` | `base.css`·`main.css`(Tailwind 진입 + `@theme` 토큰 + `@layer components` 공통 클래스) | `nuxt.config.ts`의 `css`로 등록. **색상/공통 컴포넌트 스타일은 여기서 토큰화** |
 | `app/types/` | 도메인 TS 타입/인터페이스/유니언 | `enums.ts`, `domain.ts`. **명시 import 대상**(`import type`) |
 | `app/data/` | 더미 데이터(매장/베이/가격/매니저/차종/서비스/사용자) | `prices.ts`·`stores.ts`·`managers.ts`·`carTypes.ts`·`serviceTypes.ts`·`users.ts`. **명시 import 대상** |
 | `app/services/` *(계약은 `README.md`)* | 데이터 접근 추상화 계층 | `priceService.ts`·`storeService.ts`·`reservationService.ts`. **명시 import 대상**. 계약: `app/services/README.md`. **2차 교체 지점**: 내부만 `$fetch`로 교체(시그니처 유지) |
-| `backend/` *(2차·미생성)* | Spring Boot BE — **독립 Gradle 프로젝트** | 루트 `package.json`에 Java 빌드를 끼워넣지 마라. FE는 루트 `npm`, BE는 `cd backend && ./gradlew`로 빌드 경계를 분리하라. `backend/build/`·`backend/.gradle/`·`*.class`·IDE 산출물(`.idea/`·`*.iml`)을 루트 `.gitignore`에 추가하라 |
+| `backend/` *(2차·Phase 0 부트스트랩 완료)* | Spring Boot BE — **독립 Gradle 프로젝트**(`build.gradle`·`settings.gradle`·Gradle Wrapper) | 루트 `package.json`에 Java 빌드를 끼워넣지 마라. FE는 루트 `npm`, BE는 `cd backend && ./gradlew`로 빌드 경계를 분리하라. `backend/build/`·`backend/.gradle/`는 **이미 루트 `.gitignore`에 반영됨**(Gradle Wrapper는 커밋 유지). IDE 산출물(`.idea/`·`*.iml`)은 필요 시 추가하라 |
 
 ### Spring Boot + MyBatis 패키지 구조 (`backend/src/main/java/com/carwash/`, 2차)
 
@@ -49,8 +49,8 @@
 
 - **`~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킨다.** (Nuxt가 자동 제공) 상대경로(`../`)보다 별칭을 우선하라.
 - **데이터 접근은 `app/services/`로 감싸라.** 컴포넌트/스토어에서 `app/data/`를 직접 import하지 마라(2단계 백엔드 교체 지점). 단방향 의존 계약은 `app/services/README.md` 참조.
-- **1차(ROADMAP_1) Phase 0~8 구현 완료**: `app/types`(`enums`·`domain`)·`app/data`(`prices`·`stores`·`managers`·`carTypes`·`serviceTypes`·`users`)·`app/composables`(`useSlots`·`useToast`)·`app/services`(`priceService`·`storeService`·`reservationService`)가 채워졌고, 인증(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)·레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)·**예약 위저드 3분할**(`app/pages/reserve/{index,slot,done}.vue` + `app/stores/reservationDraft.ts` + 위저드/진입 가드)·예약 목록·상태전이(`app/pages/reservations.vue` + `app/stores/reservation.ts`)·후기/평점(`app/pages/review/[reservationId].vue` + `app/stores/review.ts`)·입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`·`SlotGrid.vue`)·Playwright E2E(`e2e/`)가 모두 구현됐다. 1차 DoD는 `docs/roadmaps/ROADMAP_1.md`, **2차(Spring Boot 백엔드 + BO)는 `docs/roadmaps/ROADMAP_2.md`** 를 정본으로 따르라.
-- **미구현(다음 1차 대상) — 일반 회원가입(FW1)**: `/signup`은 ROADMAP_1 **Phase 3.1(v1.5)** 에 정의됐으나 **아직 미구현**이다. 구현 시 즉시 가입(더미) 방식으로 `app/pages/signup.vue`(신규)·`app/middleware/guest.ts`(신규)·`app/stores/auth.ts`의 `signup` 액션(이메일 중복 검사 → in-memory `users` 추가 → 자동 로그인)을 만들고, `app/components/AppNav.vue`·`app/pages/login.vue`에 상호 링크를 추가하라. 이메일 인증/SMTP·매니저/관리자 가입은 2차(`ROADMAP_2`)다.
+- **1차(ROADMAP_1) Phase 0~8 구현 완료**: `app/types`(`enums`·`domain`)·`app/data`(`prices`·`stores`·`managers`·`carTypes`·`serviceTypes`·`users`)·`app/composables`(`useSlots`·`useToast`)·`app/services`(`priceService`·`storeService`·`reservationService`)가 채워졌고, 인증(`app/stores/auth.ts`·`app/middleware/auth.ts`·`app/pages/login.vue`)·레이아웃 opt-in(`app.vue` → `<NuxtLayout>` → `app/layouts/default.vue`)·공통 네비(`app/components/AppNav.vue`)·**예약 위저드 3분할**(`app/pages/reserve/{index,slot,done}.vue` + `app/stores/reservationDraft.ts` + 위저드/진입 가드)·예약 목록·상태전이(`app/pages/reservations.vue` + `app/stores/reservation.ts`)·후기/평점(`app/pages/review/[reservationId].vue` + `app/stores/review.ts`)·**일반 회원가입(FW1)**(`app/pages/signup.vue` + `app/middleware/guest.ts` + `app/stores/auth.ts`의 `signup` 액션 — 즉시 가입·이메일 중복 검사·자동 로그인)·입력 컴포넌트(`WheelPicker.vue`·`SearchableSelect.vue`·`SlotGrid.vue`)·Playwright E2E(`e2e/`)가 모두 구현됐다. 1차 DoD는 `docs/roadmaps/ROADMAP_1.md`, **2차(Spring Boot 백엔드 + BO)는 `docs/roadmaps/ROADMAP_2.md`** 를 정본으로 따르라.
+- **회원가입 확장(2차 대상)**: 1차 `/signup`은 즉시 가입(더미)이다. 이메일 인증/SMTP·매니저/관리자 가입(`EMAIL_VERIFIED → PENDING_APPROVAL`)은 2차(`ROADMAP_2`)에서 백엔드 연동으로 구현하라. 기존 `signup.vue`·`guest.ts`·`auth.signup`을 삭제하지 말고 `app/services/*` 경유로 확장하라(additive).
 
 ### 자동 임포트 vs 명시 import (강제 구분)
 
@@ -176,7 +176,7 @@ export default defineNuxtRouteMiddleware((to) => {
 ### 백엔드 빌드·기동 명령
 
 - 빌드/테스트: `cd backend && ./gradlew build`(컴파일+테스트) → `./gradlew test`(**동시성 통합테스트 포함**).
-- 기동: `cd backend && ./gradlew bootRun`(:8080). FE는 루트 `npm run dev`(:3000)와 **동시 기동**.
+- 기동: `cd backend && ./gradlew bootRun`(:8080). FE는 루트 `npm run dev`(:3000)와 **동시 기동**. 부트스트랩 검증: `GET http://localhost:8080/api/health` → `{"status":"UP"}`. H2 콘솔은 `http://localhost:8080/h2-console`.
 
 ## 스타일링(Tailwind CSS v4) 규칙
 
@@ -208,7 +208,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ## 핵심 파일 동시 수정 규칙
 
-- **신규 페이지 추가 시**: `app/pages/`에 `.vue` 파일을 생성하면 라우트가 자동 등록된다(수동 등록 불필요). 보호가 필요하면 `definePageMeta({ middleware: 'auth' })`를 함께 지정하라. **로그인 상태를 차단해야 하는 게스트 전용 페이지(로그인·회원가입)는 `guest` 미들웨어**(로그인 상태면 `/reserve`로 리다이렉트 — `auth`의 반대)로 보호하라(`guest.ts` 미존재 시 ROADMAP_1 Phase 3.1 패턴으로 신설).
+- **신규 페이지 추가 시**: `app/pages/`에 `.vue` 파일을 생성하면 라우트가 자동 등록된다(수동 등록 불필요). 보호가 필요하면 `definePageMeta({ middleware: 'auth' })`를 함께 지정하라. **로그인 상태를 차단해야 하는 게스트 전용 페이지(로그인·회원가입)는 기존 `guest` 미들웨어**(`app/middleware/guest.ts` — 로그인 상태면 `/reserve`로 리다이렉트, `auth`의 반대)로 보호하라.
 - **전역 모듈/플러그인 추가 시**: 의존성 설치 → `nuxt.config.ts`의 `modules`에 등록(또는 `app/plugins/`에 플러그인 생성)을 함께 수행하라.
 - **의존성 설치 후**: `npm run postinstall`(`nuxt prepare`)로 `.nuxt` 타입을 재생성하라.
 - **npm 스크립트 추가 시**: `package.json`과 `CLAUDE.md`의 "주요 명령어" 표를 함께 갱신하라.

@@ -12,5 +12,5 @@ export const carTypes: CarTypeOption[] = [
   { code: 'SMALL', name: '소형', size: 'SMALL' },
   { code: 'MID', name: '준중형·중형', size: 'MID' },
   { code: 'LARGE', name: '대형·SUV', size: 'LARGE' },
-  { code: 'VAN_ETC', name: '승합·기타', size: 'LARGE' },
+  { code: 'VAN_ETC', name: '승합·기타', size: 'XLARGE' }, // 2차 Q5: 특대형 베이 수용
 ]

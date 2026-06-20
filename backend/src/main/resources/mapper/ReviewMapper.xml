@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.ReviewMapper">
+
+    <sql id="columns">
+        id, reservation_id, user_id, store_id, manager_id, rating, `text`, created_at
+    </sql>
+
+    <select id="findById" resultType="com.carwash.domain.Review">
+        SELECT <include refid="columns"/> FROM review WHERE id = #{id}
+    </select>
+
+    <select id="findByStore" resultType="com.carwash.domain.Review">
+        SELECT <include refid="columns"/> FROM review
+        WHERE store_id = #{storeId} ORDER BY created_at DESC
+    </select>
+
+    <insert id="insert">
+        INSERT INTO review
+            (id, reservation_id, user_id, store_id, manager_id, rating, `text`, created_at)
+        VALUES
+            (#{id}, #{reservationId}, #{userId}, #{storeId}, #{managerId}, #{rating}, #{text}, #{createdAt})
+    </insert>
+</mapper>
