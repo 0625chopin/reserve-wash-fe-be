@@ -1057,15 +1057,15 @@ public class ManagerReservationController {
 require 8장의 **결재 상태머신**(SUBMITTED → APPROVED_L1 → APPROVED_L2 → CONFIRMED / REJECTED)을 구현하고, **매니저 휴무(M7 흐름의 2단계 승인: 최고매니저 → 관리자)** 와 **매장 휴일(8.1: 매니저 신청 → 관리자 승인)** 을 처리한다. 휴무 유형(FULL_DAY/SHIFT_n, require 5.5)은 전일/교대조 구분 없이 동일 흐름을 따른다(require 8.2). 매니저 가입 승인(M7)·가입 승인(S3)도 동일 승인 패턴을 재사용한다.
 
 #### 태스크 체크리스트
-- [ ] `domain/Approval` 또는 도메인별(`ManagerDayoff`·`StoreHoliday`)에 `ApprovalStatus` enum(require 8.3)
-- [ ] `POST /api/manager/dayoffs` — 매니저 휴무 결재 상신(SUBMITTED), 휴무유형 포함(require 5.5)
-- [ ] `PATCH /api/manager/dayoffs/{id}/approve-l1` — 최고매니저 1차 승인(SUBMITTED → APPROVED_L1)
-- [ ] `PATCH /api/admin/dayoffs/{id}/approve-l2` — 관리자 최종 승인(APPROVED_L1 → APPROVED_L2 → CONFIRMED)
-- [ ] `PATCH .../reject` — 어느 단계든 반려(→ REJECTED → 재신청)
-- [ ] 매장 휴일(8.1): 매니저 신청 → 관리자 단일 승인(L1 생략 또는 L1=관리자, require 8.3 단순화)
-- [ ] M7(매니저 가입 승인)·S3(가입 승인) — 동일 승인 패턴 재사용(require 4.3·11.2)
-- [ ] CONFIRMED 시 슬롯 비활성 반영: FULL_DAY=그날 전체, SHIFT_n=해당 교대 시간대만(require 5.5·6.1)
-- [ ] 역할 인가: L1=STORE_ADMIN, L2=ADMIN (require 3.2·8.3)
+- [x] 도메인별(`ManagerDayoff`·`StoreHoliday`)에 `ApprovalStatus` enum(SUBMITTED/APPROVED_L1/CONFIRMED/REJECTED, require 8.3) *(P7-1)*
+- [x] `POST /api/manager/dayoffs` — 매니저 휴무 결재 상신(SUBMITTED), 휴무유형 포함(require 5.5) *(P7-5)*
+- [x] `PATCH /api/manager/dayoffs/{id}/approve-l1` — 최고매니저 1차 승인(SUBMITTED → APPROVED_L1) *(STORE_ADMIN 세분 인가)*
+- [x] `PATCH /api/admin/dayoffs/{id}/approve-l2` — 관리자 최종 승인(APPROVED_L1 → CONFIRMED) *(APPROVED_L2는 확정으로 collapse)*
+- [x] `PATCH .../reject` + `/resubmit` — 반려(→ REJECTED) 후 재신청(→ SUBMITTED)
+- [x] 매장 휴일(8.1): 매니저 신청(`POST /api/manager/holidays`) → 관리자 단일 승인(`PATCH /api/admin/holidays/{id}/approve`)
+- [ ] ~~M7(매니저 가입 승인)·S3(가입 승인)~~ → **이연**. 동일 승인 패턴(상태 enum+도메인 전이+역할 인가)을 `ApprovalService`가 시연하나, User 가입 상태머신은 Phase 3에서 이연된 SMTP/인증 흐름과 묶임 — 후속 단계에서 재사용
+- [x] CONFIRMED 시 슬롯 비활성 반영: FULL_DAY=그날 전체, SHIFT_n=해당 교대 시간대만(require 5.5·6.1) *(확정 휴무→카탈로그 노출→isManagerOffAt 게이팅, P7-6 BE 테스트로 실증)*
+- [x] 역할 인가: L1=STORE_ADMIN, L2=ADMIN (require 3.2·8.3)
 
 #### 생성·수정 파일
 `domain/ManagerDayoff.java`(승인상태·휴무유형), `domain/StoreHoliday.java`(승인상태), `mapper/ManagerDayoffMapper.java`·`mapper/StoreHolidayMapper.java` + XML, `controller/DayoffController.java`, `controller/StoreHolidayController.java`, `service/ApprovalService.java`, `dto/DayoffRequest.java`, `dto/ApprovalResponse.java`, FE `app/pages/manager/dayoffs.vue`·`app/pages/admin/approvals.vue`(신규)
@@ -1132,16 +1132,18 @@ public void approveL2() {
 ```
 
 #### 완료기준 (DoD)
-- [ ] 매니저 휴무가 **2단계 승인**(최고매니저 → 관리자)을 거쳐 CONFIRMED된다(require 8.2)
-- [ ] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 CONFIRMED된다(require 8.1)
-- [ ] CONFIRMED 시 FULL_DAY는 그날 전체, SHIFT_n은 해당 교대 시간대만 슬롯이 비활성된다(require 5.5·6.1)
-- [ ] 어느 단계든 반려(REJECTED) 후 재신청(SUBMITTED)이 가능하다
-- [ ] 단계 건너뛰기·권한 외 승인이 차단된다(상태 가드 + 역할 인가)
-- [ ] `./gradlew build` + 결재 상태머신 통합테스트 통과
+- [x] 매니저 휴무가 **2단계 승인**(최고매니저 → 관리자)을 거쳐 CONFIRMED된다(require 8.2) *(ApprovalApiTest·결재 E2E 2단계 데모)*
+- [x] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 CONFIRMED된다(require 8.1) *(`휴일_1단계_승인`)*
+- [x] CONFIRMED 시 FULL_DAY는 그날 전체, SHIFT_n은 해당 교대 시간대만 슬롯이 비활성된다(require 5.5·6.1) *(`확정_FULL_DAY…대행 차단`·`확정_SHIFT1…오전만 차단/오후 허용`)*
+- [x] 어느 단계든 반려(REJECTED) 후 재신청(SUBMITTED)이 가능하다 *(`반려_후_재신청`)*
+- [x] 단계 건너뛰기·권한 외 승인이 차단된다(상태 가드 + 역할 인가) *(`단계_건너뛰기…409`·`MANAGER approve-l1 403`·`USER 403`)*
+- [x] `./gradlew build`(결재 7건 포함 전건 green) + 결재 상태머신 통합테스트 통과 + `type-check`·`test:e2e`(31건) 통과
 
 #### 구현 메모 (📌)
-- 📌 **워크플로우 엔진 미사용**: require 8.2가 명시했듯 별도 워크플로우 엔진 없이 **상태값 변경 방식**으로 구현합니다. 상태 enum + 도메인 전이 메서드 + 역할 인가의 조합으로 충분합니다.
-- 📌 **승인 패턴 재사용**: M7(매니저 가입 승인)·S3(가입 승인)도 본질적으로 같은 "신청 → 검토자 승인" 패턴입니다. `ApprovalService`의 전이 골격을 공유하되, 대상 도메인(User vs Dayoff vs Holiday)과 매퍼·승인 주체만 다르게 주입하세요.
+- 📌 **워크플로우 엔진 미사용**: require 8.2대로 별도 엔진 없이 **상태값 변경 방식**으로 구현. `ApprovalStatus` enum + 도메인 전이 메서드(`approveL1`/`approveL2`/`reject`/`resubmit`) + 경로 기반 역할 인가의 조합. `APPROVED_L2`는 별도 저장 상태 없이 L2 승인 시 곧장 `CONFIRMED`로 collapse(require 8.3 예시 정합).
+- 📌 **슬롯 비활성 = 확정 휴무의 카탈로그 반영**: 희소 슬롯 행을 변형하지 않는다. 워크플로우 휴무는 카탈로그와 **동일 `manager_dayoff` 테이블**을 쓰고, 카탈로그 쿼리는 `status='CONFIRMED'`만 노출(`ManagerMapper` LEFT JOIN 필터). 확정된 휴무는 `Manager.dayoffs`에 나타나 기존 `isManagerOffAt`(FULL_DAY 전일/SHIFT_n 해당 교대) 게이팅으로 **FE 슬롯/시간 선택 비활성 + 서버 대행 예약 차단(400)** 을 동시에 실현. 기존 시드 휴무는 `status DEFAULT 'CONFIRMED'`로 회귀 안전(ManagerMapperTest/CatalogApiTest 유지).
+- 📌 **역할 세분 인가**: `approve-l1`만 STORE_ADMIN 한정 매처(`HttpMethod.PATCH /api/manager/dayoffs/*/approve-l1`)를 일반 `/api/manager/**`(MANAGER·STORE_ADMIN) 매처보다 **먼저** 평가. L2·반려·휴일 승인은 `/api/admin/**`=ADMIN. STORE_ADMIN 데모용 시드 유저(`storeadmin@test.com`) 추가.
+- 📌 **M7/S3 이연**: 가입 승인은 본질적으로 같은 "신청 → 검토자 승인" 패턴이나 User 가입 상태머신은 Phase 3에서 이연된 이메일 인증/SMTP 흐름과 결합 — `ApprovalService` 전이 골격을 재사용해 후속 단계에서 도입.
 
 ---
 

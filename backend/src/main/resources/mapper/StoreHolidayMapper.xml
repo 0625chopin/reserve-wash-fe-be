@@ -3,14 +3,27 @@
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.carwash.mapper.StoreHolidayMapper">
 
+    <!-- map-underscore-to-camel-case: store_id→storeId. status는 ApprovalStatus enum(name) -->
     <select id="findByStore" resultType="com.carwash.domain.StoreHoliday">
-        SELECT id, store_id, `date`, approved FROM store_holiday
+        SELECT id, store_id, `date`, status FROM store_holiday
         WHERE store_id = #{storeId} ORDER BY `date`
     </select>
 
-    <!-- id는 BIGINT AUTO_INCREMENT 내부 surrogate(미세팅) -->
-    <insert id="insert">
-        INSERT INTO store_holiday (store_id, `date`, approved)
-        VALUES (#{storeId}, #{date}, #{approved})
+    <select id="findById" resultType="com.carwash.domain.StoreHoliday">
+        SELECT id, store_id, `date`, status FROM store_holiday WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultType="com.carwash.domain.StoreHoliday">
+        SELECT id, store_id, `date`, status FROM store_holiday ORDER BY id DESC
+    </select>
+
+    <!-- 신청 — id는 AUTO_INCREMENT(useGeneratedKeys) -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO store_holiday (store_id, `date`, status)
+        VALUES (#{storeId}, #{date}, #{status})
     </insert>
+
+    <update id="updateStatus">
+        UPDATE store_holiday SET status = #{status} WHERE id = #{id}
+    </update>
 </mapper>

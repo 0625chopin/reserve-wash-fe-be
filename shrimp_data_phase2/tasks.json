@@ -1866,6 +1866,358 @@
       "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 2차 배치(P6-6~P6-8): BE 인가/기능 통합테스트, FE BO 화면+role-guard, 게이트+ROADMAP. 앞선 P6-1~P6-5(매퍼/DTO/서비스/컨트롤러/경로인가)에 의존. 인가는 경로 기반(/api/manager/**→MANAGER·STORE_ADMIN, /api/admin/**→ADMIN), 권한 외 403·미인증 401. 시드: manager@test.com(MANAGER), admin@test.com(ADMIN), user@test.com·user2@test.com(USER), 모두 BCrypt('password'). 대행은 confirm 위임(Phase4 동시성). FE: role-guard 미들웨어 신규, manager/admin 페이지 신규(AppNav 무수정, E2E는 직접 goto). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용.",
       "summary": "P6-8 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — BoApiTest 8건 포함 전건 0실패(15개 테스트 클래스). (2) npm run type-check 0 에러. (3) e2e/bo.spec.ts 신규 4건(매니저 대행 성공·USER→manager/admin role-guard 리다이렉트·ADMIN S4/S5 조회) — 하이드레이션 레이스(첫 fill이 hydration 직전 실행돼 리셋됨)는 이메일 입력을 select/텍스트 뒤로 이동 + toHaveValue/toBeEnabled 가드로 해결. npm run test:e2e 전건 29건(1차 25 + BO 4) 통과(10.2s). (4) ROADMAP_2 Phase 6 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(경로 기반 인가, 이메일 기반 대행, S5 distinct 정의, 휴무 SHIFT 서버 검증, additive) 기록.",
       "completedAt": "2026-06-20T19:13:30.491Z"
+    },
+    {
+      "id": "2e907375-81f5-4958-a584-166ec5dba9cd",
+      "name": "P7-1 ApprovalStatus enum + 도메인 전이 + 스키마/시드",
+      "description": "결재 상태 enum과 ManagerDayoff/StoreHoliday 도메인 전이 메서드 추가, 스키마/시드/카탈로그 필터 정합. 회귀 안전(기존 시드 CONFIRMED).",
+      "notes": "기존 시드 dayoff는 DEFAULT로 CONFIRMED → ManagerMapperTest(3/1) 유지. store_holiday 미시드라 컬럼 변경 안전. 10테이블 불변.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T19:20:38.759Z",
+      "updatedAt": "2026-06-20T19:27:35.192Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/domain/enums/ApprovalStatus.java",
+          "type": "CREATE",
+          "description": "결재 상태 enum",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain/ManagerDayoff.java",
+          "type": "TO_MODIFY",
+          "description": "전이 메서드+필드",
+          "lineStart": 1,
+          "lineEnd": 19
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain/StoreHoliday.java",
+          "type": "TO_MODIFY",
+          "description": "status 전이",
+          "lineStart": 1,
+          "lineEnd": 22
+        },
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "status 컬럼",
+          "lineStart": 54,
+          "lineEnd": 115
+        },
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "TO_MODIFY",
+          "description": "STORE_ADMIN 시드",
+          "lineStart": 33,
+          "lineEnd": 44
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ManagerMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "CONFIRMED 필터",
+          "lineStart": 19,
+          "lineEnd": 44
+        }
+      ],
+      "implementationGuide": "(1) domain/enums/ApprovalStatus.java: SUBMITTED, APPROVED_L1, CONFIRMED, REJECTED. (2) domain/ManagerDayoff.java: 필드 추가 Long id, String managerId, ApprovalStatus status(@Getter @NoArgsConstructor @Builder 유지, @AllArgsConstructor 제거). 전이: approveL1()(SUBMITTED→APPROVED_L1 else ISE), approveL2()(APPROVED_L1→CONFIRMED else ISE), reject()(CONFIRMED/REJECTED면 ISE, 그 외 →REJECTED), resubmit()(REJECTED→SUBMITTED else ISE). (3) domain/StoreHoliday.java: approved 제거, ApprovalStatus status 추가. approve()(SUBMITTED→CONFIRMED else ISE), reject()(REJECTED). (4) schema.sql: manager_dayoff에 status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED' 추가; store_holiday approved BOOLEAN→status VARCHAR(20) NOT NULL. (5) data.sql: manager_dayoff INSERT는 status 미지정(DEFAULT CONFIRMED 활용) 유지; users에 STORE_ADMIN 시드 추가 INSERT ('storeadmin1','storeadmin@test.com','매장관리자','STORE_ADMIN', 기존 BCrypt 해시). (6) ManagerMapper.xml 3쿼리 LEFT JOIN에 AND md.status = 'CONFIRMED' 추가.",
+      "verificationCriteria": "빌드 통과. ManagerMapperTest/CatalogApiTest 회귀 green(시드 dayoff 여전히 CONFIRMED로 노출). 도메인 전이 가드가 불가 전이 시 IllegalStateException.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우(require 8장). 결재 상태머신을 상태값 변경 방식(워크플로우 엔진 미사용)으로 구현. 매니저 휴무=2단계 승인(L1 최고매니저 STORE_ADMIN → L2 관리자 ADMIN → CONFIRMED), 매장 휴일=1단계 승인(매니저 신청 → 관리자 CONFIRMED). 반려(REJECTED)→재신청(SUBMITTED). 단계 건너뛰기·권한 외 차단(도메인 가드 + 역할 인가).\n\n[핵심 설계]\n- ApprovalStatus enum: SUBMITTED, APPROVED_L1, CONFIRMED, REJECTED. (APPROVED_L2는 L2 승인 시 곧장 CONFIRMED로 — ROADMAP 예시 approveL2()=확정과 정합, 별도 저장 상태 미사용).\n- 슬롯 비활성 = 확정 휴무가 카탈로그 Manager.dayoffs(status='CONFIRMED' 필터)에 반영 → 기존 isManagerOffAt 게이팅(FULL_DAY 전일/SHIFT_n 해당 교대만)으로 해당 매니저 슬롯선택(FE)·대행예약(서버 400) 차단. 워크플로우 dayoff가 곧 카탈로그 dayoff(동일 manager_dayoff 테이블). 희소 슬롯 행 미변형.\n- 회귀 안전: manager_dayoff에 status VARCHAR(20) DEFAULT 'CONFIRMED' 추가 → 기존 시드 4행 자동 CONFIRMED(ManagerMapperTest mgr1=3·mgr3=1 dayoffs 유지). 카탈로그 ManagerMapper 3쿼리의 LEFT JOIN에 AND md.status='CONFIRMED' 추가. store_holiday는 미시드라 approved BOOLEAN→status VARCHAR(20) 변경 자유. STORE_ADMIN 시드 유저(storeadmin@test.com, role STORE_ADMIN) 추가(2단계 E2E용, 기존 유저 무변경).\n- 인가: approve-l1만 STORE_ADMIN 세분 매처(HttpMethod.PATCH, /api/manager/dayoffs/*/approve-l1)를 일반 /api/manager/**(MANAGER,STORE_ADMIN) 앞에 배치. /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409(IllegalStateException→기존 GlobalExceptionHandler).\n\n[현재 코드 사실 — 검증 완료]\n- ManagerDayoff 도메인{date,type}(Manager.dayoffs 원소, FE 무변환). StoreHoliday{id,storeId,date,approved}. 둘 다 backend 내 builder/new 생성 지점 없음(MyBatis 필드 접근) → 필드 추가 안전.\n- StoreHolidayMapper{findByStore,insert} + XML 존재(approved 사용 — status로 갱신). ManagerDayoffMapper 없음(신규).\n- ManagerMapper.xml: managerWithDayoffs resultMap(date,type collection) + findAll/findByStore/findById 3쿼리 LEFT JOIN manager_dayoff. findById가 dayoffs 로드.\n- DayoffResponse{date,type}(카탈로그용, from(ManagerDayoff)) — 도메인 필드 추가해도 무영향.\n- ManagerReservationService.isManagerOffAt(manager.getDayoffs()로 FULL_DAY/SHIFT 판정) — 확정 휴무 차단에 재사용.\n- 시드: manager_dayoff 4행(mgr1 06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2). users 4명(user1/user2 USER, manager1 MANAGER, admin1 ADMIN, BCrypt('password') 해시 동일).\n- SchemaIntegrityTest=10테이블(컬럼 추가 무영향). SecurityConfig 경로 인가(manager/**→MANAGER·STORE_ADMIN, admin/**→ADMIN) 기존.\n- FE role-guard 미들웨어(meta.roles), auth 스토어 currentUser.role 존재. BO 페이지 패턴(manager/reserve.vue, admin/stores/[id]/*) 참조.\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P7-1 완료. ApprovalStatus enum(SUBMITTED/APPROVED_L1/CONFIRMED/REJECTED). ManagerDayoff에 id/managerId/status + 전이(approveL1/approveL2→CONFIRMED/reject/resubmit, 불가전이 ISE). StoreHoliday를 approved→status + approve/reject 전이로 교체. schema.sql: manager_dayoff status DEFAULT 'CONFIRMED'(기존 시드 자동 확정), store_holiday approved→status. data.sql: STORE_ADMIN 시드(storeadmin@test.com) 추가. ManagerMapper 3쿼리 LEFT JOIN에 AND md.status='CONFIRMED' 추가. ManagerMapperTest(mgr1=3·mgr2=empty·mgr3=1)·CatalogApiTest 회귀 green(전체 16클래스 통과).",
+      "completedAt": "2026-06-20T19:27:35.188Z"
+    },
+    {
+      "id": "1432eaab-706f-485f-b963-dab96f220fce",
+      "name": "P7-2 ManagerDayoffMapper(신규) + StoreHolidayMapper(status)",
+      "description": "결재 워크플로우용 매퍼. 휴무 매퍼 신규(전체 컬럼+상태 UPDATE), 휴일 매퍼 approved→status 갱신.",
+      "notes": "ManagerDayoff.type 프로퍼티 ↔ dayoff_type 컬럼 매핑 주의(AS type 별칭 또는 resultMap). status enum은 EnumTypeHandler(name).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "2e907375-81f5-4958-a584-166ec5dba9cd"
+        }
+      ],
+      "createdAt": "2026-06-20T19:20:38.759Z",
+      "updatedAt": "2026-06-20T19:27:47.563Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ManagerDayoffMapper.java",
+          "type": "CREATE",
+          "description": "휴무 워크플로우 매퍼",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ManagerDayoffMapper.xml",
+          "type": "CREATE",
+          "description": "휴무 매퍼 XML",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/StoreHolidayMapper.java",
+          "type": "TO_MODIFY",
+          "description": "status 기반",
+          "lineStart": 1,
+          "lineEnd": 14
+        },
+        {
+          "path": "backend/src/main/resources/mapper/StoreHolidayMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "status SQL",
+          "lineStart": 1,
+          "lineEnd": 16
+        }
+      ],
+      "implementationGuide": "(1) mapper/ManagerDayoffMapper.java(@Mapper): int insert(ManagerDayoff)[useGeneratedKeys id], ManagerDayoff findById(Long), int updateStatus(@Param id,@Param status), List<ManagerDayoff> findByStore(String storeId), List<ManagerDayoff> findAll(). XML: insert INTO manager_dayoff(manager_id,`date`,dayoff_type,status) VALUES(...,#{status}) useGeneratedKeys keyProperty=id; resultMap 또는 resultType으로 id/manager_id/date/dayoff_type/status 매핑(map-underscore-camel; status는 ApprovalStatus enum, dayoff_type→type 컬럼이므로 select에서 dayoff_type AS type 또는 resultMap 사용); findByStore=JOIN manager m ON m.id=md.manager_id WHERE m.store_id=#{storeId}; findById/findAll. (2) StoreHolidayMapper(+XML): findByStore/insert를 status 기반으로 변경, findById(Long)/updateStatus(id,status)/findAll 추가. insert INTO store_holiday(store_id,`date`,status).",
+      "verificationCriteria": "insert 후 findById로 id/status/type 정상 조회. updateStatus 영향행 1. findByStore가 매장 매니저 휴무 반환. 빌드 통과.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우(require 8장). 결재 상태머신을 상태값 변경 방식(워크플로우 엔진 미사용)으로 구현. 매니저 휴무=2단계 승인(L1 최고매니저 STORE_ADMIN → L2 관리자 ADMIN → CONFIRMED), 매장 휴일=1단계 승인(매니저 신청 → 관리자 CONFIRMED). 반려(REJECTED)→재신청(SUBMITTED). 단계 건너뛰기·권한 외 차단(도메인 가드 + 역할 인가).\n\n[핵심 설계]\n- ApprovalStatus enum: SUBMITTED, APPROVED_L1, CONFIRMED, REJECTED. (APPROVED_L2는 L2 승인 시 곧장 CONFIRMED로 — ROADMAP 예시 approveL2()=확정과 정합, 별도 저장 상태 미사용).\n- 슬롯 비활성 = 확정 휴무가 카탈로그 Manager.dayoffs(status='CONFIRMED' 필터)에 반영 → 기존 isManagerOffAt 게이팅(FULL_DAY 전일/SHIFT_n 해당 교대만)으로 해당 매니저 슬롯선택(FE)·대행예약(서버 400) 차단. 워크플로우 dayoff가 곧 카탈로그 dayoff(동일 manager_dayoff 테이블). 희소 슬롯 행 미변형.\n- 회귀 안전: manager_dayoff에 status VARCHAR(20) DEFAULT 'CONFIRMED' 추가 → 기존 시드 4행 자동 CONFIRMED(ManagerMapperTest mgr1=3·mgr3=1 dayoffs 유지). 카탈로그 ManagerMapper 3쿼리의 LEFT JOIN에 AND md.status='CONFIRMED' 추가. store_holiday는 미시드라 approved BOOLEAN→status VARCHAR(20) 변경 자유. STORE_ADMIN 시드 유저(storeadmin@test.com, role STORE_ADMIN) 추가(2단계 E2E용, 기존 유저 무변경).\n- 인가: approve-l1만 STORE_ADMIN 세분 매처(HttpMethod.PATCH, /api/manager/dayoffs/*/approve-l1)를 일반 /api/manager/**(MANAGER,STORE_ADMIN) 앞에 배치. /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409(IllegalStateException→기존 GlobalExceptionHandler).\n\n[현재 코드 사실 — 검증 완료]\n- ManagerDayoff 도메인{date,type}(Manager.dayoffs 원소, FE 무변환). StoreHoliday{id,storeId,date,approved}. 둘 다 backend 내 builder/new 생성 지점 없음(MyBatis 필드 접근) → 필드 추가 안전.\n- StoreHolidayMapper{findByStore,insert} + XML 존재(approved 사용 — status로 갱신). ManagerDayoffMapper 없음(신규).\n- ManagerMapper.xml: managerWithDayoffs resultMap(date,type collection) + findAll/findByStore/findById 3쿼리 LEFT JOIN manager_dayoff. findById가 dayoffs 로드.\n- DayoffResponse{date,type}(카탈로그용, from(ManagerDayoff)) — 도메인 필드 추가해도 무영향.\n- ManagerReservationService.isManagerOffAt(manager.getDayoffs()로 FULL_DAY/SHIFT 판정) — 확정 휴무 차단에 재사용.\n- 시드: manager_dayoff 4행(mgr1 06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2). users 4명(user1/user2 USER, manager1 MANAGER, admin1 ADMIN, BCrypt('password') 해시 동일).\n- SchemaIntegrityTest=10테이블(컬럼 추가 무영향). SecurityConfig 경로 인가(manager/**→MANAGER·STORE_ADMIN, admin/**→ADMIN) 기존.\n- FE role-guard 미들웨어(meta.roles), auth 스토어 currentUser.role 존재. BO 페이지 패턴(manager/reserve.vue, admin/stores/[id]/*) 참조.\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P7-2 완료. ManagerDayoffMapper(신규, @Mapper): insert(useGeneratedKeys id), findById, updateStatus, findByStore(JOIN manager로 매장 필터), findAll. XML은 dayoffRow resultMap으로 dayoff_type→type/status/manager_id 매핑. StoreHolidayMapper를 status 기반으로 교체: findByStore/findById/findAll/insert(useGeneratedKeys)/updateStatus. EnumTypeHandler(name) 매핑. ApprovalApiTest가 insert→id 캡처→updateStatus 경로를 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:27:47.557Z"
+    },
+    {
+      "id": "5a377982-0c1a-4a14-8e12-e75647ebcbfc",
+      "name": "P7-3 결재 DTO 4종",
+      "description": "결재 요청/응답 DTO. DayoffRequest, HolidayRequest, DayoffApprovalResponse(from ManagerDayoff), HolidayApprovalResponse(from StoreHoliday).",
+      "notes": "카탈로그용 DayoffResponse(date,type)와 이름 구분(DayoffApprovalResponse). status enum 직렬화는 name().",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "2e907375-81f5-4958-a584-166ec5dba9cd"
+        }
+      ],
+      "createdAt": "2026-06-20T19:20:38.759Z",
+      "updatedAt": "2026-06-20T19:27:57.315Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto/DayoffRequest.java",
+          "type": "CREATE",
+          "description": "휴무 신청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/HolidayRequest.java",
+          "type": "CREATE",
+          "description": "휴일 신청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/DayoffApprovalResponse.java",
+          "type": "CREATE",
+          "description": "휴무 결재 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/HolidayApprovalResponse.java",
+          "type": "CREATE",
+          "description": "휴일 결재 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "dto/DayoffRequest.java: record(@NotBlank managerId, @NotBlank date, @NotNull DayoffType type). dto/HolidayRequest.java: record(@NotBlank storeId, @NotBlank date). dto/DayoffApprovalResponse.java: record(Long id, String managerId, String date, DayoffType type, ApprovalStatus status) + from(ManagerDayoff). dto/HolidayApprovalResponse.java: record(Long id, String storeId, String date, ApprovalStatus status) + from(StoreHoliday). jakarta.validation.",
+      "verificationCriteria": "4 DTO 컴파일 통과. from() 무변환 매핑. 검증 애너테이션 적용.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우(require 8장). 결재 상태머신을 상태값 변경 방식(워크플로우 엔진 미사용)으로 구현. 매니저 휴무=2단계 승인(L1 최고매니저 STORE_ADMIN → L2 관리자 ADMIN → CONFIRMED), 매장 휴일=1단계 승인(매니저 신청 → 관리자 CONFIRMED). 반려(REJECTED)→재신청(SUBMITTED). 단계 건너뛰기·권한 외 차단(도메인 가드 + 역할 인가).\n\n[핵심 설계]\n- ApprovalStatus enum: SUBMITTED, APPROVED_L1, CONFIRMED, REJECTED. (APPROVED_L2는 L2 승인 시 곧장 CONFIRMED로 — ROADMAP 예시 approveL2()=확정과 정합, 별도 저장 상태 미사용).\n- 슬롯 비활성 = 확정 휴무가 카탈로그 Manager.dayoffs(status='CONFIRMED' 필터)에 반영 → 기존 isManagerOffAt 게이팅(FULL_DAY 전일/SHIFT_n 해당 교대만)으로 해당 매니저 슬롯선택(FE)·대행예약(서버 400) 차단. 워크플로우 dayoff가 곧 카탈로그 dayoff(동일 manager_dayoff 테이블). 희소 슬롯 행 미변형.\n- 회귀 안전: manager_dayoff에 status VARCHAR(20) DEFAULT 'CONFIRMED' 추가 → 기존 시드 4행 자동 CONFIRMED(ManagerMapperTest mgr1=3·mgr3=1 dayoffs 유지). 카탈로그 ManagerMapper 3쿼리의 LEFT JOIN에 AND md.status='CONFIRMED' 추가. store_holiday는 미시드라 approved BOOLEAN→status VARCHAR(20) 변경 자유. STORE_ADMIN 시드 유저(storeadmin@test.com, role STORE_ADMIN) 추가(2단계 E2E용, 기존 유저 무변경).\n- 인가: approve-l1만 STORE_ADMIN 세분 매처(HttpMethod.PATCH, /api/manager/dayoffs/*/approve-l1)를 일반 /api/manager/**(MANAGER,STORE_ADMIN) 앞에 배치. /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409(IllegalStateException→기존 GlobalExceptionHandler).\n\n[현재 코드 사실 — 검증 완료]\n- ManagerDayoff 도메인{date,type}(Manager.dayoffs 원소, FE 무변환). StoreHoliday{id,storeId,date,approved}. 둘 다 backend 내 builder/new 생성 지점 없음(MyBatis 필드 접근) → 필드 추가 안전.\n- StoreHolidayMapper{findByStore,insert} + XML 존재(approved 사용 — status로 갱신). ManagerDayoffMapper 없음(신규).\n- ManagerMapper.xml: managerWithDayoffs resultMap(date,type collection) + findAll/findByStore/findById 3쿼리 LEFT JOIN manager_dayoff. findById가 dayoffs 로드.\n- DayoffResponse{date,type}(카탈로그용, from(ManagerDayoff)) — 도메인 필드 추가해도 무영향.\n- ManagerReservationService.isManagerOffAt(manager.getDayoffs()로 FULL_DAY/SHIFT 판정) — 확정 휴무 차단에 재사용.\n- 시드: manager_dayoff 4행(mgr1 06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2). users 4명(user1/user2 USER, manager1 MANAGER, admin1 ADMIN, BCrypt('password') 해시 동일).\n- SchemaIntegrityTest=10테이블(컬럼 추가 무영향). SecurityConfig 경로 인가(manager/**→MANAGER·STORE_ADMIN, admin/**→ADMIN) 기존.\n- FE role-guard 미들웨어(meta.roles), auth 스토어 currentUser.role 존재. BO 페이지 패턴(manager/reserve.vue, admin/stores/[id]/*) 참조.\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P7-3 완료. DTO 4종 record: DayoffRequest(managerId/date/type @NotBlank/@NotNull), HolidayRequest(storeId/date), DayoffApprovalResponse(id/managerId/date/type/status + from(ManagerDayoff)), HolidayApprovalResponse(id/storeId/date/status + from(StoreHoliday)). 카탈로그용 DayoffResponse와 이름 분리. 컴파일·ApprovalApiTest green.",
+      "completedAt": "2026-06-20T19:27:57.312Z"
+    },
+    {
+      "id": "94a8b3f7-0370-4e9a-92ce-313869f432ed",
+      "name": "P7-4 ApprovalService(2단계 휴무 + 1단계 휴일)",
+      "description": "결재 전이 서비스. 휴무 submit/approveL1/approveL2/reject/resubmit + 목록, 휴일 submit/approve/reject + 목록. 미존재 404, 불가전이 도메인 가드(→409).",
+      "notes": "도메인 전이의 IllegalStateException은 기존 GlobalExceptionHandler가 409 INVALID_TRANSITION으로 매핑. @Transactional.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1432eaab-706f-485f-b963-dab96f220fce"
+        },
+        {
+          "taskId": "5a377982-0c1a-4a14-8e12-e75647ebcbfc"
+        }
+      ],
+      "createdAt": "2026-06-20T19:20:38.759Z",
+      "updatedAt": "2026-06-20T19:28:08.266Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/ApprovalService.java",
+          "type": "CREATE",
+          "description": "결재 서비스",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/exception/GlobalExceptionHandler.java",
+          "type": "REFERENCE",
+          "description": "IllegalStateException→409",
+          "lineStart": 31,
+          "lineEnd": 44
+        }
+      ],
+      "implementationGuide": "service/ApprovalService.java(@Service, 주입 ManagerDayoffMapper, StoreHolidayMapper). 휴무: submitDayoff(DayoffRequest)=ManagerDayoff.builder(managerId,date,type,status=SUBMITTED) insert→findById→DayoffApprovalResponse. approveDayoffL1(id)/approveDayoffL2(id)/rejectDayoff(id)/resubmitDayoff(id)=findById(null→ResponseStatusException 404)→도메인 전이(approveL1/approveL2/reject/resubmit)→updateStatus(id,status.name()). listDayoffsByStore(storeId)/listAllDayoffs()→매핑 리스트. 휴일: submitHoliday(HolidayRequest)=StoreHoliday.builder(storeId,date,status=SUBMITTED) insert. approveHoliday(id)/rejectHoliday(id)=findById(404)→approve()/reject()→updateStatus. listHolidays(). HttpStatus/ResponseStatusException import.",
+      "verificationCriteria": "휴무 2단계(SUBMITTED→APPROVED_L1→CONFIRMED)·휴일 1단계(SUBMITTED→CONFIRMED)·reject→resubmit 동작. 단계 건너뛰기 시 IllegalStateException. 미존재 404.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우(require 8장). 결재 상태머신을 상태값 변경 방식(워크플로우 엔진 미사용)으로 구현. 매니저 휴무=2단계 승인(L1 최고매니저 STORE_ADMIN → L2 관리자 ADMIN → CONFIRMED), 매장 휴일=1단계 승인(매니저 신청 → 관리자 CONFIRMED). 반려(REJECTED)→재신청(SUBMITTED). 단계 건너뛰기·권한 외 차단(도메인 가드 + 역할 인가).\n\n[핵심 설계]\n- ApprovalStatus enum: SUBMITTED, APPROVED_L1, CONFIRMED, REJECTED. (APPROVED_L2는 L2 승인 시 곧장 CONFIRMED로 — ROADMAP 예시 approveL2()=확정과 정합, 별도 저장 상태 미사용).\n- 슬롯 비활성 = 확정 휴무가 카탈로그 Manager.dayoffs(status='CONFIRMED' 필터)에 반영 → 기존 isManagerOffAt 게이팅(FULL_DAY 전일/SHIFT_n 해당 교대만)으로 해당 매니저 슬롯선택(FE)·대행예약(서버 400) 차단. 워크플로우 dayoff가 곧 카탈로그 dayoff(동일 manager_dayoff 테이블). 희소 슬롯 행 미변형.\n- 회귀 안전: manager_dayoff에 status VARCHAR(20) DEFAULT 'CONFIRMED' 추가 → 기존 시드 4행 자동 CONFIRMED(ManagerMapperTest mgr1=3·mgr3=1 dayoffs 유지). 카탈로그 ManagerMapper 3쿼리의 LEFT JOIN에 AND md.status='CONFIRMED' 추가. store_holiday는 미시드라 approved BOOLEAN→status VARCHAR(20) 변경 자유. STORE_ADMIN 시드 유저(storeadmin@test.com, role STORE_ADMIN) 추가(2단계 E2E용, 기존 유저 무변경).\n- 인가: approve-l1만 STORE_ADMIN 세분 매처(HttpMethod.PATCH, /api/manager/dayoffs/*/approve-l1)를 일반 /api/manager/**(MANAGER,STORE_ADMIN) 앞에 배치. /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409(IllegalStateException→기존 GlobalExceptionHandler).\n\n[현재 코드 사실 — 검증 완료]\n- ManagerDayoff 도메인{date,type}(Manager.dayoffs 원소, FE 무변환). StoreHoliday{id,storeId,date,approved}. 둘 다 backend 내 builder/new 생성 지점 없음(MyBatis 필드 접근) → 필드 추가 안전.\n- StoreHolidayMapper{findByStore,insert} + XML 존재(approved 사용 — status로 갱신). ManagerDayoffMapper 없음(신규).\n- ManagerMapper.xml: managerWithDayoffs resultMap(date,type collection) + findAll/findByStore/findById 3쿼리 LEFT JOIN manager_dayoff. findById가 dayoffs 로드.\n- DayoffResponse{date,type}(카탈로그용, from(ManagerDayoff)) — 도메인 필드 추가해도 무영향.\n- ManagerReservationService.isManagerOffAt(manager.getDayoffs()로 FULL_DAY/SHIFT 판정) — 확정 휴무 차단에 재사용.\n- 시드: manager_dayoff 4행(mgr1 06-22 FULL_DAY/06-23 SHIFT_1/06-29 FULL_DAY, mgr3 06-23 SHIFT_2). users 4명(user1/user2 USER, manager1 MANAGER, admin1 ADMIN, BCrypt('password') 해시 동일).\n- SchemaIntegrityTest=10테이블(컬럼 추가 무영향). SecurityConfig 경로 인가(manager/**→MANAGER·STORE_ADMIN, admin/**→ADMIN) 기존.\n- FE role-guard 미들웨어(meta.roles), auth 스토어 currentUser.role 존재. BO 페이지 패턴(manager/reserve.vue, admin/stores/[id]/*) 참조.\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리, FE↔BE 무변환, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P7-4 완료. ApprovalService(@Service): 휴무 submitDayoff(builder SUBMITTED+insert useGeneratedKeys)·approveDayoffL1/L2/rejectDayoff/resubmitDayoff(loadDayoff 404→도메인 전이→updateStatus)·listDayoffsByStore/listAllDayoffs. 휴일 submitHoliday·approveHoliday/rejectHoliday·listHolidays. 불가전이는 도메인 ISE→GlobalExceptionHandler 409 INVALID_TRANSITION, 미존재 ResponseStatusException 404. @Transactional. ApprovalApiTest 7건이 2단계/1단계/반려재신청/단계가드409/404 경로 실증.",
+      "completedAt": "2026-06-20T19:28:08.262Z"
+    },
+    {
+      "id": "e80541f3-8c58-401f-9191-4418e1d783dc",
+      "name": "P7-5 결재 컨트롤러 3종 + 세분 인가",
+      "description": "휴무/휴일 결재 엔드포인트와 SecurityConfig 세분 역할 인가(approve-l1=STORE_ADMIN).",
+      "notes": "approve-l1 세분 매처 순서 중요(구체 먼저). PATH 변수 Long id. PATCH는 CORS allowedMethods 이미 포함. 미인증 401·권한 외 403.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "94a8b3f7-0370-4e9a-92ce-313869f432ed"
+        }
+      ],
+      "createdAt": "2026-06-20T19:21:36.710Z",
+      "updatedAt": "2026-06-20T19:28:19.309Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/DayoffController.java",
+          "type": "CREATE",
+          "description": "휴무 신청/L1/재신청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/StoreHolidayController.java",
+          "type": "CREATE",
+          "description": "휴일 신청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminApprovalController.java",
+          "type": "CREATE",
+          "description": "관리자 L2/승인/반려/목록",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "TO_MODIFY",
+          "description": "approve-l1 STORE_ADMIN 세분 매처",
+          "lineStart": 41,
+          "lineEnd": 52
+        }
+      ],
+      "implementationGuide": "(1) controller/DayoffController.java(@RequestMapping(\"/api/manager/dayoffs\")): POST submit(@Valid DayoffRequest)→DayoffApprovalResponse; GET list(@RequestParam storeId)→listDayoffsByStore; PATCH /{id}/approve-l1→approveDayoffL1(204); PATCH /{id}/resubmit→resubmitDayoff(204). (2) controller/StoreHolidayController.java(@RequestMapping(\"/api/manager/holidays\")): POST submit(@Valid HolidayRequest)→HolidayApprovalResponse. (3) controller/AdminApprovalController.java(@RequestMapping(\"/api/admin\")): GET /dayoffs→listAllDayoffs; PATCH /dayoffs/{id}/approve-l2(204); PATCH /dayoffs/{id}/reject(204); GET /holidays→listHolidays; PATCH /holidays/{id}/approve(204); PATCH /holidays/{id}/reject(204). (4) SecurityConfig: import org.springframework.http.HttpMethod; authorizeHttpRequests에서 일반 /api/manager/** 매처 '이전'에 .requestMatchers(HttpMethod.PATCH, \"/api/manager/dayoffs/*/approve-l1\").hasRole(\"STORE_ADMIN\") 추가. /api/admin/**=ADMIN, /api/manager/**=hasAnyRole(MANAGER,STORE_ADMIN) 기존 유지.",
+      "verificationCriteria": "휴무 submit/L1/L2/reject/resubmit·휴일 submit/approve/reject 엔드포인트 동작. approve-l1은 STORE_ADMIN만(MANAGER 403). admin/**는 ADMIN만. 빌드 통과.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우. 2차 배치(P7-5~P7-8): 컨트롤러+세분 인가, BE 결재 상태머신 통합테스트(하드 DoD 게이트), FE 결재 화면, 게이트+ROADMAP. 앞선 P7-1~P7-4(enum/도메인/스키마/매퍼/DTO/서비스)에 의존. 인가: approve-l1만 STORE_ADMIN 세분 매처를 일반 /api/manager/** 앞에 배치, /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409. 시드 STORE_ADMIN 유저(storeadmin@test.com) 추가됨. 슬롯 비활성 = 확정 휴무가 카탈로그(CONFIRMED 필터)→isManagerOffAt 게이팅. FE: role-guard 재사용, manager/dayoffs.vue·admin/approvals.vue 신규(AppNav 무수정). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용. Phase 7 DoD 게이트=BE 결재 상태머신 통합테스트(+1차 E2E 회귀·type-check). M7/S3(가입 승인)은 동일 패턴 재사용 명시 후 이연.",
+      "summary": "P7-5 완료. DayoffController(/api/manager/dayoffs: POST submit·GET list·PATCH /{id}/approve-l1·/resubmit), StoreHolidayController(/api/manager/holidays POST submit), AdminApprovalController(/api/admin: GET /dayoffs·PATCH /dayoffs/{id}/approve-l2·/reject·GET /holidays·PATCH /holidays/{id}/approve·/reject). SecurityConfig에 HttpMethod import + .requestMatchers(PATCH, \"/api/manager/dayoffs/*/approve-l1\").hasRole(\"STORE_ADMIN\")를 일반 manager/** 매처 앞에 배치. ApprovalApiTest: MANAGER approve-l1 403·STORE_ADMIN 204·ADMIN L2/reject 동작·USER 403 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:28:19.308Z"
+    },
+    {
+      "id": "b9e7f028-49bb-464d-9773-fa6e21a6363f",
+      "name": "P7-6 결재 상태머신 통합테스트(하드 DoD)",
+      "description": "Phase 7 핵심 게이트. 2단계 휴무·1단계 휴일·반려/재신청·단계 건너뛰기 409·역할 403·확정 휴무가 대행 차단(슬롯 비활성)을 MockMvc로 검증.",
+      "notes": "확정 휴무가 managerMapper.findById(CONFIRMED 필터)→isManagerOffAt로 대행 차단됨을 실증(슬롯 비활성 의미). 응답 id는 ObjectMapper로 캡처. ApprovalApiTest는 web 컨텍스트(BoApiTest와 동일 캐시 공유 가능 — 고유 날짜로 격리).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e80541f3-8c58-401f-9191-4418e1d783dc"
+        }
+      ],
+      "createdAt": "2026-06-20T19:21:36.710Z",
+      "updatedAt": "2026-06-20T19:28:31.598Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/approval/ApprovalApiTest.java",
+          "type": "CREATE",
+          "description": "결재 상태머신 통합테스트",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "test/.../approval/ApprovalApiTest.java(@SpringBootTest @AutoConfigureMockMvc, JwtTokenProvider 역할별 토큰: MANAGER manager1, STORE_ADMIN storeadmin1, ADMIN admin1, USER user1). 시나리오: (1) 휴무 2단계 — manager POST /api/manager/dayoffs(mgr2 unique date FULL_DAY)→SUBMITTED + id 캡처; MANAGER approve-l1→403; STORE_ADMIN approve-l1→204; ADMIN approve-l2→204(이후 GET /api/admin/dayoffs에서 해당 id status=CONFIRMED). (2) 단계 건너뛰기 — 새 submit→ADMIN approve-l2 직접→409. (3) 반려/재신청 — submit→STORE_ADMIN... ADMIN reject→204(REJECTED)→manager resubmit→204(SUBMITTED). (4) 휴일 1단계 — manager POST /api/manager/holidays→ADMIN approve→204. (5) 역할 — USER가 manager/dayoffs POST→403. (6) 슬롯 비활성 — mgr2 FULL_DAY 2026-12-01 submit→L1→L2 CONFIRMED 후, manager 대행 POST /api/manager/reservations(mgr2,store1,2026-12-01,09:00)→400(휴무); SHIFT_1 2026-12-02 confirm 후 09:00 대행→400, 15:00 대행→200. 슬롯 충돌 회피 고유 날짜.",
+      "verificationCriteria": "2단계 휴무 CONFIRMED·단계건너뛰기 409·반려/재신청·휴일 승인·역할 403·확정 휴무 대행차단(FULL_DAY 전일/SHIFT 해당시간) 전 시나리오 통과. ./gradlew test 전건 green.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우. 2차 배치(P7-5~P7-8): 컨트롤러+세분 인가, BE 결재 상태머신 통합테스트(하드 DoD 게이트), FE 결재 화면, 게이트+ROADMAP. 앞선 P7-1~P7-4(enum/도메인/스키마/매퍼/DTO/서비스)에 의존. 인가: approve-l1만 STORE_ADMIN 세분 매처를 일반 /api/manager/** 앞에 배치, /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409. 시드 STORE_ADMIN 유저(storeadmin@test.com) 추가됨. 슬롯 비활성 = 확정 휴무가 카탈로그(CONFIRMED 필터)→isManagerOffAt 게이팅. FE: role-guard 재사용, manager/dayoffs.vue·admin/approvals.vue 신규(AppNav 무수정). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용. Phase 7 DoD 게이트=BE 결재 상태머신 통합테스트(+1차 E2E 회귀·type-check). M7/S3(가입 승인)은 동일 패턴 재사용 명시 후 이연.",
+      "summary": "P7-6 완료. ApprovalApiTest 7건(@SpringBootTest+MockMvc, ObjectMapper id 캡처): 휴무 2단계(MANAGER L1 403→STORE_ADMIN L1 204→ADMIN L2 204), 단계건너뛰기 409 INVALID_TRANSITION, 반려→재신청, 휴일 1단계 승인, USER 403, 확정 FULL_DAY 휴무→대행 그날 차단 400, 확정 SHIFT_1→오전 09:00 대행 400·오후 15:00 대행 200. 공유 H2 오염 회피 위해 워크플로우 매니저를 mgr4(store3, 어느 테스트도 dayoff 단정 안 함)로 격리(ManagerMapperTest mgr2 empty 회귀 해결). ./gradlew test 전건 green(16클래스, 결재 7건 failures=0).",
+      "completedAt": "2026-06-20T19:28:31.595Z"
+    },
+    {
+      "id": "fb787e6c-5609-4a6d-9121-8e2dce7ef5a5",
+      "name": "P7-7 FE 결재 화면 2종(role-guard 재사용)",
+      "description": "매니저 휴무/휴일 신청·L1 승인 화면과 관리자 결재함(L2/승인/반려) 신규. 기존 role-guard·AppNav 무변경.",
+      "notes": "목록 행 id는 서버 BIGINT — 새로고침 함수로 PATCH 후 재조회. 카탈로그(getApprovedStores/getManagersByStore) 재사용. type-check 통과 필요.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e80541f3-8c58-401f-9191-4418e1d783dc"
+        }
+      ],
+      "createdAt": "2026-06-20T19:21:36.710Z",
+      "updatedAt": "2026-06-20T19:30:02.936Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/manager/dayoffs.vue",
+          "type": "CREATE",
+          "description": "매니저 휴무/휴일 신청·L1",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/admin/approvals.vue",
+          "type": "CREATE",
+          "description": "관리자 결재함",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/manager/reserve.vue",
+          "type": "REFERENCE",
+          "description": "BO 페이지 패턴 참조",
+          "lineStart": 1,
+          "lineEnd": 60
+        }
+      ],
+      "implementationGuide": "app/pages/manager/dayoffs.vue: definePageMeta({middleware:['auth','role-guard'], roles:['MANAGER','STORE_ADMIN']}). 휴무 신청 폼(매장 select→매니저 select, 날짜 text, 휴무유형 select FULL_DAY/SHIFT_1~3) → POST /api/manager/dayoffs. 휴일 신청 폼(매장 select, 날짜) → POST /api/manager/holidays. 신청 목록: GET /api/manager/dayoffs?storeId= → status 표시, STORE_ADMIN이면 SUBMITTED 행에 approve-l1 버튼(PATCH). testid: dayoff-submit/dayoff-type/dayoff-date/dayoff-row-{id}/dayoff-status-{id}/dayoff-approve-l1-{id}, holiday-submit 등. app/pages/admin/approvals.vue: roles:['ADMIN']. GET /api/admin/dayoffs + /api/admin/holidays → 목록, 각 행 approve-l2/reject(dayoff)·approve/reject(holiday) 버튼(PATCH 후 목록 새로고침). testid: approval-dayoff-row-{id}/approve-l2-{id}/reject-dayoff-{id}, approval-holiday-row-{id} 등. $apiFetch=useNuxtApp().$apiFetch, base=useRuntimeConfig().public.apiBase. 기존 bo-input/.card/.btn 스타일 재사용. 갱신은 목록 재조회 함수.",
+      "verificationCriteria": "npm run type-check 통과. 매니저 신청→목록 표시, STORE_ADMIN L1 승인, 관리자 결재함 L2/반려 동작. 기존 페이지/AppNav diff 없음.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우. 2차 배치(P7-5~P7-8): 컨트롤러+세분 인가, BE 결재 상태머신 통합테스트(하드 DoD 게이트), FE 결재 화면, 게이트+ROADMAP. 앞선 P7-1~P7-4(enum/도메인/스키마/매퍼/DTO/서비스)에 의존. 인가: approve-l1만 STORE_ADMIN 세분 매처를 일반 /api/manager/** 앞에 배치, /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409. 시드 STORE_ADMIN 유저(storeadmin@test.com) 추가됨. 슬롯 비활성 = 확정 휴무가 카탈로그(CONFIRMED 필터)→isManagerOffAt 게이팅. FE: role-guard 재사용, manager/dayoffs.vue·admin/approvals.vue 신규(AppNav 무수정). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용. Phase 7 DoD 게이트=BE 결재 상태머신 통합테스트(+1차 E2E 회귀·type-check). M7/S3(가입 승인)은 동일 패턴 재사용 명시 후 이연.",
+      "summary": "P7-7 완료. manager/dayoffs.vue(roles MANAGER/STORE_ADMIN): 매장→매니저 select·휴무유형·날짜로 휴무 상신, 매장 휴일 상신, GET 목록(status 표시), STORE_ADMIN이면 SUBMITTED 행 approve-l1·REJECTED 행 resubmit 버튼, PATCH 후 재조회. admin/approvals.vue(roles ADMIN): GET /admin/dayoffs·/holidays, APPROVED_L1 행 approve-l2(확정)·SUBMITTED/APPROVED_L1 reject, 휴일 SUBMITTED approve/reject, PATCH 후 load() 갱신. role-guard 재사용, bo-input/.card/.btn 스타일 재사용. npm run type-check 0 에러. 기존 페이지/AppNav 무변경.",
+      "completedAt": "2026-06-20T19:30:02.930Z"
+    },
+    {
+      "id": "aa16546c-9c84-4bc1-a238-b5b4442b5213",
+      "name": "P7-8 Phase 7 게이트 + 결재 E2E + ROADMAP",
+      "description": "Phase 7 DoD 종합 게이트. BE 빌드(결재 상태머신 테스트)·type-check·1차 E2E 회귀·결재 E2E(2단계 승인) 통과. ROADMAP_2 Phase 7 체크리스트/DoD 갱신.",
+      "notes": "DoD 하드 게이트=BE 결재 상태머신 통합테스트. E2E는 2단계 승인 데모(가능 시). 슬롯 비활성은 P7-6 BE 테스트로 실증.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b9e7f028-49bb-464d-9773-fa6e21a6363f"
+        },
+        {
+          "taskId": "fb787e6c-5609-4a6d-9121-8e2dce7ef5a5"
+        }
+      ],
+      "createdAt": "2026-06-20T19:21:36.710Z",
+      "updatedAt": "2026-06-20T19:33:34.006Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/approval.spec.ts",
+          "type": "CREATE",
+          "description": "결재 E2E",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 7 체크리스트/DoD 갱신",
+          "lineStart": 1052,
+          "lineEnd": 1145
+        }
+      ],
+      "implementationGuide": "(1) JAVA_HOME export 후 cd backend && ./gradlew build(결재 테스트 포함). (2) npm run type-check. (3) e2e/approval.spec.ts: manager(manager@test.com) /manager/dayoffs에서 휴무 신청(mgr2, 고유 날짜 2026-11-1x, FULL_DAY)→SUBMITTED 표시; storeadmin(storeadmin@test.com) approve-l1→APPROVED_L1; admin(admin@test.com) /admin/approvals approve-l2→CONFIRMED 확인; USER role-guard 리다이렉트. clearCookies 후 역할 전환, 고유 날짜로 슬롯 무관. npm run test:e2e 전건(1차 25 + BO 4 + 결재) 통과. 하이드레이션 레이스 주의(첫 입력은 select/마지막 텍스트). (4) docs/roadmaps/ROADMAP_2.md Phase 7 체크리스트/DoD [x] 갱신 + 구현 메모(상태머신 4상태·APPROVED_L2 collapse, 슬롯 비활성=확정휴무 카탈로그 반영→isManagerOffAt 게이팅, approve-l1 STORE_ADMIN 세분 인가, M7/S3 이연). 게이트 통과 후 커밋·푸시는 사용자 확인.",
+      "verificationCriteria": "./gradlew build BUILD SUCCESSFUL(결재 테스트 포함). type-check 0. test:e2e 전건 통과(2단계 승인 데모 포함). ROADMAP_2 Phase 7 DoD 체크 반영.",
+      "analysisResult": "2차 Phase 7 — 휴일/휴무 결재 워크플로우. 2차 배치(P7-5~P7-8): 컨트롤러+세분 인가, BE 결재 상태머신 통합테스트(하드 DoD 게이트), FE 결재 화면, 게이트+ROADMAP. 앞선 P7-1~P7-4(enum/도메인/스키마/매퍼/DTO/서비스)에 의존. 인가: approve-l1만 STORE_ADMIN 세분 매처를 일반 /api/manager/** 앞에 배치, /api/admin/**=ADMIN. 권한 외 403·미인증 401·불가전이 409. 시드 STORE_ADMIN 유저(storeadmin@test.com) 추가됨. 슬롯 비활성 = 확정 휴무가 카탈로그(CONFIRMED 필터)→isManagerOffAt 게이팅. FE: role-guard 재사용, manager/dayoffs.vue·admin/approvals.vue 신규(AppNav 무수정). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용. Phase 7 DoD 게이트=BE 결재 상태머신 통합테스트(+1차 E2E 회귀·type-check). M7/S3(가입 승인)은 동일 패턴 재사용 명시 후 이연.",
+      "summary": "P7-8 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — ApprovalApiTest 7건 포함 전건 0실패(16클래스). (2) npm run type-check 0 에러. (3) e2e/approval.spec.ts 2건(매니저 상신→storeadmin 1차→admin 2차 확정 풀 플로우, USER role-guard 리다이렉트). 하이드레이션 레이스는 워밍업 클릭+매니저 옵션 게이트로 방어, 행 식별은 고유 날짜 filter+DESC 정렬 first로 해결. npm run test:e2e 전건 31건(1차 25 + BO 4 + 결재 2) 통과. (4) ROADMAP_2 Phase 7 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(상태머신 4상태·APPROVED_L2 collapse, 슬롯 비활성=확정휴무 카탈로그 반영→isManagerOffAt, approve-l1 STORE_ADMIN 세분 인가, M7/S3 이연) 기록.",
+      "completedAt": "2026-06-20T19:33:34.002Z"
     }
   ]
 }

@@ -51,12 +51,14 @@ CREATE TABLE IF NOT EXISTS manager (
     is_store_admin  BOOLEAN      NOT NULL   -- 매장 최고권한 매니저 여부
 );
 
--- 매니저 휴무 = (매니저, 날짜, 휴무 유형) (require 5.4·5.5)
+-- 매니저 휴무 = (매니저, 날짜, 휴무 유형) (require 5.4·5.5) + 결재 상태(Phase 7)
+--   status DEFAULT 'CONFIRMED' — 기존 시드 휴무는 확정으로 간주(카탈로그 노출 유지). 신규 신청은 'SUBMITTED'로 INSERT.
 CREATE TABLE IF NOT EXISTS manager_dayoff (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,   -- 내부 surrogate
     manager_id   VARCHAR(64) NOT NULL,
     `date`       VARCHAR(10) NOT NULL,                -- 'YYYY-MM-DD'
-    dayoff_type  VARCHAR(20) NOT NULL                 -- DayoffType enum: FULL_DAY/SHIFT_1~3
+    dayoff_type  VARCHAR(20) NOT NULL,                -- DayoffType enum: FULL_DAY/SHIFT_1~3
+    status       VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'   -- ApprovalStatus enum (Phase 7 결재)
 );
 
 -- 슬롯 = (매장, 베이, 날짜, 30분 시간단위), 시스템 전체 UNIQUE (require 5.2·7.3 최종 방어선)
@@ -106,10 +108,10 @@ CREATE TABLE IF NOT EXISTS review (
     created_at      VARCHAR(40)  NOT NULL       -- ISO 문자열
 );
 
--- 매장 휴일 — 매니저 신청 → 관리자 승인 (require 5.4, Phase 7 결재 연계)
+-- 매장 휴일 — 매니저 신청 → 관리자 1단계 승인 (require 5.4·8.1, Phase 7 결재)
 CREATE TABLE IF NOT EXISTS store_holiday (
     id        BIGINT AUTO_INCREMENT PRIMARY KEY,   -- 내부 surrogate
     store_id  VARCHAR(64) NOT NULL,
     `date`    VARCHAR(10) NOT NULL,
-    approved  BOOLEAN     NOT NULL
+    status    VARCHAR(20) NOT NULL                 -- ApprovalStatus enum (SUBMITTED→CONFIRMED/REJECTED)
 );

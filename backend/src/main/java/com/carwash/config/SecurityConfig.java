@@ -5,6 +5,7 @@ import com.carwash.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -46,8 +47,11 @@ public class SecurityConfig {
                                 "/api/slots")
                         .permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
-                        // BO 역할 인가 (require 3.2) — 구체적 경로 매처를 anyRequest 이전에 둔다.
+                        // BO 역할 인가 (require 3.2·8.3) — 구체적 경로 매처를 anyRequest 이전에 둔다.
                         //   권한 외 역할 → 403(기본 AccessDeniedHandler), 미인증 → 401(위 entryPoint)
+                        // 휴무 1차 승인은 최고매니저(STORE_ADMIN) 한정 — 일반 manager/** 매처보다 먼저 평가
+                        .requestMatchers(HttpMethod.PATCH, "/api/manager/dayoffs/*/approve-l1")
+                        .hasRole("STORE_ADMIN")
                         .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "STORE_ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

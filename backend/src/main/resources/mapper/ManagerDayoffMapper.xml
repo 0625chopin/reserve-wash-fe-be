@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carwash.mapper.ManagerDayoffMapper">
+
+    <!-- dayoff_type → 프로퍼티 type 매핑(별칭 대신 resultMap). status는 ApprovalStatus enum(name) -->
+    <resultMap id="dayoffRow" type="com.carwash.domain.ManagerDayoff">
+        <id property="id" column="id"/>
+        <result property="managerId" column="manager_id"/>
+        <result property="date" column="date"/>
+        <result property="type" column="dayoff_type"/>
+        <result property="status" column="status"/>
+    </resultMap>
+
+    <!-- 신청 — id는 AUTO_INCREMENT(useGeneratedKeys). enum은 기본 EnumTypeHandler(name) -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO manager_dayoff (manager_id, `date`, dayoff_type, status)
+        VALUES (#{managerId}, #{date}, #{type}, #{status})
+    </insert>
+
+    <select id="findById" resultMap="dayoffRow">
+        SELECT id, manager_id, `date`, dayoff_type, status
+        FROM manager_dayoff WHERE id = #{id}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE manager_dayoff SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <!-- 매장 소속 매니저들의 휴무 신청(L1 검토) -->
+    <select id="findByStore" resultMap="dayoffRow">
+        SELECT md.id, md.manager_id, md.`date`, md.dayoff_type, md.status
+        FROM manager_dayoff md
+        JOIN manager m ON m.id = md.manager_id
+        WHERE m.store_id = #{storeId}
+        ORDER BY md.id DESC
+    </select>
+
+    <select id="findAll" resultMap="dayoffRow">
+        SELECT id, manager_id, `date`, dayoff_type, status
+        FROM manager_dayoff ORDER BY id DESC
+    </select>
+</mapper>
