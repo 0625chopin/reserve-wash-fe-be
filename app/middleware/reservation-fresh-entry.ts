@@ -1,8 +1,6 @@
-// 위저드 신규 진입 시 진행상태 초기화 (require 6.5.3)
-// in-memory draft가 싱글톤이라 재진입 시 이전 선택이 남는 문제를 방지한다.
-// 단, '/reserve/slot'에서 '이전'으로 돌아온 경우(from=/reserve/slot)는 선택을 유지한다.
-export default defineNuxtRouteMiddleware((to, from) => {
-  if (from.path !== '/reserve/slot') {
-    useReservationDraftStore().reset()
-  }
+// 위저드 1페이지(/reserve) 진입 시 진행상태 초기화 (require 6.5.3)
+// in-memory draft 싱글톤이 이전 선택을 남기지 않도록, /reserve에 들어올 때마다 항상 초기화한다.
+// '이전' 버튼(/reserve/slot → /reserve)으로 돌아온 경우도 동일하게 매장 선택부터 새로 시작한다.
+export default defineNuxtRouteMiddleware(() => {
+  useReservationDraftStore().reset()
 })
