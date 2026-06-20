@@ -29,13 +29,17 @@ function onNewReservation() {
         <dt class="text-[--color-content-muted]">매장</dt>
         <dd class="font-medium text-[--color-content-strong]">{{ draft.lastReservation.store }}</dd>
         <dt class="text-[--color-content-muted]">매니저</dt>
-        <dd class="font-medium text-[--color-content-strong]">{{ draft.lastReservation.manager }}</dd>
+        <dd class="font-medium text-[--color-content-strong]">
+          {{ draft.lastReservation.manager }}
+        </dd>
         <dt class="text-[--color-content-muted]">차종 · 베이</dt>
         <dd class="font-medium text-[--color-content-strong]">
           {{ draft.lastReservation.carType }} · {{ draft.lastReservation.bay }}
         </dd>
         <dt class="text-[--color-content-muted]">서비스</dt>
-        <dd class="font-medium text-[--color-content-strong]">{{ draft.lastReservation.service }}</dd>
+        <dd class="font-medium text-[--color-content-strong]">
+          {{ draft.lastReservation.service }}
+        </dd>
         <dt class="text-[--color-content-muted]">일시</dt>
         <dd class="font-medium text-[--color-content-strong]">
           {{ draft.lastReservation.date }} {{ draft.lastReservation.time }}

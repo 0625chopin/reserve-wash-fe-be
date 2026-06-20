@@ -76,7 +76,10 @@ function onReserve() {
       <!-- 날짜·시간 휠 -->
       <div>
         <span class="field-label">날짜 · 시간 선택</span>
-        <p v-if="draft.selectedManager?.dayoffs.length" class="mb-2 text-xs text-[--color-content-muted]">
+        <p
+          v-if="draft.selectedManager?.dayoffs.length"
+          class="mb-2 text-xs text-[--color-content-muted]"
+        >
           취소선 표시된 휴무(전일·교대조) 시간대는 선택할 수 없어요.
         </p>
         <!-- 휠 선택기는 클라이언트 전용(스크롤·날짜 계산) -->
@@ -113,7 +116,8 @@ function onReserve() {
             data-testid="bay-occupied-notice"
             class="mt-2 text-xs font-medium text-[--color-brand-accent]"
           >
-            선택하신 베이는 이 시간대에 이미 예약되어 있어요. 위 그리드에서 다른 베이를 선택해 주세요.
+            선택하신 베이는 이 시간대에 이미 예약되어 있어요. 위 그리드에서 다른 베이를 선택해
+            주세요.
           </p>
         </div>
       </ClientOnly>

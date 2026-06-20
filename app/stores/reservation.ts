@@ -18,7 +18,10 @@ export const useReservationStore = defineStore('reservation', () => {
   // release로 'AVAILABLE'을 명시 기록하면 시드(RESERVED)를 오버라이드한다.
   function getStatus(slot: Slot): SlotStatus {
     const key = slotKey(slot.storeId, slot.bayId, slot.date, slot.timeSlot)
-    return slotStatus.value[key] ?? getSeededSlotStatus(slot.storeId, slot.bayId, slot.date, slot.timeSlot)
+    return (
+      slotStatus.value[key] ??
+      getSeededSlotStatus(slot.storeId, slot.bayId, slot.date, slot.timeSlot)
+    )
   }
 
   // 슬롯 선택 → 즉시 HOLDING (낙관적 갱신, require 7.1 1단계)

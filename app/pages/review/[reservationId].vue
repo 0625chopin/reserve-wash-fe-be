@@ -47,14 +47,13 @@ function onSubmit() {
   })
 }
 
-// 매장/매니저 평균 평점 (require 9.1) — 작성 후 표시
+// 통합(전체) 평균 평점 (require 9.1) — 매장/매니저 구분 없는 서비스 전체 평균
 function fmtAvg(v: number | undefined) {
   return v === undefined ? '-' : v.toFixed(1)
 }
-const storeAvg = computed(() => (target.value ? review.averageByStore[target.value.storeId] : undefined))
-const managerAvg = computed(() =>
-  target.value && target.value.managerId ? review.averageByManager[target.value.managerId] : undefined,
-)
+const overallAvg = computed(() => review.averageOverall)
+// 내가 작성한 후기(평점·문구) — 작성 완료 화면에 표시
+const myReview = computed(() => review.reviewOf(reservationId))
 </script>
 
 <template>
@@ -63,8 +62,8 @@ const managerAvg = computed(() =>
       <span class="badge-accent mb-3">후기</span>
       <h1 class="text-3xl font-bold">후기 작성</h1>
       <p v-if="target" class="mt-2 text-sm text-[--color-content-muted]">
-        {{ storeName(target.storeId) }} · {{ managerName(target.managerId) }} ·
-        {{ target.date }} {{ target.timeSlot }}
+        {{ storeName(target.storeId) }} · {{ managerName(target.managerId) }} · {{ target.date }}
+        {{ target.timeSlot }}
       </p>
     </header>
 
@@ -75,15 +74,27 @@ const managerAvg = computed(() =>
         <span class="text-lg font-semibold text-[--color-content-strong]">후기가 등록되었어요</span>
       </div>
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt class="text-[--color-content-muted]">매장 평균 평점</dt>
-        <dd data-testid="avg-store" class="font-medium text-[--color-content-strong]">
-          ★ {{ fmtAvg(storeAvg) }}
+        <dt class="text-[--color-content-muted]">내 평점</dt>
+        <dd data-testid="my-rating" class="font-medium text-[--color-content-strong]">
+          ★ {{ myReview?.rating ?? '-' }} / 5
         </dd>
-        <dt class="text-[--color-content-muted]">매니저 평균 평점</dt>
-        <dd data-testid="avg-manager" class="font-medium text-[--color-content-strong]">
-          ★ {{ fmtAvg(managerAvg) }}
+        <dt class="text-[--color-content-muted]">통합 평균 평점</dt>
+        <dd data-testid="avg-overall" class="font-medium text-[--color-content-strong]">
+          ★ {{ fmtAvg(overallAvg) }}
         </dd>
       </dl>
+
+      <!-- 내가 작성한 후기 문구 -->
+      <div v-if="myReview?.text" class="mt-4">
+        <span class="field-label">내 후기</span>
+        <p
+          data-testid="my-review-text"
+          class="rounded-xl border border-[--color-line-soft] bg-[--color-surface-1] px-4 py-3 text-sm text-[--color-content]"
+        >
+          {{ myReview.text }}
+        </p>
+      </div>
+
       <div class="mt-6 border-t border-[--color-line-soft] pt-5">
         <NuxtLink to="/reservations" class="btn btn-primary w-full">예약 목록으로</NuxtLink>
       </div>

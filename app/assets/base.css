@@ -2,75 +2,81 @@
   베이스 리셋 + 다크 테마 전역 — create-vue 기본(초록/라이트)을 프리미엄 다크로 교체.
   body 배경은 네이비(#0B1120), 본문 텍스트는 slate-200.
   색상 토큰은 main.css의 @theme에서 정의하므로 여기선 리터럴 값을 직접 사용한다.
+
+  ※ 전체를 @layer base로 선언한다. unlayered면 전역 리셋(* { margin: 0 })·a 색상이
+    Tailwind의 components/utilities 레이어를 덮어써, space-y 등 margin 유틸리티가 무력화되고
+    .btn 링크 글자색이 배경에 묻히는 문제가 발생한다(컴포넌트/유틸리티가 base를 이기도록).
 */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+  }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-}
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+  /*
+    배경 라디얼 글로우 — 뷰포트에 고정. background-attachment:fixed는
+    스크롤마다 리페인트를 유발(화면 흔들림)하므로, 합성되는 fixed 레이어로 대체한다.
+  */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(60rem 40rem at 80% -10%, rgb(56 189 248 / 0.08), transparent 60%),
+      radial-gradient(50rem 36rem at 0% 110%, rgb(163 230 53 / 0.05), transparent 60%);
+  }
 
-/*
-  배경 라디얼 글로우 — 뷰포트에 고정. background-attachment:fixed는
-  스크롤마다 리페인트를 유발(화면 흔들림)하므로, 합성되는 fixed 레이어로 대체한다.
-*/
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    radial-gradient(60rem 40rem at 80% -10%, rgb(56 189 248 / 0.08), transparent 60%),
-    radial-gradient(50rem 36rem at 0% 110%, rgb(163 230 53 / 0.05), transparent 60%);
-}
+  body {
+    min-height: 100vh;
+    color: #e2e8f0; /* slate-200 */
+    background-color: #0b1120; /* 네이비 */
+    line-height: 1.6;
+    font-family:
+      Inter,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      'Helvetica Neue',
+      sans-serif;
+    font-size: 15px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-body {
-  min-height: 100vh;
-  color: #e2e8f0; /* slate-200 */
-  background-color: #0b1120; /* 네이비 */
-  line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Helvetica Neue',
-    sans-serif;
-  font-size: 15px;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  /* 제목 타이포 위계 — 1.25 모듈러 스케일 기반 */
+  h1,
+  h2,
+  h3 {
+    color: #f8fafc; /* slate-50 */
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
 
-/* 제목 타이포 위계 — 1.25 모듈러 스케일 기반 */
-h1,
-h2,
-h3 {
-  color: #f8fafc; /* slate-50 */
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
+  /* 링크 기본색 — 컴포넌트 레이어(.btn-*)가 우선하도록 base에 둔다 */
+  a {
+    color: #38bdf8; /* sky-400 */
+    text-decoration: none;
+    transition: color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  a:hover {
+    color: #7dd3fc; /* sky-300 */
+  }
 
-a {
-  color: #38bdf8; /* sky-400 */
-  text-decoration: none;
-  transition: color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-a:hover {
-  color: #7dd3fc; /* sky-300 */
-}
-
-button {
-  font-family: inherit;
+  button {
+    font-family: inherit;
+  }
 }

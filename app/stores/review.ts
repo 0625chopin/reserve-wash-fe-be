@@ -38,6 +38,18 @@ export const useReviewStore = defineStore('review', () => {
   // 매니저별 평균 평점 — managerId null(대행 아님)은 제외
   const averageByManager = computed(() => averageBy((r) => r.managerId))
 
+  // 통합(전체) 평균 평점 — 매장/매니저 구분 없는 서비스 전체 평균 (작성 완료 화면 표시용)
+  const averageOverall = computed(() => {
+    if (reviews.value.length === 0) return undefined
+    const sum = reviews.value.reduce((acc, r) => acc + r.rating, 0)
+    return sum / reviews.value.length
+  })
+
+  // 특정 예약의 작성된 후기 조회 (작성 완료 화면에 평점·문구 표시용)
+  function reviewOf(reservationId: string): Review | undefined {
+    return reviews.value.find((r) => r.reservationId === reservationId)
+  }
+
   // 후기 식별자 — 세션 내 증가 시퀀스(현재시각/랜덤 회피)
   let seq = 0
   function nextReviewId(): string {
@@ -45,5 +57,14 @@ export const useReviewStore = defineStore('review', () => {
     return `rv-${seq}`
   }
 
-  return { reviews, addReview, hasReview, averageByStore, averageByManager, nextReviewId }
+  return {
+    reviews,
+    addReview,
+    hasReview,
+    reviewOf,
+    averageByStore,
+    averageByManager,
+    averageOverall,
+    nextReviewId,
+  }
 })

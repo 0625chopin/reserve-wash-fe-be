@@ -62,9 +62,11 @@ test('후기 작성: 세차완료 예약에 평점 제출 → 완료·평균 표
   await page.getByTestId('review-text').fill('아주 깨끗하게 잘 됐어요')
   await page.getByTestId('review-submit').click()
 
-  // 완료 상태 + 매장 평균(5.0) 표시
+  // 완료 상태 + 통합 평균(5.0) + 내가 작성한 평점·문구 표시
   await expect(page.getByTestId('review-done')).toBeVisible()
-  await expect(page.getByTestId('avg-store')).toContainText('5.0')
+  await expect(page.getByTestId('avg-overall')).toContainText('5.0')
+  await expect(page.getByTestId('my-rating')).toContainText('5')
+  await expect(page.getByTestId('my-review-text')).toContainText('아주 깨끗하게 잘 됐어요')
 
   // 목록 재방문 → 작성완료 표시, 작성 링크는 사라짐
   await page.getByTestId('nav-reservations').click()

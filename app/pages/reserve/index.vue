@@ -19,9 +19,7 @@ const carTypeOptions = getCarTypes()
 const serviceTypeOptions = getServiceTypes()
 
 // 선택 매장의 매니저만 노출 (require 6.3)
-const storeManagers = computed(() =>
-  draft.storeId ? getManagersByStore(draft.storeId) : [],
-)
+const storeManagers = computed(() => (draft.storeId ? getManagersByStore(draft.storeId) : []))
 
 function onNext() {
   if (draft.canProceedToSlot) navigateTo('/reserve/slot')
@@ -31,16 +29,16 @@ function onNext() {
 <template>
   <section data-testid="page-reserve" class="mx-auto max-w-2xl">
     <!-- 페이지 헤더 -->
-    <header class="mb-8">
-      <span class="badge-accent mb-3">세차 예약 · 1/3</span>
-      <h1 class="text-3xl font-bold">무엇을 예약할까요?</h1>
-      <p class="mt-2 text-sm text-[--color-content-muted]">
-        매장 · 매니저 · 차종 · 서비스를 선택하면 다음 단계에서 날짜·시간과 베이를 고를 수 있어요.
+    <header class="mb-4">
+      <span class="badge-accent mb-2">세차 예약 · 1/3</span>
+      <h1 class="text-2xl font-bold">무엇을 예약할까요?</h1>
+      <p class="mt-1 text-sm text-[--color-content-muted]">
+        매장 · 매니저 · 차종 · 서비스를 선택하면 다음 단계로 넘어가요.
       </p>
     </header>
 
     <!-- 단계형 폼 카드 -->
-    <div class="card space-y-12 p-6 sm:p-8 sm:py-10">
+    <div class="card space-y-3 p-5 sm:p-6">
       <!-- 매장 -->
       <div>
         <span class="field-label">매장 선택</span>
@@ -99,7 +97,9 @@ function onNext() {
         >
           <span class="text-sm text-[--color-content-muted]">예상 금액</span>
           <span class="text-right">
-            <strong class="text-lg font-bold text-[--color-content-strong]">{{ draft.priceLabel }}</strong>
+            <strong class="text-lg font-bold text-[--color-content-strong]">{{
+              draft.priceLabel
+            }}</strong>
             <span class="block text-xs text-[--color-content-muted]">
               현장결제만 가능 (예약 시 결제 없음)
             </span>
@@ -118,7 +118,10 @@ function onNext() {
         >
           다음 · 날짜·시간·베이 선택
         </button>
-        <p v-if="!draft.canProceedToSlot" class="mt-2 text-center text-xs text-[--color-content-muted]">
+        <p
+          v-if="!draft.canProceedToSlot"
+          class="mt-2 text-center text-xs text-[--color-content-muted]"
+        >
           매장 · 매니저 · 차종 · 서비스를 모두 선택해 주세요.
         </p>
       </div>

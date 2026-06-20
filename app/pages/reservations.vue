@@ -23,7 +23,10 @@ const serviceTypeOptions = getServiceTypes()
 
 // 내 예약 — 최신이 위로 (require 6.1)
 const myReservations = computed(() =>
-  reservation.reservations.filter((r) => r.userId === auth.currentUser?.id).slice().reverse(),
+  reservation.reservations
+    .filter((r) => r.userId === auth.currentUser?.id)
+    .slice()
+    .reverse(),
 )
 
 function storeName(id: string) {
@@ -74,7 +77,9 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
         <!-- 상단: 매장 + 상태 뱃지 -->
         <div class="flex items-start justify-between gap-3">
           <div>
-            <p class="text-lg font-bold text-[--color-content-strong]">{{ storeName(r.storeId) }}</p>
+            <p class="text-lg font-bold text-[--color-content-strong]">
+              {{ storeName(r.storeId) }}
+            </p>
             <p class="mt-0.5 text-sm text-[--color-content-muted]">{{ r.date }} {{ r.timeSlot }}</p>
           </div>
           <span :data-testid="`status-${r.id}`" class="status-badge" :data-status="r.status">
@@ -132,13 +137,14 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
             >
               후기 작성
             </NuxtLink>
-            <span
+            <NuxtLink
               v-else
               :data-testid="`reviewed-${r.id}`"
-              class="ml-auto text-sm text-[--color-content-muted]"
+              :to="`/review/${r.id}`"
+              class="btn btn-ghost ml-auto"
             >
-              후기 작성 완료
-            </span>
+              ★ {{ review.reviewOf(r.id)?.rating ?? '-' }} · 후기 확인
+            </NuxtLink>
           </template>
           <span v-else class="text-sm text-[--color-content-muted]">취소된 예약입니다.</span>
         </div>
@@ -156,7 +162,15 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
           fill="none"
           aria-hidden="true"
         >
-          <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.6" />
+          <rect
+            x="4"
+            y="5"
+            width="16"
+            height="15"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
           <path
             d="M8 3v4M16 3v4M4 10h16"
             stroke="currentColor"

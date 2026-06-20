@@ -1006,17 +1006,19 @@ export const useReviewStore = defineStore('review', () => {
 Playwright E2E를 설치/설정하고, 핵심 FO 플로우 시나리오를 작성·통과시키며, 린트/타입/포맷을 정리한다.
 
 #### 태스크 체크리스트
-- [ ] Playwright 설치 및 `playwright.config.ts` 설정 (6장 참조)
-- [ ] `package.json`에 `test:e2e` 스크립트 추가
-- [ ] 핵심 시나리오 작성: 로그인, 검색 필터, 슬롯 예약, **동시 충돌 재선택**, 취소, 후기 작성 (6장 체크리스트)
-- [ ] 컴포넌트에 `data-testid` 부여(테스트 셀렉터 안정화)
-- [ ] `npm run lint`, `npm run type-check`, `npm run format` 전체 통과
-- [ ] `README.md`/문서 업데이트(실행 방법, 더미 계정 안내)
+- [x] Playwright 설치 및 `playwright.config.ts` 설정 (6장 참조)
+- [x] `package.json`에 `test:e2e`·`test:e2e:ui` 스크립트 추가
+- [x] 핵심 시나리오 작성: 로그인, 검색 필터, 위저드 예약, 베이 점유 선택불가, 휴무(전일/교대조), 취소·세차완료, 후기 작성 (6.2 체크리스트) — Phase 5~8에 분산 구현
+- [x] 컴포넌트에 `data-testid` 부여(테스트 셀렉터 안정화)
+- [x] `npm run lint`, `npm run type-check`, `npm run format` 전체 통과
+- [x] `README.md`/문서 업데이트(실행 방법, 더미 계정 안내)
+
+> 📌 **'동시 충돌 재선택' 항목 변경(v1.4)**: 예약 위저드+베이 그리드 단일화로 점유 베이가 그리드에서 **사전 비활성**되므로, 단일 클라이언트 UI에서는 점유 슬롯 확정 충돌 토스트 경로에 도달하지 않는다. 따라서 E2E는 **'베이 점유 선택불가(그리드 disabled)'** 로 대체 검증한다(`confirm()` 충돌 분기·`useToast`는 2·3단계 서버 검증 대비 방어 코드로 잔존). 6.1/7장 결정과 정합.
 
 #### 완료기준 (DoD)
-- [ ] `npm run test:e2e`가 모든 핵심 시나리오를 통과
-- [ ] `npm run lint`, `npm run type-check` 통과, `npm run format` 적용됨
-- [ ] README에 실행/테스트/더미 계정 안내가 반영됨
+- [x] `npm run test:e2e`가 모든 핵심 시나리오를 통과 (전체 21/21)
+- [x] `npm run lint`, `npm run type-check` 통과, `npm run format` 적용됨
+- [x] README에 실행/테스트/더미 계정 안내가 반영됨
 
 ---
 
@@ -1128,22 +1130,22 @@ export default defineConfig({
 
 ### 6.2 시나리오 체크리스트
 
-- [ ] **로그인 성공**: 더미 계정 입력 → `/reserve`로 이동, 네비에 사용자 표시
-- [ ] **로그인 실패**: 잘못된 비밀번호 → 에러 메시지 노출, 이동하지 않음
-- [ ] **미인증 가드**: 로그아웃 상태로 `/reserve` 진입 → `/login`으로 리다이렉트
-- [ ] **매장 검색 필터**: select에 키워드 입력 → 일치 매장만 노출
-- [ ] **매니저 검색 + 휴무**: 매장 선택 후 매니저 노출, 휴무일 슬롯 비활성 확인
-- [ ] **매니저 전일 휴무**: `FULL_DAY` 휴무 날짜 선택 시 그날 전체 슬롯이 비활성 (require 5.5)
-- [ ] **매니저 교대조 휴무**: `SHIFT_1`(06:00~14:00) 휴무 매니저 선택 시 해당 시간대 30분 슬롯만 비활성, 14:30 등 타 시간대는 선택 가능 (require 5.5, 6.1)
-- [x] **예약 위저드 3페이지 흐름**: 1p(매장·매니저·차종·서비스 선택→가격 표시→"다음")→2p(`/reserve/slot` 날짜·시간·베이 그리드 선택→"예약하기")→3p(`/reserve/done` 완료 요약) 순으로 진행된다 (require 6.5, Phase 5.1)
-- [x] **위저드 진입 가드**: step1 미완료 상태로 `/reserve/slot` 직접 진입, 확정 없이 `/reserve/done` 직접 진입 시 모두 `/reserve`로 리다이렉트된다 (require 6.5.3, Phase 5.1)
-- [ ] **슬롯 예약 성공**: 날짜→슬롯 클릭(HOLDING)→차종/서비스 선택(가격 확인)→확정→예약 목록에 RESERVED
-- [ ] **베이 슬롯 점유 선택불가**: 날짜·시간 선택 후, 그 시간대에 RESERVED/COMPLETED인 베이가 미니 그리드에서 비활성(disabled)으로 표시되어 클릭 불가 (require 5.2, 6.1, 7장)
-- [ ] **점유 베이 충돌 재선택**: 점유된 베이 대신 다른 활성 베이를 선택해 정상 예약되는 흐름 확인 (베이 점유 사전 차단 ↔ 아래 동시성 충돌과 구분)
-- [ ] **동시 예약 충돌 → 재선택 유도**: 이미 RESERVED/HOLDING 슬롯 확정 시도 → 토스트 노출, 예약 미생성
-- [ ] **예약 취소(승인 전/후)**: 취소 → 상태 CANCELED, 슬롯 다시 AVAILABLE
-- [ ] **세차완료 → 후기 작성**: RESERVED→COMPLETED 전이 → 후기 작성(평점 1~5) → 평균 평점 갱신
-- [ ] **후기 작성 자격**: COMPLETED 아닌 예약은 후기 화면 진입 차단
+- [x] **로그인 성공**: 더미 계정 입력 → `/reserve`로 이동, 네비에 사용자 표시 *(auth.spec)*
+- [x] **로그인 실패**: 잘못된 비밀번호 → 에러 메시지 노출, 이동하지 않음 *(auth.spec)*
+- [x] **미인증 가드**: 로그아웃 상태로 `/reserve` 진입 → `/login`으로 리다이렉트 *(home.spec)*
+- [x] **매장 검색 필터**: select에 키워드 입력 → 일치 매장만 노출 *(reserve.spec)*
+- [x] **매니저 검색 + 휴무**: 매장 선택 후 매니저 노출, 휴무일 슬롯 비활성 확인 *(reserve.spec)*
+- [x] **매니저 전일 휴무**: `FULL_DAY` 휴무 날짜가 날짜 휠에서 비활성 (require 5.5) *(reserve.spec)*
+- [x] **매니저 교대조 휴무**: `SHIFT_1`(06:00~14:00) 휴무 매니저 선택 시 해당 시간대 30분 슬롯만 비활성, 14:00 등 타 시간대는 선택 가능 (require 5.5, 6.1) *(reserve.spec)*
+- [x] **예약 위저드 3페이지 흐름**: 1p(매장·매니저·차종·서비스 선택→가격 표시→"다음")→2p(`/reserve/slot` 날짜·시간·베이 그리드 선택→"예약하기")→3p(`/reserve/done` 완료 요약) 순으로 진행된다 (require 6.5, Phase 5.1) *(reserve.spec)*
+- [x] **위저드 진입 가드**: step1 미완료 상태로 `/reserve/slot` 직접 진입, 확정 없이 `/reserve/done` 직접 진입 시 모두 `/reserve`로 리다이렉트된다 (require 6.5.3, Phase 5.1) *(reserve.spec)*
+- [x] **슬롯 예약 성공**: 위저드로 날짜·시간·베이 선택(HOLDING)→가격 확인→확정→`/reserve/done` 완료, 예약 목록에 RESERVED *(reserve.spec/reservations.spec)*
+- [x] **베이 슬롯 점유 선택불가**: 날짜·시간 선택 후, 그 시간대에 RESERVED/COMPLETED인 베이가 미니 그리드에서 비활성(disabled)으로 표시되어 클릭 불가 (require 5.2, 6.1, 7장) *(reserve.spec)*
+- [x] **점유 베이 충돌 재선택**: 점유된 베이 대신 다른 활성 베이를 선택해 정상 예약되는 흐름 확인 *(reserve.spec)*
+- [~] **동시 예약 충돌 → 재선택 유도**: ⚠️ 위저드+그리드 단일화로 UI 도달 불가 → **'베이 점유 선택불가(그리드 disabled)'** 로 대체 검증(위 Phase 8 메모 참조). `confirm()` 충돌 분기는 2·3단계 서버 검증 대비 방어 코드로 잔존
+- [x] **예약 취소(승인 전/후)**: 취소 → 상태 CANCELED, 슬롯 다시 AVAILABLE *(reservations.spec)*
+- [x] **세차완료 → 후기 작성**: RESERVED→COMPLETED 전이 → 후기 작성(평점 1~5) → 평균 평점 갱신 *(reservations.spec/review.spec)*
+- [x] **후기 작성 자격**: COMPLETED 아닌(또는 미존재) 예약은 후기 화면 진입 차단 *(review.spec)*
 
 ### 6.3 테스트 작성 팁
 
