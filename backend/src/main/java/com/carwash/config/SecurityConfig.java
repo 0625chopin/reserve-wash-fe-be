@@ -46,6 +46,10 @@ public class SecurityConfig {
                                 "/api/slots")
                         .permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        // BO 역할 인가 (require 3.2) — 구체적 경로 매처를 anyRequest 이전에 둔다.
+                        //   권한 외 역할 → 403(기본 AccessDeniedHandler), 미인증 → 401(위 entryPoint)
+                        .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "STORE_ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(
                         new JwtAuthenticationFilter(tokenProvider),

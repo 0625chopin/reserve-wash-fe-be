@@ -1564,6 +1564,308 @@
       "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
       "summary": "P5-7 게이트 완료. (1) ./gradlew build BUILD SUCCESSFUL — 전이 통합테스트 5건 포함 전건 0실패(14개 테스트 클래스). (2) npm run type-check 0 에러(serverId 옵셔널 정합). (3) npm run test:e2e 25건 전건 통과(9.9s) — reservations.spec 세차완료/취소+슬롯 AVAILABLE release, review.spec complete→후기 흐름이 서버 전이로 회귀 그린. (4) ROADMAP_2 Phase 5 체크리스트·DoD 전부 [x] 갱신, M6 승인 미도입(Phase 6 이연)·serverId 분리·IllegalStateException→409 구현 메모 기록, 생성·수정 파일 목록 실구현 반영.",
       "completedAt": "2026-06-20T18:57:52.344Z"
+    },
+    {
+      "id": "bfda49bd-4718-4a4e-8c2d-10c23bc91475",
+      "name": "P6-1 BE ReservationMapper.findByStore + XML",
+      "description": "매장별 예약 조회(S4·S5 기반)를 위한 findByStore 추가. 기존 컬럼/SQL 패턴 재사용.",
+      "notes": "기존 findById/findByUser/insert/updateStatus 보존. enum 기본 매핑.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T19:02:51.734Z",
+      "updatedAt": "2026-06-20T19:05:49.008Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReservationMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findByStore 선언",
+          "lineStart": 9,
+          "lineEnd": 18
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ReservationMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "findByStore select",
+          "lineStart": 11,
+          "lineEnd": 18
+        }
+      ],
+      "implementationGuide": "ReservationMapper.java: List<Reservation> findByStore(String storeId); 추가. ReservationMapper.xml: <select id=\"findByStore\" resultType=\"com.carwash.domain.Reservation\"> SELECT <include refid=\"columns\"/> FROM reservation WHERE store_id = #{storeId} ORDER BY `date`, time_slot </select>. 기존 columns sql 조각 재사용.",
+      "verificationCriteria": "findByStore('store1')가 store1 예약을 날짜·시간 순으로 반환. 빌드 통과.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 1차에서 문서화만 한 BO 착수. 인가는 Phase 3 역할 가드(JWT ROLE_ 권한) 재사용.\n\n[설계 결정]\n- 인가: @PreAuthorize 대신 SecurityConfig 경로 기반 — /api/manager/** → hasAnyRole(MANAGER,STORE_ADMIN), /api/admin/** → hasRole(ADMIN). @EnableMethodSecurity 불필요(중앙집중 정합). 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entrypoint).\n- M3: User(manager1)↔Manager(mgr1) 링크 없음 → ProxyReservationRequest는 고객 이메일(customerEmail)+managerId+슬롯필드. 서비스가 userMapper.findByEmail(email)→고객 해석(null 404), managerMapper.findById(managerId)→소속 매장 검증(store 불일치 400), 본인 휴무(서버 SHIFT 매핑: SHIFT_1 06:00~14:00/SHIFT_2 14:00~22:00/SHIFT_3 22:00~06:00, FULL_DAY 전일) 차단(400), 이후 reservationService.confirm(고객userId, ConfirmRequest{managerId 포함})로 위임 → Phase4 동시성/UNIQUE/낙관락 동일 재사용. 결과 ReservationResponse(userId=고객, managerId=대행).\n- S4 GET /api/admin/stores/{id}/reservations: reservationMapper.findByStore(storeId)→예약 목록 + userMapper.findAll() 맵으로 고객명/이메일 조인(N+1 회피) → AdminReservationResponse 리스트.\n- S5 GET /api/admin/stores/{id}/users: 매장 예약 고객 distinct(userId set) → AdminUserResponse 리스트(passwordHash 제외).\n\n[현재 코드 사실 — 검증 완료]\n- JWT: JwtAuthenticationFilter가 ROLE_+role 권한 세팅(hasRole 정합). 시드 user: user1/user2(USER), manager1(MANAGER, manager@test.com), admin1(ADMIN, admin@test.com). 모두 BCrypt('password').\n- Manager(mgr1~4)는 User와 별개 엔티티(storeId/dayoffs 보유). managerMapper.findById는 dayoffs collection 로드함(resultMap managerWithDayoffs).\n- ReservationMapper: findById/findByUser/insert/updateStatus 보유 — findByStore 없음(추가 필요). UserMapper: findAll/findById/findByEmail/insert 보유.\n- reservationService.confirm(userId, ConfirmRequest)는 insertHold→낙관락→reservation insert(id 'rsv-'+UUID)→ReservationResponse. ConfirmRequest{storeId,bayId,date,timeSlot,managerId(nullable),carType,serviceType,amount}.\n- SecurityConfig: permitAll(/api/auth,health,stores,managers,bays,prices,slots,h2-console) + anyRequest authenticated + 401 entrypoint + CORS(PATCH 포함). @ConditionalOnWebApplication(SERVLET).\n- FE: middleware auth/guest/reservation-*/review-guard 존재, role-guard 없음(추가). auth 스토어 currentUser=useCookie<User>(role 보유). 페이지 manager/·admin/ 디렉터리 없음(신규). AppNav 무수정(E2E는 직접 goto).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리(매퍼/서비스/컨트롤러), FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, BO는 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-1 완료. ReservationMapper.findByStore(String) 선언 + XML <select id=\"findByStore\"> (store_id 필터, date/time_slot 정렬, columns 조각 재사용) 추가. 기존 매퍼 메서드 보존. BoApiTest S4/S5 조회가 findByStore 경로를 실증, 빌드 green.",
+      "completedAt": "2026-06-20T19:05:49.003Z"
+    },
+    {
+      "id": "a5d20fed-f0df-469e-be9d-22473ed9e66f",
+      "name": "P6-2 BE BO DTO 3종(record)",
+      "description": "BO 요청/응답 DTO. ProxyReservationRequest(대행 요청), AdminReservationResponse(S4, 고객 정보 포함 + from), AdminUserResponse(S5, passwordHash 제외 + from).",
+      "notes": "FE 무변환 정합. AdminReservationResponse는 Reservation 필드 + userName/userEmail 평면화.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T19:02:51.734Z",
+      "updatedAt": "2026-06-20T19:05:57.930Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ProxyReservationRequest.java",
+          "type": "CREATE",
+          "description": "대행 예약 요청",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/AdminReservationResponse.java",
+          "type": "CREATE",
+          "description": "S4 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/AdminUserResponse.java",
+          "type": "CREATE",
+          "description": "S5 응답",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "dto/ProxyReservationRequest.java: record(@NotBlank customerEmail, @NotBlank managerId, @NotBlank storeId, @NotBlank bayId, @NotBlank date, @NotBlank timeSlot, @NotNull CarType carType, @NotNull ServiceType serviceType, int amount). dto/AdminReservationResponse.java: record(id,userId,userName,userEmail,storeId,bayId,managerId,date,timeSlot,CarType,ServiceType,int amount,ReservationStatus status) + static from(Reservation r, User u). dto/AdminUserResponse.java: record(id,email,name,UserRole role) + static from(User u). jakarta.validation 사용.",
+      "verificationCriteria": "3 DTO 컴파일 통과. from() 정적 변환이 도메인→DTO 무변환 매핑(AdminUserResponse는 passwordHash 미포함).",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 1차에서 문서화만 한 BO 착수. 인가는 Phase 3 역할 가드(JWT ROLE_ 권한) 재사용.\n\n[설계 결정]\n- 인가: @PreAuthorize 대신 SecurityConfig 경로 기반 — /api/manager/** → hasAnyRole(MANAGER,STORE_ADMIN), /api/admin/** → hasRole(ADMIN). @EnableMethodSecurity 불필요(중앙집중 정합). 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entrypoint).\n- M3: User(manager1)↔Manager(mgr1) 링크 없음 → ProxyReservationRequest는 고객 이메일(customerEmail)+managerId+슬롯필드. 서비스가 userMapper.findByEmail(email)→고객 해석(null 404), managerMapper.findById(managerId)→소속 매장 검증(store 불일치 400), 본인 휴무(서버 SHIFT 매핑: SHIFT_1 06:00~14:00/SHIFT_2 14:00~22:00/SHIFT_3 22:00~06:00, FULL_DAY 전일) 차단(400), 이후 reservationService.confirm(고객userId, ConfirmRequest{managerId 포함})로 위임 → Phase4 동시성/UNIQUE/낙관락 동일 재사용. 결과 ReservationResponse(userId=고객, managerId=대행).\n- S4 GET /api/admin/stores/{id}/reservations: reservationMapper.findByStore(storeId)→예약 목록 + userMapper.findAll() 맵으로 고객명/이메일 조인(N+1 회피) → AdminReservationResponse 리스트.\n- S5 GET /api/admin/stores/{id}/users: 매장 예약 고객 distinct(userId set) → AdminUserResponse 리스트(passwordHash 제외).\n\n[현재 코드 사실 — 검증 완료]\n- JWT: JwtAuthenticationFilter가 ROLE_+role 권한 세팅(hasRole 정합). 시드 user: user1/user2(USER), manager1(MANAGER, manager@test.com), admin1(ADMIN, admin@test.com). 모두 BCrypt('password').\n- Manager(mgr1~4)는 User와 별개 엔티티(storeId/dayoffs 보유). managerMapper.findById는 dayoffs collection 로드함(resultMap managerWithDayoffs).\n- ReservationMapper: findById/findByUser/insert/updateStatus 보유 — findByStore 없음(추가 필요). UserMapper: findAll/findById/findByEmail/insert 보유.\n- reservationService.confirm(userId, ConfirmRequest)는 insertHold→낙관락→reservation insert(id 'rsv-'+UUID)→ReservationResponse. ConfirmRequest{storeId,bayId,date,timeSlot,managerId(nullable),carType,serviceType,amount}.\n- SecurityConfig: permitAll(/api/auth,health,stores,managers,bays,prices,slots,h2-console) + anyRequest authenticated + 401 entrypoint + CORS(PATCH 포함). @ConditionalOnWebApplication(SERVLET).\n- FE: middleware auth/guest/reservation-*/review-guard 존재, role-guard 없음(추가). auth 스토어 currentUser=useCookie<User>(role 보유). 페이지 manager/·admin/ 디렉터리 없음(신규). AppNav 무수정(E2E는 직접 goto).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리(매퍼/서비스/컨트롤러), FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, BO는 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-2 완료. DTO 3종 record 생성: ProxyReservationRequest(customerEmail/managerId/슬롯필드 + @NotBlank/@NotNull 검증), AdminReservationResponse(예약+userName/userEmail 평면화 + from(Reservation,User), user null 방어), AdminUserResponse(id/email/name/role + from(User), passwordHash 미포함). 컴파일·BoApiTest green.",
+      "completedAt": "2026-06-20T19:05:57.926Z"
+    },
+    {
+      "id": "58a5a50c-2b90-43fa-a01f-4dcbee7bcdc3",
+      "name": "P6-3 BE ManagerReservationService 대행(M3)",
+      "description": "매니저 대행 예약. 고객 이메일 해석·소속 매장 검증·본인 휴무 차단 후 reservationService.confirm 위임(동시성 재사용).",
+      "notes": "confirm 위임으로 insertHold/UNIQUE/낙관락 동시성 동일. 휴무 SHIFT 매핑은 FE storeService.isManagerOffAt와 동일 경계.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "a5d20fed-f0df-469e-be9d-22473ed9e66f"
+        }
+      ],
+      "createdAt": "2026-06-20T19:02:51.734Z",
+      "updatedAt": "2026-06-20T19:06:11.587Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/ManagerReservationService.java",
+          "type": "CREATE",
+          "description": "대행 서비스",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "REFERENCE",
+          "description": "confirm 위임 대상",
+          "lineStart": 37,
+          "lineEnd": 51
+        }
+      ],
+      "implementationGuide": "service/ManagerReservationService.java(@Service, 생성자 주입: UserMapper, ManagerMapper, ReservationService). proxyReserve(ProxyReservationRequest req): User customer=userMapper.findByEmail(req.customerEmail()); if(customer==null) throw ResponseStatusException(404,'고객을 찾을 수 없습니다'). Manager m=managerMapper.findById(req.managerId()); if(m==null) throw 404. if(!m.getStoreId().equals(req.storeId())) throw ResponseStatusException(400,'매니저 소속 매장이 아닙니다'). if(isManagerOffAt(m, req.date(), req.timeSlot())) throw ResponseStatusException(400,'매니저 휴무 시간대입니다'). ConfirmRequest cr=new ConfirmRequest(storeId,bayId,date,timeSlot,managerId,carType,serviceType,amount); return reservationService.confirm(customer.getId(), cr). \n private isManagerOffAt(Manager,date,timeSlot): m.getDayoffs() 순회 — date 일치 시 FULL_DAY면 true, SHIFT_x면 toMinutes(timeSlot) 경계 검사(SHIFT_1 360~840, SHIFT_2 840~1320, SHIFT_3 >=1320||<360). DayoffType enum 비교.",
+      "verificationCriteria": "대행 성공(userId=고객·managerId=대행 ReservationResponse). 미존재 이메일 404, 타 매장 매니저 400, 본인 휴무 시간대 400. 슬롯 충돌 시 confirm이 409.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 1차에서 문서화만 한 BO 착수. 인가는 Phase 3 역할 가드(JWT ROLE_ 권한) 재사용.\n\n[설계 결정]\n- 인가: @PreAuthorize 대신 SecurityConfig 경로 기반 — /api/manager/** → hasAnyRole(MANAGER,STORE_ADMIN), /api/admin/** → hasRole(ADMIN). @EnableMethodSecurity 불필요(중앙집중 정합). 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entrypoint).\n- M3: User(manager1)↔Manager(mgr1) 링크 없음 → ProxyReservationRequest는 고객 이메일(customerEmail)+managerId+슬롯필드. 서비스가 userMapper.findByEmail(email)→고객 해석(null 404), managerMapper.findById(managerId)→소속 매장 검증(store 불일치 400), 본인 휴무(서버 SHIFT 매핑: SHIFT_1 06:00~14:00/SHIFT_2 14:00~22:00/SHIFT_3 22:00~06:00, FULL_DAY 전일) 차단(400), 이후 reservationService.confirm(고객userId, ConfirmRequest{managerId 포함})로 위임 → Phase4 동시성/UNIQUE/낙관락 동일 재사용. 결과 ReservationResponse(userId=고객, managerId=대행).\n- S4 GET /api/admin/stores/{id}/reservations: reservationMapper.findByStore(storeId)→예약 목록 + userMapper.findAll() 맵으로 고객명/이메일 조인(N+1 회피) → AdminReservationResponse 리스트.\n- S5 GET /api/admin/stores/{id}/users: 매장 예약 고객 distinct(userId set) → AdminUserResponse 리스트(passwordHash 제외).\n\n[현재 코드 사실 — 검증 완료]\n- JWT: JwtAuthenticationFilter가 ROLE_+role 권한 세팅(hasRole 정합). 시드 user: user1/user2(USER), manager1(MANAGER, manager@test.com), admin1(ADMIN, admin@test.com). 모두 BCrypt('password').\n- Manager(mgr1~4)는 User와 별개 엔티티(storeId/dayoffs 보유). managerMapper.findById는 dayoffs collection 로드함(resultMap managerWithDayoffs).\n- ReservationMapper: findById/findByUser/insert/updateStatus 보유 — findByStore 없음(추가 필요). UserMapper: findAll/findById/findByEmail/insert 보유.\n- reservationService.confirm(userId, ConfirmRequest)는 insertHold→낙관락→reservation insert(id 'rsv-'+UUID)→ReservationResponse. ConfirmRequest{storeId,bayId,date,timeSlot,managerId(nullable),carType,serviceType,amount}.\n- SecurityConfig: permitAll(/api/auth,health,stores,managers,bays,prices,slots,h2-console) + anyRequest authenticated + 401 entrypoint + CORS(PATCH 포함). @ConditionalOnWebApplication(SERVLET).\n- FE: middleware auth/guest/reservation-*/review-guard 존재, role-guard 없음(추가). auth 스토어 currentUser=useCookie<User>(role 보유). 페이지 manager/·admin/ 디렉터리 없음(신규). AppNav 무수정(E2E는 직접 goto).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리(매퍼/서비스/컨트롤러), FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, BO는 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-3 완료. ManagerReservationService.proxyReserve: 고객 이메일→userMapper.findByEmail(null 404), managerMapper.findById(null 404), 소속 매장 불일치 400, 본인 휴무 시간대 400 후 ConfirmRequest로 reservationService.confirm(고객id) 위임 → Phase4 동시성/UNIQUE/낙관락 재사용(충돌 409 전파). 서버 SHIFT 매핑 헬퍼(SHIFT_1 360~840/SHIFT_2 840~1320/SHIFT_3 ≥1320||<360, FULL_DAY 전일)는 FE storeService와 동일 경계. BoApiTest 대행 성공/휴무400/타매장400 실증.",
+      "completedAt": "2026-06-20T19:06:11.583Z"
+    },
+    {
+      "id": "27901952-e0d9-4801-9faa-0abb12c8a2e4",
+      "name": "P6-4 BE AdminService(S4·S5)",
+      "description": "관리자 매장별 예약자(S4)·사용자(S5) 조회. findByStore + 사용자 맵 조인.",
+      "notes": "N+1 회피 위해 userMapper.findAll() 1회 맵핑. 매장에 예약 없으면 빈 리스트.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "bfda49bd-4718-4a4e-8c2d-10c23bc91475"
+        },
+        {
+          "taskId": "a5d20fed-f0df-469e-be9d-22473ed9e66f"
+        }
+      ],
+      "createdAt": "2026-06-20T19:02:51.734Z",
+      "updatedAt": "2026-06-20T19:06:21.800Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/AdminService.java",
+          "type": "CREATE",
+          "description": "S4·S5 서비스",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "service/AdminService.java(@Service @Transactional(readOnly=true), 주입: ReservationMapper, UserMapper). storeReservations(String storeId): List<Reservation> rs=reservationMapper.findByStore(storeId); Map<String,User> users=userMapper.findAll().stream().collect(toMap(User::getId, u->u)); return rs.stream().map(r-> AdminReservationResponse.from(r, users.get(r.getUserId()))).toList(). storeUsers(String storeId): findByStore→ userId distinct(LinkedHashSet) → users.get → AdminUserResponse.from. null 사용자 방어(맵 미존재 시 스킵 또는 빈 정보).",
+      "verificationCriteria": "storeReservations('store1')가 고객명/이메일 포함 예약 리스트 반환. storeUsers('store1')가 distinct 고객 리스트(passwordHash 없음) 반환.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 1차에서 문서화만 한 BO 착수. 인가는 Phase 3 역할 가드(JWT ROLE_ 권한) 재사용.\n\n[설계 결정]\n- 인가: @PreAuthorize 대신 SecurityConfig 경로 기반 — /api/manager/** → hasAnyRole(MANAGER,STORE_ADMIN), /api/admin/** → hasRole(ADMIN). @EnableMethodSecurity 불필요(중앙집중 정합). 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entrypoint).\n- M3: User(manager1)↔Manager(mgr1) 링크 없음 → ProxyReservationRequest는 고객 이메일(customerEmail)+managerId+슬롯필드. 서비스가 userMapper.findByEmail(email)→고객 해석(null 404), managerMapper.findById(managerId)→소속 매장 검증(store 불일치 400), 본인 휴무(서버 SHIFT 매핑: SHIFT_1 06:00~14:00/SHIFT_2 14:00~22:00/SHIFT_3 22:00~06:00, FULL_DAY 전일) 차단(400), 이후 reservationService.confirm(고객userId, ConfirmRequest{managerId 포함})로 위임 → Phase4 동시성/UNIQUE/낙관락 동일 재사용. 결과 ReservationResponse(userId=고객, managerId=대행).\n- S4 GET /api/admin/stores/{id}/reservations: reservationMapper.findByStore(storeId)→예약 목록 + userMapper.findAll() 맵으로 고객명/이메일 조인(N+1 회피) → AdminReservationResponse 리스트.\n- S5 GET /api/admin/stores/{id}/users: 매장 예약 고객 distinct(userId set) → AdminUserResponse 리스트(passwordHash 제외).\n\n[현재 코드 사실 — 검증 완료]\n- JWT: JwtAuthenticationFilter가 ROLE_+role 권한 세팅(hasRole 정합). 시드 user: user1/user2(USER), manager1(MANAGER, manager@test.com), admin1(ADMIN, admin@test.com). 모두 BCrypt('password').\n- Manager(mgr1~4)는 User와 별개 엔티티(storeId/dayoffs 보유). managerMapper.findById는 dayoffs collection 로드함(resultMap managerWithDayoffs).\n- ReservationMapper: findById/findByUser/insert/updateStatus 보유 — findByStore 없음(추가 필요). UserMapper: findAll/findById/findByEmail/insert 보유.\n- reservationService.confirm(userId, ConfirmRequest)는 insertHold→낙관락→reservation insert(id 'rsv-'+UUID)→ReservationResponse. ConfirmRequest{storeId,bayId,date,timeSlot,managerId(nullable),carType,serviceType,amount}.\n- SecurityConfig: permitAll(/api/auth,health,stores,managers,bays,prices,slots,h2-console) + anyRequest authenticated + 401 entrypoint + CORS(PATCH 포함). @ConditionalOnWebApplication(SERVLET).\n- FE: middleware auth/guest/reservation-*/review-guard 존재, role-guard 없음(추가). auth 스토어 currentUser=useCookie<User>(role 보유). 페이지 manager/·admin/ 디렉터리 없음(신규). AppNav 무수정(E2E는 직접 goto).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리(매퍼/서비스/컨트롤러), FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, BO는 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-4 완료. AdminService(@Service @Transactional(readOnly=true)): storeReservations=findByStore + userMap(findAll 1회 toMap)으로 고객명/이메일 조인→AdminReservationResponse 리스트. storeUsers=findByStore 고객 distinct(LinkedHashMap putIfAbsent, 최초 등장 순)→AdminUserResponse 리스트(passwordHash 없음). user null 방어. BoApiTest S4/S5 200 + userName/userEmail/id 존재 실증.",
+      "completedAt": "2026-06-20T19:06:21.795Z"
+    },
+    {
+      "id": "0d8e35b1-0744-4100-8d9a-846995aed67b",
+      "name": "P6-5 BE Controllers + 경로 인가",
+      "description": "ManagerReservationController(POST 대행)·AdminController(S4·S5 GET) + SecurityConfig 경로 기반 역할 인가.",
+      "notes": "경로 인가는 permitAll/anyRequest 사이 순서 중요(구체적 매처 먼저). 권한 외→403, 미인증→401. @PreAuthorize 미사용(중앙집중).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "58a5a50c-2b90-43fa-a01f-4dcbee7bcdc3"
+        },
+        {
+          "taskId": "27901952-e0d9-4801-9faa-0abb12c8a2e4"
+        }
+      ],
+      "createdAt": "2026-06-20T19:02:51.734Z",
+      "updatedAt": "2026-06-20T19:06:31.262Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/ManagerReservationController.java",
+          "type": "CREATE",
+          "description": "대행 컨트롤러",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminController.java",
+          "type": "CREATE",
+          "description": "관리자 컨트롤러",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "TO_MODIFY",
+          "description": "manager/**·admin/** 경로 인가",
+          "lineStart": 41,
+          "lineEnd": 49
+        }
+      ],
+      "implementationGuide": "controller/ManagerReservationController.java(@RestController @RequestMapping(\"/api/manager/reservations\")): @PostMapping ReservationResponse proxyReserve(@Valid @RequestBody ProxyReservationRequest req){ return service.proxyReserve(req); }. controller/AdminController.java(@RestController @RequestMapping(\"/api/admin\")): @GetMapping(\"/stores/{id}/reservations\") List<AdminReservationResponse> reservations(@PathVariable String id){ return adminService.storeReservations(id); } @GetMapping(\"/stores/{id}/users\") List<AdminUserResponse> users(@PathVariable String id){ return adminService.storeUsers(id); }. SecurityConfig authorizeHttpRequests에 anyRequest 이전 추가: .requestMatchers(\"/api/manager/**\").hasAnyRole(\"MANAGER\",\"STORE_ADMIN\") .requestMatchers(\"/api/admin/**\").hasRole(\"ADMIN\").",
+      "verificationCriteria": "POST /api/manager/reservations(MANAGER 성공·USER 403·무토큰 401), GET /api/admin/stores/{id}/reservations·users(ADMIN 성공·MANAGER 403). 빌드 통과.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 1차에서 문서화만 한 BO 착수. 인가는 Phase 3 역할 가드(JWT ROLE_ 권한) 재사용.\n\n[설계 결정]\n- 인가: @PreAuthorize 대신 SecurityConfig 경로 기반 — /api/manager/** → hasAnyRole(MANAGER,STORE_ADMIN), /api/admin/** → hasRole(ADMIN). @EnableMethodSecurity 불필요(중앙집중 정합). 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entrypoint).\n- M3: User(manager1)↔Manager(mgr1) 링크 없음 → ProxyReservationRequest는 고객 이메일(customerEmail)+managerId+슬롯필드. 서비스가 userMapper.findByEmail(email)→고객 해석(null 404), managerMapper.findById(managerId)→소속 매장 검증(store 불일치 400), 본인 휴무(서버 SHIFT 매핑: SHIFT_1 06:00~14:00/SHIFT_2 14:00~22:00/SHIFT_3 22:00~06:00, FULL_DAY 전일) 차단(400), 이후 reservationService.confirm(고객userId, ConfirmRequest{managerId 포함})로 위임 → Phase4 동시성/UNIQUE/낙관락 동일 재사용. 결과 ReservationResponse(userId=고객, managerId=대행).\n- S4 GET /api/admin/stores/{id}/reservations: reservationMapper.findByStore(storeId)→예약 목록 + userMapper.findAll() 맵으로 고객명/이메일 조인(N+1 회피) → AdminReservationResponse 리스트.\n- S5 GET /api/admin/stores/{id}/users: 매장 예약 고객 distinct(userId set) → AdminUserResponse 리스트(passwordHash 제외).\n\n[현재 코드 사실 — 검증 완료]\n- JWT: JwtAuthenticationFilter가 ROLE_+role 권한 세팅(hasRole 정합). 시드 user: user1/user2(USER), manager1(MANAGER, manager@test.com), admin1(ADMIN, admin@test.com). 모두 BCrypt('password').\n- Manager(mgr1~4)는 User와 별개 엔티티(storeId/dayoffs 보유). managerMapper.findById는 dayoffs collection 로드함(resultMap managerWithDayoffs).\n- ReservationMapper: findById/findByUser/insert/updateStatus 보유 — findByStore 없음(추가 필요). UserMapper: findAll/findById/findByEmail/insert 보유.\n- reservationService.confirm(userId, ConfirmRequest)는 insertHold→낙관락→reservation insert(id 'rsv-'+UUID)→ReservationResponse. ConfirmRequest{storeId,bayId,date,timeSlot,managerId(nullable),carType,serviceType,amount}.\n- SecurityConfig: permitAll(/api/auth,health,stores,managers,bays,prices,slots,h2-console) + anyRequest authenticated + 401 entrypoint + CORS(PATCH 포함). @ConditionalOnWebApplication(SERVLET).\n- FE: middleware auth/guest/reservation-*/review-guard 존재, role-guard 없음(추가). auth 스토어 currentUser=useCookie<User>(role 보유). 페이지 manager/·admin/ 디렉터리 없음(신규). AppNav 무수정(E2E는 직접 goto).\n\n[불변 원칙] MyBatis only(JPA 금지), 계층 분리(매퍼/서비스/컨트롤러), FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(기존 컴포넌트/페이지/AppNav 무변경, BO는 신규 파일). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-5 완료. ManagerReservationController(POST /api/manager/reservations → proxyReserve), AdminController(GET /api/admin/stores/{id}/reservations·users) 생성. SecurityConfig authorizeHttpRequests에 anyRequest 이전 .requestMatchers(\"/api/manager/**\").hasAnyRole(\"MANAGER\",\"STORE_ADMIN\")·(\"/api/admin/**\").hasRole(\"ADMIN\") 추가(구체 매처 우선). BoApiTest: MANAGER 대행 성공·USER 403·무토큰 401·ADMIN S4/S5 200·MANAGER admin 403 전 시나리오 green.",
+      "completedAt": "2026-06-20T19:06:31.259Z"
+    },
+    {
+      "id": "fec02f14-a24e-4b1f-b0d0-1c8c4d2b112d",
+      "name": "P6-6 BE BO 통합테스트(인가·대행·조회)",
+      "description": "MockMvc로 역할 인가와 BO 기능을 검증. 대행 성공/휴무 차단/권한 403/미인증 401, S4·S5 조회.",
+      "notes": "기존 ReservationApiTest/AuthApiTest 패턴 재사용. H2 멱등(DROP IF EXISTS). 대행 성공이 admin 조회 결과에 반영되도록 같은 컨텍스트/슬롯 일관 사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "0d8e35b1-0744-4100-8d9a-846995aed67b"
+        }
+      ],
+      "createdAt": "2026-06-20T19:03:37.266Z",
+      "updatedAt": "2026-06-20T19:06:41.462Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/bo/BoApiTest.java",
+          "type": "CREATE",
+          "description": "BO 통합테스트",
+          "lineStart": 1,
+          "lineEnd": 1
+        }
+      ],
+      "implementationGuide": "test/.../bo/BoApiTest.java(@SpringBootTest @AutoConfigureMockMvc). JwtTokenProvider로 역할별 토큰 생성(User.builder role MANAGER/ADMIN/USER). 시나리오: (1) 대행 성공 — manager 토큰으로 POST /api/manager/reservations(customerEmail user@test.com, managerId mgr1, store1, 고유 슬롯 예: store1-A2 2026-09-01 09:00) → 200 + jsonPath userId=user1, managerId=mgr1. (2) 휴무 차단 — mgr1 FULL_DAY(2026-06-22) 시간대 대행 → 400. (3) 타 매장 매니저(mgr3 store2를 store1로) → 400. (4) USER 토큰 대행 → 403. (5) 무토큰 → 401. (6) ADMIN GET /api/admin/stores/store1/reservations → 200 배열(위 대행분 포함, userName/userEmail 존재). (7) ADMIN GET /api/admin/stores/store1/users → 200 배열. (8) MANAGER가 admin 엔드포인트 → 403. 슬롯 충돌 회피 위해 고유 날짜 사용.",
+      "verificationCriteria": "대행 성공/휴무400/타매장400/USER403/무토큰401/ADMIN S4·S5 200/MANAGER admin403 전 시나리오 통과. ./gradlew test 전건 green.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 2차 배치(P6-6~P6-8): BE 인가/기능 통합테스트, FE BO 화면+role-guard, 게이트+ROADMAP. 앞선 P6-1~P6-5(매퍼/DTO/서비스/컨트롤러/경로인가)에 의존. 인가는 경로 기반(/api/manager/**→MANAGER·STORE_ADMIN, /api/admin/**→ADMIN), 권한 외 403·미인증 401. 시드: manager@test.com(MANAGER), admin@test.com(ADMIN), user@test.com·user2@test.com(USER), 모두 BCrypt('password'). 대행은 confirm 위임(Phase4 동시성). FE: role-guard 미들웨어 신규, manager/admin 페이지 신규(AppNav 무수정, E2E는 직접 goto). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-6 완료. BoApiTest(@SpringBootTest+MockMvc, JwtTokenProvider 역할별 토큰) 8건: 대행 성공(userId=user1·managerId=mgr1·RESERVED), 휴무(2026-06-22 FULL_DAY) 400, 타 매장 매니저(mgr3→store1) 400, USER 403, 무토큰 401, ADMIN S4(userName/userEmail 존재)·S5(id 존재) 200, MANAGER admin 403. 고유 날짜(2026-09-xx)로 슬롯 격리. ./gradlew test 전건 green(BO 8건 failures=0, 총 15개 테스트 클래스).",
+      "completedAt": "2026-06-20T19:06:41.459Z"
+    },
+    {
+      "id": "76154dec-e468-4510-8813-8ff80c375a0f",
+      "name": "P6-7 FE role-guard + BO 화면 3종",
+      "description": "역할 라우트 가드 미들웨어와 BO 페이지(매니저 대행, 관리자 예약자/사용자 관리) 신규. 기존 컴포넌트/AppNav 무변경(additive).",
+      "notes": "동기 카탈로그 서비스 재사용(catalog 플러그인이 부팅 로드). 날짜/시간은 단순 입력으로 충분(테스트 결정성). 마크업은 기존 .card/.btn/.field-label 토큰 재사용. AppNav 무수정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "0d8e35b1-0744-4100-8d9a-846995aed67b"
+        }
+      ],
+      "createdAt": "2026-06-20T19:03:37.266Z",
+      "updatedAt": "2026-06-20T19:08:46.249Z",
+      "relatedFiles": [
+        {
+          "path": "app/middleware/role-guard.ts",
+          "type": "CREATE",
+          "description": "역할 가드",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/manager/reserve.vue",
+          "type": "CREATE",
+          "description": "매니저 대행 페이지",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/admin/stores/[id]/reservations.vue",
+          "type": "CREATE",
+          "description": "S4 페이지",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/pages/admin/stores/[id]/users.vue",
+          "type": "CREATE",
+          "description": "S5 페이지",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "app/middleware/auth.ts",
+          "type": "REFERENCE",
+          "description": "미들웨어 패턴 참조",
+          "lineStart": 1,
+          "lineEnd": 30
+        }
+      ],
+      "implementationGuide": "app/middleware/role-guard.ts: defineNuxtRouteMiddleware((to)=>{ const auth=useAuthStore(); const roles=to.meta.roles as string[]|undefined; if(!roles) return; const role=auth.currentUser?.role; if(!role||!roles.includes(role)) return navigateTo('/reserve') }). \n app/pages/manager/reserve.vue: definePageMeta({middleware:['auth','role-guard'], roles:['MANAGER','STORE_ADMIN']}). 카탈로그(getApprovedStores/getManagersByStore/getCarTypes/getServiceTypes/getBaysForCar)·getPrice 재사용. 입력: 고객 이메일(text), 매장 select, 매니저 select(매장 소속), 차종/서비스 select, 날짜/시간(text 또는 WheelPicker), 베이 select. 제출 → $apiFetch POST /api/manager/reservations {customerEmail,managerId,storeId,bayId,date,timeSlot,carType,serviceType,amount}. 성공/실패 토스트(useToast). testid 부여(proxy-customer-email, proxy-store, proxy-manager, ... proxy-submit, proxy-result). \n app/pages/admin/stores/[id]/reservations.vue: definePageMeta roles:['ADMIN']. onMounted/useAsyncData로 $apiFetch GET /api/admin/stores/{route.params.id}/reservations → 표. testid admin-reservation-row. \n app/pages/admin/stores/[id]/users.vue: 동일 패턴 GET .../users. testid admin-user-row. \n $apiFetch=useNuxtApp().$apiFetch, base=useRuntimeConfig().public.apiBase.",
+      "verificationCriteria": "npm run type-check 통과. role-guard가 권한 외 역할을 /reserve로 리다이렉트. 대행 페이지가 BE로 POST하고 결과 표시. admin 페이지가 목록 표시. 기존 페이지/AppNav diff 없음.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 2차 배치(P6-6~P6-8): BE 인가/기능 통합테스트, FE BO 화면+role-guard, 게이트+ROADMAP. 앞선 P6-1~P6-5(매퍼/DTO/서비스/컨트롤러/경로인가)에 의존. 인가는 경로 기반(/api/manager/**→MANAGER·STORE_ADMIN, /api/admin/**→ADMIN), 권한 외 403·미인증 401. 시드: manager@test.com(MANAGER), admin@test.com(ADMIN), user@test.com·user2@test.com(USER), 모두 BCrypt('password'). 대행은 confirm 위임(Phase4 동시성). FE: role-guard 미들웨어 신규, manager/admin 페이지 신규(AppNav 무수정, E2E는 직접 goto). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-7 완료. role-guard.ts(meta.roles 기반, 권한 외→/reserve 리다이렉트). manager/reserve.vue(roles MANAGER/STORE_ADMIN, 카탈로그·getPrice 재사용, 고객 이메일+매장/매니저/차종/서비스/날짜/시간/베이 입력, cascade 초기화, $apiFetch POST /manager/reservations, 인라인 결과 메시지, proxy-* testid). admin/stores/[id]/reservations.vue(S4)·users.vue(S5)(roles ADMIN, onMounted $apiFetch GET, admin-reservation-row-*/admin-user-row-* testid). useToast 대신 자체 인라인 메시지로 결합 최소화. npm run type-check 0 에러(커스텀 meta.roles 정상). 기존 페이지/AppNav 무변경(additive).",
+      "completedAt": "2026-06-20T19:08:46.245Z"
+    },
+    {
+      "id": "f73ead64-1f72-495d-94d4-1467e6bbb6f2",
+      "name": "P6-8 Phase 6 게이트 + BO E2E + ROADMAP 갱신",
+      "description": "Phase 6 DoD 종합 게이트. BE 빌드(BO 테스트)·FE 타입체크·BO E2E(대행/조회/권한 가드)·1차 회귀 전건 통과. ROADMAP_2 Phase 6 체크리스트/DoD 갱신.",
+      "notes": "BO E2E는 직접 goto + 역할별 로그인. 슬롯 충돌 회피 위해 BO 대행 E2E는 고유 날짜 사용. role-guard 리다이렉트 검증 포함.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "fec02f14-a24e-4b1f-b0d0-1c8c4d2b112d"
+        },
+        {
+          "taskId": "76154dec-e468-4510-8813-8ff80c375a0f"
+        }
+      ],
+      "createdAt": "2026-06-20T19:03:37.266Z",
+      "updatedAt": "2026-06-20T19:13:30.495Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/bo.spec.ts",
+          "type": "CREATE",
+          "description": "BO E2E",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 6 체크리스트/DoD 갱신",
+          "lineStart": 977,
+          "lineEnd": 1043
+        }
+      ],
+      "implementationGuide": "(1) JAVA_HOME export 후 cd backend && ./gradlew build. (2) npm run type-check. (3) e2e/bo.spec.ts 신규: 매니저 로그인(manager@test.com)→/manager/reserve 대행 예약 성공, USER 로그인→/manager/reserve 접근 시 /reserve 리다이렉트(role-guard), ADMIN 로그인→/admin/stores/store1/reservations·users 목록 노출. npm run test:e2e 전건(1차 25 + BO) 통과. 실패 시 수정. (4) docs/roadmaps/ROADMAP_2.md Phase 6 체크리스트/DoD [x] 갱신 + 구현 메모(경로 기반 인가 채택 이유, 고객 이메일 기반 대행, M3 휴무 서버 검증, S5=매장 예약 고객 distinct 정의) 기록. 게이트 통과 후 커밋·푸시는 사용자 확인.",
+      "verificationCriteria": "./gradlew build BUILD SUCCESSFUL(BO 테스트 포함). type-check 0. test:e2e 전건 통과(대행/조회/role-guard). ROADMAP_2 Phase 6 DoD 체크 반영.",
+      "analysisResult": "2차 Phase 6 — BO: 예약 대행(M3) + 매장 관리(S4·S5). 2차 배치(P6-6~P6-8): BE 인가/기능 통합테스트, FE BO 화면+role-guard, 게이트+ROADMAP. 앞선 P6-1~P6-5(매퍼/DTO/서비스/컨트롤러/경로인가)에 의존. 인가는 경로 기반(/api/manager/**→MANAGER·STORE_ADMIN, /api/admin/**→ADMIN), 권한 외 403·미인증 401. 시드: manager@test.com(MANAGER), admin@test.com(ADMIN), user@test.com·user2@test.com(USER), 모두 BCrypt('password'). 대행은 confirm 위임(Phase4 동시성). FE: role-guard 미들웨어 신규, manager/admin 페이지 신규(AppNav 무수정, E2E는 직접 goto). oxfmt(세미콜론 없음). 2차는 shrimp-task-manager-phase2만 사용.",
+      "summary": "P6-8 게이트 완료. (1) ./gradlew test BUILD SUCCESSFUL — BoApiTest 8건 포함 전건 0실패(15개 테스트 클래스). (2) npm run type-check 0 에러. (3) e2e/bo.spec.ts 신규 4건(매니저 대행 성공·USER→manager/admin role-guard 리다이렉트·ADMIN S4/S5 조회) — 하이드레이션 레이스(첫 fill이 hydration 직전 실행돼 리셋됨)는 이메일 입력을 select/텍스트 뒤로 이동 + toHaveValue/toBeEnabled 가드로 해결. npm run test:e2e 전건 29건(1차 25 + BO 4) 통과(10.2s). (4) ROADMAP_2 Phase 6 체크리스트·DoD 전부 [x] 갱신 + 구현 메모(경로 기반 인가, 이메일 기반 대행, S5 distinct 정의, 휴무 SHIFT 서버 검증, additive) 기록.",
+      "completedAt": "2026-06-20T19:13:30.491Z"
     }
   ]
 }

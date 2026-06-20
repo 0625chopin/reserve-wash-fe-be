@@ -13,6 +13,9 @@ public interface ReservationMapper {
 
     List<Reservation> findByUser(String userId);
 
+    // 매장별 예약 조회 — BO 관리자 예약자/사용자 관리(S4·S5, Phase 6)
+    List<Reservation> findByStore(String storeId);
+
     int insert(Reservation reservation);
 
     // 상태 전이 영속화 — id로 status만 갱신(전이 가드는 도메인 메서드가 담당)

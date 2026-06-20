@@ -17,6 +17,12 @@
         WHERE user_id = #{userId} ORDER BY `date`, time_slot
     </select>
 
+    <!-- 매장별 예약 — BO 관리자 화면(S4·S5, Phase 6) -->
+    <select id="findByStore" resultType="com.carwash.domain.Reservation">
+        SELECT <include refid="columns"/> FROM reservation
+        WHERE store_id = #{storeId} ORDER BY `date`, time_slot
+    </select>
+
     <!-- id는 앱이 부여(문자열). enum은 기본 EnumTypeHandler(name) 매핑 -->
     <insert id="insert">
         INSERT INTO reservation

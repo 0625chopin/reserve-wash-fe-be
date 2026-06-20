@@ -982,13 +982,13 @@ public void cancel(Long reservationId) {
 1차에서 문서화만 했던 BO를 착수한다. **매니저 예약 대행(M3)** — 매니저가 소속 매장 기준으로 사용자 예약을 대행 — 과 **관리자 매장별 예약자 관리(S4)·사용자 관리(S5)** 를 구현한다. 인가는 Phase 3의 역할 가드를 재사용한다.
 
 #### 태스크 체크리스트
-- [ ] `POST /api/manager/reservations` — 매니저 대행 예약(M3), 소속 매장·본인 휴무 반영(require 6.2)
-- [ ] 대행 예약도 동일 동시성 경로(Phase 4 confirm) + 동일 베이 노출 규칙(Phase 0 Q7) 재사용
-- [ ] `GET /api/admin/stores/{id}/reservations` — 매장별 예약자 관리(S4, require 11.1)
-- [ ] `GET /api/admin/stores/{id}/users` — 매장별 사용자 관리(S5)
-- [ ] 역할 인가: M3=MANAGER/STORE_ADMIN, S4·S5=ADMIN (require 3.2)
-- [ ] FE BO 화면(신규): 매니저 대행 예약 페이지, 관리자 예약자/사용자 관리 페이지
-- [ ] FE 라우트 가드 `role-guard`(Phase 3) 적용 — 권한 외 접근 차단
+- [x] `POST /api/manager/reservations` — 매니저 대행 예약(M3), 소속 매장·본인 휴무 반영(require 6.2) *(P6-3·P6-5)*
+- [x] 대행 예약도 동일 동시성 경로(Phase 4 `confirm`) + 동일 베이 노출 규칙(Phase 0 Q7) 재사용 *(proxyReserve가 reservationService.confirm 위임)*
+- [x] `GET /api/admin/stores/{id}/reservations` — 매장별 예약자 관리(S4, require 11.1) *(P6-4·P6-5)*
+- [x] `GET /api/admin/stores/{id}/users` — 매장별 사용자 관리(S5) *(P6-4·P6-5)*
+- [x] 역할 인가: M3=MANAGER/STORE_ADMIN, S4·S5=ADMIN (require 3.2) *(SecurityConfig 경로 기반)*
+- [x] FE BO 화면(신규): 매니저 대행 예약(`manager/reserve.vue`), 관리자 예약자/사용자 관리(`admin/stores/[id]/reservations.vue`·`users.vue`)
+- [x] FE 라우트 가드 `role-guard` 적용 — 권한 외 접근 차단(`meta.roles`)
 
 #### 생성·수정 파일
 `controller/ManagerReservationController.java`, `controller/AdminController.java`, `service/ManagerReservationService.java`, `service/AdminService.java`, `dto/ProxyReservationRequest.java`, `dto/AdminReservationResponse.java`, `dto/AdminUserResponse.java`, FE `app/pages/manager/reserve.vue`(신규), FE `app/pages/admin/stores/[id]/reservations.vue`·`users.vue`(신규), FE `app/middleware/role-guard.ts`(적용)
@@ -1034,11 +1034,18 @@ public class ManagerReservationController {
 ```
 
 #### 완료기준 (DoD)
-- [ ] 매니저가 소속 매장 기준으로 사용자 예약을 대행할 수 있고, 본인 휴무 시간대는 차단된다(M3, require 6.2)
-- [ ] 대행 예약이 일반 예약과 **동일한 동시성/베이 노출 규칙**을 따른다(Phase 0 Q7)
-- [ ] 관리자가 매장별 예약자(S4)·사용자(S5) 목록을 조회할 수 있다(require 11.1)
-- [ ] 권한 외 역할이 BO 엔드포인트 호출 시 403을 받는다(require 3.2)
-- [ ] `./gradlew build`, `npm run type-check` 통과 + BO E2E 시나리오(대행/조회) 통과
+- [x] 매니저가 소속 매장 기준으로 사용자 예약을 대행할 수 있고, 본인 휴무 시간대는 차단된다(M3, require 6.2) *(BoApiTest 대행 성공·휴무 400)*
+- [x] 대행 예약이 일반 예약과 **동일한 동시성/베이 노출 규칙**을 따른다(Phase 0 Q7) *(confirm 위임 — insertHold·UNIQUE·낙관락 동일)*
+- [x] 관리자가 매장별 예약자(S4)·사용자(S5) 목록을 조회할 수 있다(require 11.1) *(BoApiTest S4·S5 200, BO E2E 조회)*
+- [x] 권한 외 역할이 BO 엔드포인트 호출 시 403을 받는다(require 3.2) *(USER 대행 403·MANAGER admin 403)*
+- [x] `./gradlew build`(BO 8건 포함 전건 green)·`npm run type-check`(0) + BO E2E(대행/조회/role-guard 4건) + 1차 회귀 25건 = **E2E 29건** 통과
+
+#### 구현 메모 (📌)
+- 📌 **인가 방식 — 경로 기반 채택**: `@PreAuthorize`(메서드 보안) 대신 `SecurityConfig.authorizeHttpRequests`에서 `/api/manager/**`→`hasAnyRole(MANAGER,STORE_ADMIN)`, `/api/admin/**`→`hasRole(ADMIN)`으로 중앙집중 인가. 기존 permitAll/anyRequest 설정과 단일 소스로 일관(구체 매처를 `anyRequest` 이전 배치). JWT 필터가 이미 `ROLE_`+role 권한을 세팅하므로 `@EnableMethodSecurity` 불필요. 권한 외→403(기본 AccessDeniedHandler), 미인증→401(기존 entryPoint).
+- 📌 **대행 고객 식별 — 이메일 기반**: User(로그인 계정)와 Manager(`mgr1`~) 엔티티가 분리돼 있어, `ProxyReservationRequest`는 대행 고객을 **이메일**로 받고 서버가 `userMapper.findByEmail`로 해석(미존재 404). 대행 매니저는 `managerId`로 받아 **소속 매장 일치**(불일치 400)와 **본인 휴무**(서버 SHIFT 매핑, 400)를 검증한 뒤 `reservationService.confirm(고객id, ConfirmRequest{managerId})`로 위임 → Phase 4 동시성 경로 그대로 재사용(충돌 409).
+- 📌 **S5 정의**: users 테이블에 store 소속 컬럼이 없으므로 "매장별 사용자"는 **해당 매장에 예약 이력이 있는 고객(distinct, 최초 등장 순)**으로 정의. `userMapper.findAll()` 1회 맵으로 조인(N+1 회피), `passwordHash` 미노출.
+- 📌 **휴무 SHIFT 서버 검증**: FE `storeService.isManagerOffAt`와 동일 경계(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00, FULL_DAY 전일)를 `ManagerReservationService`에 복제.
+- 📌 **additive**: 기존 컴포넌트·페이지·AppNav 무변경, BO는 신규 파일(미들웨어 1·페이지 3·컨트롤러 2·서비스 2·DTO 3·매퍼 메서드 1). BO E2E는 AppNav 링크 없이 직접 `goto`.
 
 ---
 
