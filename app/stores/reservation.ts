@@ -58,7 +58,42 @@ export const useReservationStore = defineStore('reservation', () => {
     }
   }
 
+  // 세차완료 — RESERVED → COMPLETED (FW6, require 11.3). 슬롯도 COMPLETED 고정
+  // 불가능 전이(RESERVED 아님)는 차단한다.
+  // TODO(2단계): 상태 전이를 서버 검증(reservationService)으로 위임
+  function completeReservation(id: string): boolean {
+    const target = reservations.value.find((r) => r.id === id)
+    if (!target || target.status !== 'RESERVED') return false
+    target.status = 'COMPLETED'
+    slotStatus.value[slotKey(target.storeId, target.bayId, target.date, target.timeSlot)] =
+      'COMPLETED'
+    return true
+  }
+
+  // 예약 취소 — RESERVED/HOLDING → CANCELED (FW7, require 11.3 b/c). 슬롯은 AVAILABLE로 release
+  // 승인 전/후 케이스 모두 동일 처리(MVP는 승인 단계 없음). COMPLETED/CANCELED는 차단한다.
+  // TODO(2단계): 상태 전이를 서버 검증(reservationService)으로 위임
+  function cancelReservation(id: string): boolean {
+    const target = reservations.value.find((r) => r.id === id)
+    if (!target || (target.status !== 'RESERVED' && target.status !== 'HOLDING')) return false
+    target.status = 'CANCELED'
+    // 시드 RESERVED를 덮어쓰도록 런타임 맵에 명시 AVAILABLE 기록
+    slotStatus.value[slotKey(target.storeId, target.bayId, target.date, target.timeSlot)] =
+      'AVAILABLE'
+    return true
+  }
+
   const reservedCount = computed(() => reservations.value.length)
 
-  return { slotStatus, reservations, reservedCount, getStatus, holdSlot, confirmReservation, releaseSlot }
+  return {
+    slotStatus,
+    reservations,
+    reservedCount,
+    getStatus,
+    holdSlot,
+    confirmReservation,
+    releaseSlot,
+    completeReservation,
+    cancelReservation,
+  }
 })

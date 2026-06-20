@@ -702,6 +702,139 @@
       "analysisResult": "예약 화면 3페이지 위저드 분할(require_v1.md v1.4 6.5 / ROADMAP v1.4 Phase 5.1). 단일 reserve.vue를 ① /reserve(매장·매니저·차종·서비스·가격) ② /reserve/slot(날짜·시간→그 시간대 베이 버튼 그리드→예약하기/충돌) ③ /reserve/done(완료 요약)로 분할. 진행 데이터는 신규 reservationDraft Pinia 스토어(in-memory, 추후 서버/Redis/JWT 교체 경계)에 보관. 베이 선택은 SlotGrid 버튼 그리드 단일화(SearchableSelect 베이 폐지). 미완료 단계 직접 URL 진입 시 reservationWizardGuard가 /reserve로 리다이렉트. 슬롯 점유 진실은 기존 reservation 스토어가 계속 소유(역할 분리), 휴무 판정은 storeService.isManagerOffAt/isManagerFullDayOff, 가격은 priceService.getPrice 재사용. 결정사항: 2페이지는 날짜/시간 먼저→베이 그리드(점유 베이 비활성), 진행상태는 in-memory만(새로고침 초기화). 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트(components/stores/composables/middleware)·types/data/services 명시 import, services 단방향, SSR 안전(ClientOnly/import.meta.client), data-testid 결정적 E2E, 주석/커밋 한국어. 기존 Phase 5 태스크(T1~T7)·NR1~5는 완료됨.",
       "summary": "W7 완료: docs/ROADMAP.md Phase 5.1 태스크 체크리스트 9항목·DoD 8항목을 실제 구현 상태로 [x] 갱신. 미들웨어 파일명/키를 reservation-wizard-guard(kebab)로 정정 반영, 상태 필드명 실제(storeId/managerId/carType/serviceType/bayId)로 정합. 구현 메모 추가: 베이 그리드 단일화로 점유 베이 사전 비활성→confirm 충돌 분기·bay-occupied-notice는 2·3단계 서버 검증 대비 방어 코드로 잔존(현재는 그리드 disabled가 점유 차단). 6.2 Playwright 위저드 흐름·진입 가드 2항목 [x]. 코드/정본(require_v1.md) 미변경, e2e 14/14·type-check·lint 통과 상태와 일치.",
       "completedAt": "2026-06-20T08:59:23.261Z"
+    },
+    {
+      "id": "90a2d861-41d9-4dae-9fa3-51dcee3e843c",
+      "name": "P6-1: reservation 스토어 상태 전이 액션 (완료/취소 + 가드)",
+      "description": "예약 상태 전이를 reservation 스토어에 추가한다. RESERVED→COMPLETED(세차완료), RESERVED/HOLDING→CANCELED(취소)+슬롯 AVAILABLE release, 불가능 전이(COMPLETED/CANCELED에서의 전이)는 차단(가드). 슬롯 status 동기화로 그리드 재방문 시 반영되게 한다.",
+      "notes": "취소는 RESERVED와 HOLDING 모두 허용(승인 전/후 케이스 수렴). releaseSlot은 HOLDING만 처리하므로 cancel은 slotStatus[key]='AVAILABLE' 직접 기록. 기존 confirmReservation/holdSlot 시그니처 변경 없음.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T09:27:56.120Z",
+      "updatedAt": "2026-06-20T09:28:34.235Z",
+      "relatedFiles": [
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "TO_MODIFY",
+          "description": "completeReservation·cancelReservation·가드 추가",
+          "lineStart": 12,
+          "lineEnd": 64
+        },
+        {
+          "path": "app/types/enums.ts",
+          "type": "REFERENCE",
+          "description": "ReservationStatus 전이값"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "REFERENCE",
+          "description": "상태 전이 표(923~928)",
+          "lineStart": 921,
+          "lineEnd": 928
+        }
+      ],
+      "implementationGuide": "app/stores/reservation.ts에 액션 추가.\n- completeReservation(id: string): boolean — reservations에서 id 찾기, status==='RESERVED'면 status='COMPLETED' + slotStatus[key]='COMPLETED' 후 true, 아니면 false(가드).\n- cancelReservation(id: string): boolean — status가 'RESERVED'|'HOLDING'이면 status='CANCELED' + slotStatus[key]='AVAILABLE'(시드 오버라이드) 후 true, 'COMPLETED'|'CANCELED'면 false(가드).\n- 두 액션 모두 slotKey(r.storeId,r.bayId,r.date,r.timeSlot)로 slotStatus 동기화.\n- return 객체에 completeReservation, cancelReservation 추가.\n- // TODO(2단계): 상태 전이를 서버 검증으로 위임. 주석 명시.",
+      "verificationCriteria": "completeReservation: RESERVED만 COMPLETED+slot COMPLETED·true, 그 외 false. cancelReservation: RESERVED/HOLDING만 CANCELED+slot AVAILABLE·true, COMPLETED/CANCELED는 false. npm run type-check 통과.",
+      "analysisResult": "Phase 6 — 예약 확정/취소/세차완료 상태 (FW6/FW7, ROADMAP 903~935, require 11.3·8장). 예약 목록 화면(reservations.vue)에서 상태 전이(RESERVED→COMPLETED, 취소→CANCELED)와 취소 시 슬롯 release를 구현. 현재 reservations.vue는 빈 상태 플레이스홀더, reservation 스토어는 reservations[](confirmReservation이 status RESERVED로 push)·slotStatus·getStatus/holdSlot/confirmReservation/releaseSlot만 보유. ReservationStatus='HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'(enums). 설계 메모: MVP는 승인(M6) 단계가 없어 목록에 HOLDING 레코드는 없음 → 취소 2케이스(승인 전/후)는 모두 취소→CANCELED+슬롯 AVAILABLE로 수렴(상태 라벨만 더미 구분, require 11.3 b/c). 슬롯 식별 키 UNIQUE=(storeId|bayId|date|timeSlot). 예약 표시 이름은 storeService 카탈로그(getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore)로 매핑, 내 예약은 auth.currentUser.id로 필터. 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전, data-testid 결정적 E2E, 색은 @theme 토큰, 주석/커밋 한국어. 기존 Phase 5·NR·W(19개)는 완료.",
+      "summary": "P6-1 완료: app/stores/reservation.ts에 completeReservation(id)·cancelReservation(id) 추가. completeReservation: RESERVED만 COMPLETED 전이+slotStatus COMPLETED, 그 외 false(가드). cancelReservation: RESERVED/HOLDING만 CANCELED 전이+slotStatus AVAILABLE(시드 오버라이드로 그리드 재방문 시 release 반영), COMPLETED/CANCELED는 false(불가능 전이 차단). slotKey로 슬롯 동기화, // TODO(2단계) 서버 위임 주석. return에 두 액션 추가. 기존 시그니처 변경 없음. type-check·lint 통과.",
+      "completedAt": "2026-06-20T09:28:34.232Z"
+    },
+    {
+      "id": "4769bb78-338e-48fa-8476-7258700d9dd1",
+      "name": "P6-2: reservations.vue 예약 목록 + 상태 전이 UI",
+      "description": "내 예약 목록 화면을 구현한다. 예약별 상태 뱃지·금액·매장/매니저/차종·베이/서비스/일시를 표시하고, 상태별 액션 버튼(세차완료/취소)을 제공한다. 예약이 없으면 기존 빈 상태 유지.",
+      "notes": "definePageMeta auto 유지. 후기 작성 링크는 Phase7 대비 자리만(라우트는 존재). 상태 뱃지/버튼은 myReservations 반응형으로 즉시 갱신.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "90a2d861-41d9-4dae-9fa3-51dcee3e843c"
+        }
+      ],
+      "createdAt": "2026-06-20T09:27:56.120Z",
+      "updatedAt": "2026-06-20T09:29:47.512Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reservations.vue",
+          "type": "TO_MODIFY",
+          "description": "목록·뱃지·전이 버튼 구현",
+          "lineStart": 1,
+          "lineEnd": 52
+        },
+        {
+          "path": "app/services/storeService.ts",
+          "type": "DEPENDENCY",
+          "description": "이름 매핑 카탈로그"
+        },
+        {
+          "path": "app/stores/auth.ts",
+          "type": "DEPENDENCY",
+          "description": "currentUser 필터"
+        }
+      ],
+      "implementationGuide": "app/pages/reserve... 아님 — app/pages/reservations.vue 구현.\n- const auth=useAuthStore(); const reservation=useReservationStore().\n- myReservations computed: reservation.reservations.filter(r=>r.userId===auth.currentUser?.id) (최신이 위로 역순 표시 가능).\n- 이름 매핑: storeService getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore로 storeName·managerName·carTypeName·serviceName·bayCode 산출(페이지 computed/헬퍼).\n- 행마다 data-testid=`reservation-${r.id}`, 상태 뱃지 data-testid=`status-${r.id}`(RESERVED/COMPLETED/CANCELED 텍스트·색).\n- 액션: status==='RESERVED'면 [세차완료](testid=`complete-${r.id}`)·[취소](testid=`cancel-${r.id}`), COMPLETED면 [후기 작성] NuxtLink to=`/review/${r.id}`(Phase7), CANCELED면 액션 없음. 버튼 클릭 시 reservation.completeReservation/cancelReservation 호출.\n- myReservations.length===0이면 기존 빈 상태(예약하러 가기) 유지.\n- 색은 @theme 토큰, 뱃지는 상태별 구분(RESERVED=primary, COMPLETED=accent, CANCELED=muted).",
+      "verificationCriteria": "예약 있으면 상태 뱃지·금액·매장/일시 표시. RESERVED 행에 세차완료·취소 버튼, 클릭 시 뱃지 즉시 갱신(COMPLETED/CANCELED). COMPLETED는 취소 버튼 없음. 예약 없으면 빈 상태. npm run type-check·lint 통과.",
+      "analysisResult": "Phase 6 — 예약 확정/취소/세차완료 상태 (FW6/FW7, ROADMAP 903~935, require 11.3·8장). 예약 목록 화면(reservations.vue)에서 상태 전이(RESERVED→COMPLETED, 취소→CANCELED)와 취소 시 슬롯 release를 구현. 현재 reservations.vue는 빈 상태 플레이스홀더, reservation 스토어는 reservations[](confirmReservation이 status RESERVED로 push)·slotStatus·getStatus/holdSlot/confirmReservation/releaseSlot만 보유. ReservationStatus='HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'(enums). 설계 메모: MVP는 승인(M6) 단계가 없어 목록에 HOLDING 레코드는 없음 → 취소 2케이스(승인 전/후)는 모두 취소→CANCELED+슬롯 AVAILABLE로 수렴(상태 라벨만 더미 구분, require 11.3 b/c). 슬롯 식별 키 UNIQUE=(storeId|bayId|date|timeSlot). 예약 표시 이름은 storeService 카탈로그(getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore)로 매핑, 내 예약은 auth.currentUser.id로 필터. 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전, data-testid 결정적 E2E, 색은 @theme 토큰, 주석/커밋 한국어. 기존 Phase 5·NR·W(19개)는 완료.",
+      "summary": "P6-2 완료: app/pages/reservations.vue 예약 목록 구현. myReservations computed(auth.currentUser.id 필터, 최신 역순). storeService 카탈로그로 storeName/managerName/carTypeName/serviceName/bayCode 매핑, priceLabel(ko-KR). 행마다 data-testid=reservation-{id}, 상태 뱃지 status-{id}(data-status별 @theme 토큰 색: RESERVED=primary/COMPLETED=accent/CANCELED·HOLDING=muted). 액션: RESERVED→세차완료(complete-{id})·취소(cancel-{id}) 버튼이 reservation.completeReservation/cancelReservation 호출, COMPLETED→후기작성 NuxtLink(review-{id}, /review/{id}), CANCELED→안내문구. 예약 없으면 기존 빈 상태 유지. 반응형으로 뱃지/버튼 즉시 갱신. type-check·lint 통과.",
+      "completedAt": "2026-06-20T09:29:47.509Z"
+    },
+    {
+      "id": "97b56951-37b7-43df-87cd-7bf903a3b6ed",
+      "name": "P6-3: e2e — 예약 목록 상태 전이·취소 슬롯 release 시나리오",
+      "description": "Playwright로 예약 생성→목록 표시→세차완료/취소 전이→취소 시 슬롯 release를 결정적으로 검증한다.",
+      "notes": "예약 id가 동적(rsv-N)이라 행 단위 locator(예: page.getByTestId(/^reservation-/) 또는 첫 행)로 접근. 취소 후 release 검증은 /reserve→/reserve/slot 흐름 재사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4769bb78-338e-48fa-8476-7258700d9dd1"
+        }
+      ],
+      "createdAt": "2026-06-20T09:27:56.120Z",
+      "updatedAt": "2026-06-20T09:31:03.700Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/reservations.spec.ts",
+          "type": "CREATE",
+          "description": "목록·전이·취소 release 시나리오"
+        },
+        {
+          "path": "e2e/reserve.spec.ts",
+          "type": "REFERENCE",
+          "description": "위저드 흐름 헬퍼 패턴"
+        }
+      ],
+      "implementationGuide": "e2e/reservations.spec.ts 신규(또는 reserve.spec 확장).\n- 헬퍼: 위저드로 1건 예약 생성(login→/reserve 1p 선택→다음→2p 비점유 슬롯 베이 클릭→예약하기→/reserve/done) 후 nav로 /reservations 이동.\n- 시나리오A 목록·완료: 생성한 예약이 RESERVED 뱃지로 표시 → complete-{id} 클릭 → status-{id}가 COMPLETED, 취소 버튼 사라짐.\n- 시나리오B 취소+release: 새 예약 생성(고정 슬롯 예: 2026-06-27 09:00) → /reservations 취소(cancel-{id}) → CANCELED 뱃지 → /reserve 재진입 후 동일 슬롯 그리드에서 해당 베이 data-status=AVAILABLE(release 확인).\n- data-testid·고정 더미값 사용. id는 rsv-N 시퀀스라 getByTestId 패턴 또는 행 내 상대 셀렉터 사용.",
+      "verificationCriteria": "목록 RESERVED 표시·세차완료 전이·취소 후 CANCELED·취소 슬롯이 그리드에서 AVAILABLE로 복귀 단정 통과. npm run test:e2e 전체 통과.",
+      "analysisResult": "Phase 6 — 예약 확정/취소/세차완료 상태 (FW6/FW7, ROADMAP 903~935, require 11.3·8장). 예약 목록 화면(reservations.vue)에서 상태 전이(RESERVED→COMPLETED, 취소→CANCELED)와 취소 시 슬롯 release를 구현. 현재 reservations.vue는 빈 상태 플레이스홀더, reservation 스토어는 reservations[](confirmReservation이 status RESERVED로 push)·slotStatus·getStatus/holdSlot/confirmReservation/releaseSlot만 보유. ReservationStatus='HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'(enums). 설계 메모: MVP는 승인(M6) 단계가 없어 목록에 HOLDING 레코드는 없음 → 취소 2케이스(승인 전/후)는 모두 취소→CANCELED+슬롯 AVAILABLE로 수렴(상태 라벨만 더미 구분, require 11.3 b/c). 슬롯 식별 키 UNIQUE=(storeId|bayId|date|timeSlot). 예약 표시 이름은 storeService 카탈로그(getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore)로 매핑, 내 예약은 auth.currentUser.id로 필터. 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전, data-testid 결정적 E2E, 색은 @theme 토큰, 주석/커밋 한국어. 기존 Phase 5·NR·W(19개)는 완료.",
+      "summary": "P6-3 완료: e2e/reservations.spec.ts 신규. login/step1/createReservation 헬퍼(위저드로 A1 예약 생성, fresh 컨텍스트라 id=rsv-1 결정적). 시나리오A: 예약 생성→/reservations→status-rsv-1 '예약 확정'→complete-rsv-1 클릭→'세차 완료'·cancel 버튼 사라짐(toHaveCount 0)·review-rsv-1 노출. 시나리오B: 예약(2026-06-27 09:00)→취소(cancel-rsv-1)→'취소됨'→/reserve 재진입·동일 슬롯 그리드에서 slot-store1-store1-A1-09:00 data-status=AVAILABLE(release 확인). lint·전체 e2e 18/18 통과.",
+      "completedAt": "2026-06-20T09:31:03.696Z"
+    },
+    {
+      "id": "1569aa80-36d3-4e26-a4f4-914a7bebf30a",
+      "name": "P6-4: ROADMAP Phase 6 DoD 동기화",
+      "description": "구현 완료에 맞춰 docs/ROADMAP.md Phase 6 태스크 체크리스트·DoD를 [x]로 갱신하고, MVP에서 HOLDING 레코드 부재(취소 2케이스 수렴) 메모를 1줄 남긴다(문서만).",
+      "notes": "커밋 메시지 한국어. 6.2 Playwright 시나리오(예약 취소/세차완료 항목)와 정합 확인.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "97b56951-37b7-43df-87cd-7bf903a3b6ed"
+        }
+      ],
+      "createdAt": "2026-06-20T09:27:56.120Z",
+      "updatedAt": "2026-06-20T09:31:39.667Z",
+      "relatedFiles": [
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 6 체크리스트·DoD 갱신",
+          "lineStart": 903,
+          "lineEnd": 935
+        }
+      ],
+      "implementationGuide": "docs/ROADMAP.md Phase 6 절(910~935) 체크리스트·DoD [x] 갱신. 구현 메모: 승인(M6) 단계 부재로 목록에 HOLDING 레코드 없음→취소 2케이스는 모두 CANCELED+슬롯 release로 수렴(라벨만 더미). 코드/정본(require_v1.md) 미변경.",
+      "verificationCriteria": "Phase 6 체크리스트·DoD가 실제 구현과 일치([x]) + 수렴 메모 존재. 코드/정본 미변경.",
+      "analysisResult": "Phase 6 — 예약 확정/취소/세차완료 상태 (FW6/FW7, ROADMAP 903~935, require 11.3·8장). 예약 목록 화면(reservations.vue)에서 상태 전이(RESERVED→COMPLETED, 취소→CANCELED)와 취소 시 슬롯 release를 구현. 현재 reservations.vue는 빈 상태 플레이스홀더, reservation 스토어는 reservations[](confirmReservation이 status RESERVED로 push)·slotStatus·getStatus/holdSlot/confirmReservation/releaseSlot만 보유. ReservationStatus='HOLDING'|'RESERVED'|'COMPLETED'|'CANCELED'(enums). 설계 메모: MVP는 승인(M6) 단계가 없어 목록에 HOLDING 레코드는 없음 → 취소 2케이스(승인 전/후)는 모두 취소→CANCELED+슬롯 AVAILABLE로 수렴(상태 라벨만 더미 구분, require 11.3 b/c). 슬롯 식별 키 UNIQUE=(storeId|bayId|date|timeSlot). 예약 표시 이름은 storeService 카탈로그(getApprovedStores/getManager/getCarTypes/getServiceTypes/getBaysByStore)로 매핑, 내 예약은 auth.currentUser.id로 필터. 규칙(shrimp-rules): oxfmt(세미콜론 없음·작은따옴표), Vue script setup lang=ts, Pinia setup, 자동임포트/services 단방향, SSR 안전, data-testid 결정적 E2E, 색은 @theme 토큰, 주석/커밋 한국어. 기존 Phase 5·NR·W(19개)는 완료.",
+      "summary": "P6-4 완료: docs/ROADMAP.md Phase 6 태스크 체크리스트 6항목·DoD 5항목을 [x]로 갱신(reservations.vue 목록·세차완료·취소2케이스·슬롯 동기화·전이 가드, type-check·lint·e2e 18/18). 구현 메모 추가: 승인(M6) 단계 부재로 HOLDING 레코드 없음→취소 2케이스 모두 CANCELED+슬롯 AVAILABLE로 수렴(라벨만 더미, require 11.3 b/c), cancelReservation은 RESERVED/HOLDING 방어적 허용, release는 런타임 맵 AVAILABLE 명시로 시드 오버라이드. 코드/정본(require_v1.md) 미변경.",
+      "completedAt": "2026-06-20T09:31:39.666Z"
     }
   ]
 }

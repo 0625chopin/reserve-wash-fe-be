@@ -908,12 +908,14 @@ definePageMeta({ middleware: ['auth', 'reservationWizardGuard'] })
 예약 목록 화면에서 **상태 전이**(HOLDING→RESERVED→COMPLETED, 취소)를 다루고, **취소 2케이스**(승인 전/후 — MVP는 더미 상태값)를 구현한다.
 
 #### 태스크 체크리스트
-- [ ] `app/pages/reservations.vue` — 내 예약 목록(상태 뱃지, 금액, 매장/날짜/시간)
-- [ ] 세차완료 처리: `RESERVED → COMPLETED` 액션 (1단계 더미; 실제로는 매니저 BO 영역, 시뮬레이션 버튼)
-- [ ] 취소 케이스 1 (승인 후 취소): `RESERVED → CANCELED` + 슬롯 release (FW7)
-- [ ] 취소 케이스 2 (승인 전 취소): `HOLDING → CANCELED` + 슬롯 release (FW7)
-- [ ] 취소/완료 시 reservation 스토어 슬롯 status 동기화 (그리드 재방문 시 반영)
-- [ ] 상태 전이 가드: 불가능한 전이(예: COMPLETED→CANCELED) 차단
+- [x] `app/pages/reservations.vue` — 내 예약 목록(상태 뱃지, 금액, 매장/매니저/차종·베이/서비스/날짜·시간), `auth.currentUser` 필터
+- [x] 세차완료 처리: `RESERVED → COMPLETED` 액션 (1단계 더미; 실제로는 매니저 BO 영역, 시뮬레이션 버튼)
+- [x] 취소 케이스 1 (승인 후 취소): `RESERVED → CANCELED` + 슬롯 release (FW7)
+- [x] 취소 케이스 2 (승인 전 취소): `HOLDING → CANCELED` + 슬롯 release (FW7) — ※ 아래 메모 참조
+- [x] 취소/완료 시 reservation 스토어 슬롯 status 동기화 (그리드 재방문 시 반영)
+- [x] 상태 전이 가드: 불가능한 전이(예: COMPLETED→CANCELED) 차단
+
+> 📌 **구현 메모(v1.4 완료)**: 본 MVP는 **승인(M6) 단계가 없어** `confirmReservation`이 곧장 `RESERVED`를 생성하므로, 목록에 `HOLDING` 레코드는 존재하지 않는다. 따라서 **취소 2케이스(승인 전/후)는 모두 `CANCELED`+슬롯 `AVAILABLE` release로 수렴**하며(상태 라벨만 더미 구분, require 11.3 b/c), `cancelReservation`은 `RESERVED`·`HOLDING`을 모두 허용하도록 방어적으로 구현했다. 슬롯 release는 런타임 맵에 `AVAILABLE`을 명시 기록해 시드를 오버라이드한다.
 
 #### 생성·수정 파일
 `app/pages/reservations.vue`(구현), `app/stores/reservation.ts`(액션 추가: `completeReservation`, `cancelReservation`)
@@ -928,11 +930,11 @@ definePageMeta({ middleware: ['auth', 'reservationWizardGuard'] })
 | `COMPLETED` | (불가) | — | — | 후기 작성만 가능 |
 
 #### 완료기준 (DoD)
-- [ ] 예약 목록에서 각 예약의 상태가 뱃지로 정확히 표시된다
-- [ ] RESERVED 예약을 세차완료로 전이할 수 있다
-- [ ] 승인 전/후 취소 2케이스가 모두 동작하고 슬롯이 다시 AVAILABLE이 된다
-- [ ] 불가능한 상태 전이가 차단된다
-- [ ] `npm run type-check`, `npm run lint` 통과
+- [x] 예약 목록에서 각 예약의 상태가 뱃지로 정확히 표시된다
+- [x] RESERVED 예약을 세차완료로 전이할 수 있다
+- [x] 승인 전/후 취소 2케이스가 모두 동작하고 슬롯이 다시 AVAILABLE이 된다
+- [x] 불가능한 상태 전이가 차단된다
+- [x] `npm run type-check`, `npm run lint`, `npm run test:e2e`(목록·전이·취소 release, 전체 18/18) 통과
 
 ---
 
