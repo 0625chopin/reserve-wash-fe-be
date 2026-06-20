@@ -45,4 +45,9 @@ public class Slot {
     public void release() {
         this.status = SlotStatus.AVAILABLE;
     }
+
+    // 세차완료 — 슬롯을 COMPLETED로 고정(예약 전이의 종속, 호출부가 RESERVED 보장, require 11.3)
+    public void complete() {
+        this.status = SlotStatus.COMPLETED;
+    }
 }

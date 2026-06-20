@@ -28,4 +28,21 @@ public class Reservation {
     private ServiceType serviceType;
     private int amount;
     private ReservationStatus status;
+
+    // 상태 전이는 도메인 메서드로 — 불가능한 전이는 예외(서버 강제, require 11.3)
+    // 세차완료(FW6/M4): RESERVED → COMPLETED
+    public void complete() {
+        if (this.status != ReservationStatus.RESERVED) {
+            throw new IllegalStateException("세차완료 불가 상태: " + this.status);
+        }
+        this.status = ReservationStatus.COMPLETED;
+    }
+
+    // 예약취소(FW7/M5): RESERVED/HOLDING → CANCELED. 이미 완료/취소된 예약은 차단
+    public void cancel() {
+        if (this.status == ReservationStatus.COMPLETED || this.status == ReservationStatus.CANCELED) {
+            throw new IllegalStateException("취소 불가 상태: " + this.status);
+        }
+        this.status = ReservationStatus.CANCELED;
+    }
 }

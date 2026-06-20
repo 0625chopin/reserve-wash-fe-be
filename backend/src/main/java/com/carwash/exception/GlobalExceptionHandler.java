@@ -29,6 +29,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("SLOT_CONFLICT", "선택하신 슬롯이 방금 예약되었습니다."));
     }
 
+    // 불가능한 상태 전이(도메인 가드) — 409. 예: COMPLETED 예약 재취소 (require 11.3)
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidTransition(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("INVALID_TRANSITION", e.getMessage()));
+    }
+
     // Bean Validation 오류 — 400
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {

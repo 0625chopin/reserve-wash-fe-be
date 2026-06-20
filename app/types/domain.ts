@@ -67,6 +67,7 @@ export interface Price {
 // 예약 (require 6장, 11.3)
 export interface Reservation {
   id: string
+  serverId?: string // BE가 부여한 예약 id — 상태 전이 PATCH 호출용(표시 id와 분리)
   userId: string
   storeId: string
   bayId: string

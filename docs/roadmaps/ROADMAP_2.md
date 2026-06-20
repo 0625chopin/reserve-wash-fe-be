@@ -897,15 +897,15 @@ export async function confirmReservation(payload: Reservation): Promise<boolean>
 1차의 클라이언트 상태 전이(ROADMAP_1 Phase 6)를 **서버 API**로 교체하고, **세차완료(FW6/M4)·예약취소(FW7/M5)** 에 더해 1차에 없던 **예약 승인(M6)** 을 도입한다. 상태 가드(불가능한 전이 차단)를 서버에서 강제한다.
 
 #### 태스크 체크리스트
-- [ ] `PATCH /api/reservations/{id}/complete` — RESERVED → COMPLETED (FW6/M4)
-- [ ] `PATCH /api/reservations/{id}/cancel` — RESERVED/HOLDING → CANCELED + 슬롯 release (FW7/M5)
-- [ ] `PATCH /api/reservations/{id}/approve` — (승인 도입 시) 예약 승인 (M6, require 11.3)
-- [ ] 상태 전이 가드: 도메인 메서드(`complete()`/`cancel()`)에서 불가능 전이 시 예외 → 409/400
-- [ ] 취소 시 슬롯 release(AVAILABLE) — 그리드 재방문 시 반영
-- [ ] FE `app/pages/reservations.vue`·`reservation` 스토어 액션을 서버 호출로 교체
+- [x] `PATCH /api/reservations/{id}/complete` — RESERVED → COMPLETED (FW6/M4) *(P5-4, 204·404·409)*
+- [x] `PATCH /api/reservations/{id}/cancel` — RESERVED/HOLDING → CANCELED + 슬롯 release (FW7/M5) *(P5-4)*
+- [x] ~~`PATCH /api/reservations/{id}/approve` — 예약 승인 (M6)~~ → **Phase 0 결정에 따라 미도입(이연)**. 1차 parity(confirm→즉시 RESERVED, PENDING 상태 미신설)·Phase 3 승인 상태머신 이연과 정합. M6 승인은 **Phase 6(BO 대행)** 에서 BO 전용 흐름으로 도입
+- [x] 상태 전이 가드: 도메인 메서드(`Reservation.complete()`/`cancel()`)에서 불가능 전이 시 `IllegalStateException` → **409 `INVALID_TRANSITION`** *(P5-1·P5-3)*
+- [x] 취소 시 슬롯 release(AVAILABLE) — 그리드 재방문 시 반영 *(P5-3, `releaseOrComplete`)*
+- [x] FE `app/stores/reservation`(`completeReservation`/`cancelReservation` async PATCH 위임) — `reservations.vue` 마크업은 무변경(additive)
 
-#### 생성·수정 파일
-`controller/ReservationController.java`(전이 엔드포인트 추가), `service/ReservationService.java`(complete/cancel/approve), `domain/Reservation.java`(도메인 전이 메서드), `mapper/ReservationMapper.java` + XML(상태 UPDATE), FE `app/pages/reservations.vue`(수정), FE `app/stores/reservation.ts`(서버 위임)
+#### 생성·수정 파일 *(실제 구현 반영)*
+`controller/ReservationController.java`(PATCH complete/cancel 추가), `service/ReservationService.java`(complete/cancel + loadOwned/releaseOrComplete), `domain/Reservation.java`·`domain/Slot.java`(도메인 전이 메서드), `mapper/ReservationMapper.java` + XML(updateStatus), `exception/GlobalExceptionHandler.java`(IllegalStateException→409), `test/.../ReservationTransitionApiTest.java`(신규 5건), FE `app/types/domain.ts`(`serverId`), FE `app/stores/reservation.ts`(서버 위임) — **`reservations.vue` 마크업 무변경(additive)**
 
 #### 상태 전이 표 (서버 강제 — require 11.3)
 
@@ -961,14 +961,16 @@ public void cancel(Long reservationId) {
 ```
 
 #### 완료기준 (DoD)
-- [ ] RESERVED 예약을 세차완료로 전이할 수 있다(FW6/M4)
-- [ ] 승인 전/후 취소가 모두 동작하고 슬롯이 다시 AVAILABLE이 된다(FW7/M5, require 11.3 b/c)
-- [ ] 불가능한 전이(COMPLETED→CANCELED 등)가 **서버에서 차단**된다(400/409)
-- [ ] **1차 목록·취소·완료 E2E 회귀**가 서버 전이로도 통과한다
-- [ ] `./gradlew build`, `npm run test:e2e` 통과
+- [x] RESERVED 예약을 세차완료로 전이할 수 있다(FW6/M4) *(전이 통합테스트 `세차완료…COMPLETED`)*
+- [x] 승인 전/후 취소가 모두 동작하고 슬롯이 다시 AVAILABLE이 된다(FW7/M5, require 11.3 b/c) *(`예약취소…AVAILABLE release`)*
+- [x] 불가능한 전이(COMPLETED→CANCELED 등)가 **서버에서 차단**된다(409 `INVALID_TRANSITION`) *(`불가능한_전이_COMPLETED_재취소는_409`)*
+- [x] **1차 목록·취소·완료 E2E 회귀**가 서버 전이로도 통과한다 *(reservations.spec 완료/취소·release, review.spec complete→후기 — E2E 25건 green)*
+- [x] `./gradlew build`(BE 39건 0실패, 전이 5건 포함), `npm run test:e2e`(25건) 통과
 
 #### 구현 메모 (📌)
-- 📌 **승인(M6)의 1차 부재**: 1차 MVP는 승인 단계가 없어 `confirm`이 곧장 RESERVED를 만들었습니다(ROADMAP_1 Phase 6 메모). 2차에서 M6 승인을 **도입할지**는 require 3.2 권한 매트릭스(M6)와 운영 정책에 달려 있습니다. 도입 시 `confirm`은 `PENDING` 같은 중간 상태를 거치도록 확장하고, 미도입 시 본 Phase의 approve 엔드포인트는 BO 대행(Phase 6) 전용으로만 둡니다 — Phase 0 결정에 준하여 확정하세요.
+- 📌 **승인(M6) 미도입 확정(Phase 0 정합)**: 1차 MVP는 승인 단계가 없어 `confirm`이 곧장 RESERVED를 만들었고(ROADMAP_1 Phase 6), Phase 3에서 승인 상태머신도 이연됨. M6 도입 시 `PENDING` 중간 상태가 생겨 `confirm` 직후 RESERVED를 기대하는 reservations.spec 회귀가 깨지므로 **Phase 5에서는 미도입**. M6 예약 승인은 **Phase 6(BO 대행)** 에서 BO 전용 흐름으로 도입한다(approve 엔드포인트도 그때 추가).
+- 📌 **id 분리(serverId)**: BE `confirm`은 서버가 부여한 예약 id(`rsv-<UUID>`)를 `ReservationResponse`로 반환한다. FE는 로컬 표시 id(`rsv-N`, 결정적 시퀀스 — testid용)는 유지하되, 응답 id를 `Reservation.serverId`(옵셔널)로 캡처해 전이 PATCH `…/{serverId}/complete|cancel`에 사용한다. 표시 id와 서버 id를 분리해 1차 E2E testid 정합과 서버 전이를 동시에 만족.
+- 📌 **전이 가드 위치**: 불가능 전이 차단은 도메인 메서드(`Reservation.complete()`/`cancel()`)가 `IllegalStateException`을 던지고, `GlobalExceptionHandler`가 이를 **409 `INVALID_TRANSITION`** 으로 매핑. 소유자 불일치/미존재는 서비스에서 `ResponseStatusException(404)`. 취소 시 슬롯은 `releaseOrComplete`가 `findByKey→release→updateStatusWithVersion(AVAILABLE)`로 release.
 
 ---
 

@@ -7,6 +7,8 @@ import com.carwash.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,4 +40,20 @@ public class ReservationController {
             @AuthenticationPrincipal String userId, @Valid @RequestBody ConfirmRequest request) {
         return reservationService.confirm(userId, request);
     }
+
+    // 세차완료(FW6/M4) — RESERVED→COMPLETED. 불가 전이 409, 비소유 404
+    @PatchMapping("/{id}/complete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void complete(@AuthenticationPrincipal String userId, @PathVariable String id) {
+        reservationService.complete(userId, id);
+    }
+
+    // 예약취소(FW7/M5) — RESERVED/HOLDING→CANCELED + 슬롯 release. 불가 전이 409, 비소유 404
+    @PatchMapping("/{id}/cancel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancel(@AuthenticationPrincipal String userId, @PathVariable String id) {
+        reservationService.cancel(userId, id);
+    }
+
+    // 예약 승인(M6)은 Phase 0 결정에 따라 미도입(1차 parity) — Phase 6 BO 대행과 함께 이연
 }

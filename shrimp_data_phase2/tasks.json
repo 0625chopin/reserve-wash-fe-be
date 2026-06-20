@@ -1310,6 +1310,260 @@
       "analysisResult": "2차 Phase 4 — 예약 API + 동시성 2단계(★핵심). 슬롯 행은 희소(예약/점유 시에만 존재, \"행 없음=AVAILABLE\"). 점유 모델: INSERT-on-hold + uk_slot_store_bay_date_time UNIQUE를 최종 방어선(동시 INSERT 1건만 성공, 나머지 DataIntegrityViolation→409). confirm(HOLDING→RESERVED): 낙관락 updateStatusWithVersion 영향행수 0이면 SlotConflictException(409) + reservation insert. 비관락(SELECT FOR UPDATE)은 시연 1경로. 예외: @RestControllerAdvice(GlobalExceptionHandler) 신설 — SlotConflictException·DataIntegrityViolationException·DuplicateKeyException→409, 슬롯없음 404, 검증 400. Phase3 ResponseStatusException과 공존(advice는 도메인예외만 한정). API: POST /api/reservations/hold·/confirm(보호—JWT, userId는 토큰 uid에서 → JwtAuthenticationFilter에 uid principal 주입 필요), GET /api/slots?storeId&date(점유 슬롯 배치, permitAll). FE(additive): getSeededSlotStatus를 catalogCache 패턴으로 서버 슬롯상태 하이드레이트(동기 getStatus 진입점 유지), confirmReservation만 async+$apiFetch(auth-fetch.ts Authorization 주입) 서버 위임 — reservation.ts/reservationDraft.confirm/slot.vue onReserve 3곳 async화, 마크업 무변경. 409→기존 useToast 재선택 토스트 재사용(새 UX 금지)+슬롯 재로드. 동시성 통합테스트 ExecutorService/CountDownLatch \"동시 N중 1건 성공\", 격리(전용슬롯/@DirtiesContext, H2 mem 공유 주의). 1차 reserve.spec 회귀(115행 정상흐름·188행 시드 점유 비활성) 서버 기반 통과. H2 MODE=MySQL FOR UPDATE 동작 실증. 2차이므로 shrimp-task-manager-phase2만. Phase 0~3 완료·커밋·푸시됨(f566ca0).",
       "summary": "P4-9 게이트 완료. 전건 통과: (1) cd backend && ./gradlew build BUILD SUCCESSFUL — 총 34건 0실패(ReservationConcurrencyTest 동시 16건 중 1건 성공, ReservationApiTest 무토큰401/confirm200/재confirm409, SlotApiTest, 기존 회귀 유지). (2) npm run type-check 통과($apiFetch 타입 포함). (3) npm run test:e2e — BE+FE 동시 기동 25건 전부 통과(9.4s): reserve.spec 정상흐름(서버 confirm)·시드 점유 비활성(GET /api/slots 하이드레이트로 A1 RESERVED disabled)·409 재선택 토스트. ROADMAP_2 Phase 4 DoD·메모 갱신. 핵심 난관: 슬롯이 서버 전역 자원이 되며 1차 E2E의 공유 슬롯(06-26 11:00)이 spec 간 충돌 → reservations/review.spec 날짜 유니크화로 해결. 미인증 403→401 entry point 추가. Phase 4(예약 API+동시성 2단계) 종료 — Phase 5(상태 전이 API) 진행 가능.",
       "completedAt": "2026-06-20T18:43:04.735Z"
+    },
+    {
+      "id": "0f7d5dd0-1526-4159-9a68-8c7bc9c57492",
+      "name": "P5-1 BE 도메인 전이 메서드(Reservation complete/cancel + Slot complete)",
+      "description": "상태 전이를 도메인 메서드로 표현하고 불가능 전이를 예외로 차단한다(require 11.3). Reservation에 complete()(RESERVED→COMPLETED, 아니면 IllegalStateException)·cancel()(COMPLETED/CANCELED면 IllegalStateException, 그 외 RESERVED/HOLDING→CANCELED) 추가. Slot에 complete()(status=COMPLETED) 추가. setter 미개방 원칙 유지.",
+      "notes": "Lombok @Getter 유지, setter 미개방. enum 상수는 com.carwash.domain.enums.ReservationStatus/SlotStatus.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:54:38.655Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/domain/Reservation.java",
+          "type": "TO_MODIFY",
+          "description": "전이 메서드 complete()/cancel() 추가",
+          "lineStart": 18,
+          "lineEnd": 31
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain/Slot.java",
+          "type": "TO_MODIFY",
+          "description": "complete() 추가",
+          "lineStart": 41,
+          "lineEnd": 47
+        }
+      ],
+      "implementationGuide": "domain/Reservation.java: ReservationStatus import 보유. 메서드 2개 추가 — public void complete(){ if(status!=RESERVED) throw new IllegalStateException(\"세차완료 불가 상태: \"+status); status=COMPLETED; } public void cancel(){ if(status==COMPLETED||status==CANCELED) throw new IllegalStateException(\"취소 불가 상태: \"+status); status=CANCELED; }. domain/Slot.java: 기존 hold/reserve/release 옆에 public void complete(){ this.status=SlotStatus.COMPLETED; } 추가(가드 없이 RESERVED→COMPLETED 단순 전이, 슬롯은 예약 전이의 종속이라 호출부에서 보장). 한국어 주석.",
+      "verificationCriteria": "Reservation.complete()는 RESERVED에서만 COMPLETED로 전이하고 그 외 IllegalStateException. cancel()은 COMPLETED/CANCELED에서 IllegalStateException, RESERVED/HOLDING에서 CANCELED. Slot.complete()는 COMPLETED. 컴파일 통과.",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-1 완료. Reservation.complete()(RESERVED→COMPLETED, 그 외 IllegalStateException)·cancel()(COMPLETED/CANCELED 차단, RESERVED/HOLDING→CANCELED) 추가. Slot.complete()(→COMPLETED) 추가. setter 미개방·@Getter 유지, 한국어 주석. ./gradlew build 컴파일 통과(전체 테스트 green).",
+      "completedAt": "2026-06-20T18:54:38.652Z"
+    },
+    {
+      "id": "013722b1-b068-4ddd-a27d-0c65c46af514",
+      "name": "P5-2 BE ReservationMapper.updateStatus + XML",
+      "description": "예약 상태 전이 영속화를 위한 UPDATE 매퍼 추가. id로 status만 갱신한다. enum은 name() 문자열로 바인딩.",
+      "notes": "기존 insert/findById/findByUser 보존. namespace=FQN 유지.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "0f7d5dd0-1526-4159-9a68-8c7bc9c57492"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:54:51.908Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReservationMapper.java",
+          "type": "TO_MODIFY",
+          "description": "updateStatus 선언 추가",
+          "lineStart": 9,
+          "lineEnd": 16
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ReservationMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "updateStatus UPDATE 추가",
+          "lineStart": 20,
+          "lineEnd": 29
+        }
+      ],
+      "implementationGuide": "mapper/ReservationMapper.java: int updateStatus(@Param(\"id\") String id, @Param(\"status\") String status); 추가(org.apache.ibatis.annotations.Param import). ReservationMapper.xml: <update id=\"updateStatus\"> UPDATE reservation SET status = #{status} WHERE id = #{id} </update> 추가. 서비스에서 reservation.getStatus().name() 전달.",
+      "verificationCriteria": "updateStatus(id,status)가 reservation.status를 갱신한다(영향 행 1). 기존 매퍼 메서드 회귀 없음. 빌드 통과.",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-2 완료. ReservationMapper.java에 int updateStatus(@Param(\"id\"),@Param(\"status\")) 선언 + Param import 추가. ReservationMapper.xml에 <update id=\"updateStatus\">UPDATE reservation SET status=#{status} WHERE id=#{id}</update> 추가. 기존 insert/findById/findByUser 보존. 빌드·테스트 green(전이 통합테스트가 updateStatus 경로를 실증).",
+      "completedAt": "2026-06-20T18:54:51.904Z"
+    },
+    {
+      "id": "7110e109-6d9f-4007-9c43-8fe2731a498c",
+      "name": "P5-3 BE ReservationService complete/cancel + 예외 매핑",
+      "description": "세차완료/취소 서비스 메서드. 소유자 검증(미존재/타인 예약→404), 도메인 전이 가드(불가 전이→IllegalStateException→409), 취소 시 슬롯 release(AVAILABLE), 완료 시 슬롯 complete(COMPLETED). GlobalExceptionHandler에 IllegalStateException→409 매핑 추가.",
+      "notes": "ResponseStatusException(404)은 Spring 자체 처리(기존 advice가 RuntimeException 전역 catch 안 하므로 보존). IllegalStateException만 새로 409 매핑. 비관락 confirmPessimistic은 무변경.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "0f7d5dd0-1526-4159-9a68-8c7bc9c57492"
+        },
+        {
+          "taskId": "013722b1-b068-4ddd-a27d-0c65c46af514"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:55:04.589Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "TO_MODIFY",
+          "description": "complete/cancel 추가",
+          "lineStart": 30,
+          "lineEnd": 65
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/exception/GlobalExceptionHandler.java",
+          "type": "TO_MODIFY",
+          "description": "IllegalStateException→409",
+          "lineStart": 31,
+          "lineEnd": 37
+        }
+      ],
+      "implementationGuide": "service/ReservationService.java에 @Transactional complete(String userId, String reservationId)·cancel(String userId, String reservationId) 추가. 공통: Reservation r = reservationMapper.findById(id); if(r==null || !r.getUserId().equals(userId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, \"예약을 찾을 수 없습니다.\"); \n complete: r.complete(); reservationMapper.updateStatus(id, r.getStatus().name()); Slot s=slotMapper.findByKey(r.getStoreId(),r.getBayId(),r.getDate(),r.getTimeSlot()); if(s!=null){ s.complete(); slotMapper.updateStatusWithVersion(s.getId(), s.getStatus().name(), s.getVersion()); } \n cancel: r.cancel(); reservationMapper.updateStatus(id, r.getStatus().name()); Slot s=slotMapper.findByKey(...); if(s!=null){ s.release(); slotMapper.updateStatusWithVersion(s.getId(), s.getStatus().name(), s.getVersion()); } \n import org.springframework.web.bind.annotation 대신 org.springframework.web.server.ResponseStatusException, org.springframework.http.HttpStatus. \n exception/GlobalExceptionHandler.java: @ExceptionHandler(IllegalStateException.class) → 409 ErrorResponse(\"INVALID_TRANSITION\", e.getMessage()).",
+      "verificationCriteria": "complete: RESERVED 예약→COMPLETED + 슬롯 COMPLETED. cancel: RESERVED/HOLDING→CANCELED + 슬롯 AVAILABLE release. 미존재/타인 예약→404. 불가 전이(COMPLETED 재취소 등)→IllegalStateException→409 INVALID_TRANSITION. 빌드 통과.",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-3 완료. ReservationService에 @Transactional complete/cancel 추가 — loadOwned(미존재/타인→ResponseStatusException 404), 도메인 전이 가드(불가→IllegalStateException), releaseOrComplete 헬퍼(완료 시 슬롯 COMPLETED·취소 시 release AVAILABLE, updateStatusWithVersion). GlobalExceptionHandler에 IllegalStateException→409 INVALID_TRANSITION 매핑 추가. 전이 통합테스트 5건이 COMPLETED/AVAILABLE release/409/404 경로를 전부 실증.",
+      "completedAt": "2026-06-20T18:55:04.584Z"
+    },
+    {
+      "id": "1f56ab6e-a3e4-4674-a3cb-b709b1b8119b",
+      "name": "P5-4 BE ReservationController PATCH 전이 엔드포인트",
+      "description": "PATCH /api/reservations/{id}/complete·/cancel 보호 엔드포인트. userId는 JWT principal(uid). 응답 본문 없음(204 No Content). approve(M6)는 Phase 6 이연 — 추가하지 않음.",
+      "notes": "approve 엔드포인트 미추가(Phase 0 결정: M6 이연). PATCH 메서드는 CORS allowedMethods에 포함돼야 함 — SecurityConfig/CORS 설정에 PATCH 포함 여부 확인(미포함 시 추가).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "7110e109-6d9f-4007-9c43-8fe2731a498c"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:55:15.349Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/ReservationController.java",
+          "type": "TO_MODIFY",
+          "description": "PATCH 전이 2종 추가",
+          "lineStart": 28,
+          "lineEnd": 41
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "REFERENCE",
+          "description": "CORS allowedMethods에 PATCH 포함 확인",
+          "lineStart": 1,
+          "lineEnd": 100
+        }
+      ],
+      "implementationGuide": "controller/ReservationController.java: import PatchMapping, PathVariable. \n @PatchMapping(\"/{id}/complete\") @ResponseStatus(HttpStatus.NO_CONTENT) public void complete(@AuthenticationPrincipal String userId, @PathVariable String id){ reservationService.complete(userId, id); } \n @PatchMapping(\"/{id}/cancel\") @ResponseStatus(HttpStatus.NO_CONTENT) public void cancel(@AuthenticationPrincipal String userId, @PathVariable String id){ reservationService.cancel(userId, id); } \n /api/reservations/** 는 SecurityConfig anyRequest().authenticated()로 자동 보호(별도 설정 불필요).",
+      "verificationCriteria": "PATCH /api/reservations/{id}/complete·/cancel가 인증 필수로 동작하고 204 반환. 토큰 없으면 401. CORS PATCH 허용. 빌드 통과.",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-4 완료. ReservationController에 @PatchMapping(\"/{id}/complete\")·(\"/{id}/cancel\") 추가(@ResponseStatus 204, @AuthenticationPrincipal uid + @PathVariable id). PatchMapping/PathVariable import 추가. approve(M6)는 Phase 6 이연 주석 명시. CORS allowedMethods는 이미 PATCH 포함 확인. 무토큰 401·204 반환을 전이 통합테스트가 실증.",
+      "completedAt": "2026-06-20T18:55:15.347Z"
+    },
+    {
+      "id": "d8a85673-268e-4ad1-b85b-b5791aae4629",
+      "name": "P5-5 BE 전이 통합테스트",
+      "description": "상태 전이 서버 강제를 검증한다(@SpringBootTest MockMvc 또는 서비스 직접 호출). 완료/취소/슬롯 release/불가 전이 409/비소유 404.",
+      "notes": "H2 멀티컨텍스트 PK 충돌 방지(기존 schema.sql DROP IF EXISTS 멱등 유지). 테스트 격리 위해 고유 슬롯키 사용.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1f56ab6e-a3e4-4674-a3cb-b709b1b8119b"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:55:25.713Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/reservation/ReservationTransitionApiTest.java",
+          "type": "CREATE",
+          "description": "전이 통합테스트",
+          "lineStart": 1,
+          "lineEnd": 1
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "REFERENCE",
+          "description": "검증 대상",
+          "lineStart": 1,
+          "lineEnd": 90
+        }
+      ],
+      "implementationGuide": "test 디렉터리에 ReservationTransitionApiTest 또는 ReservationTransitionTest 작성. 시나리오: (1) confirm으로 예약 생성(or 직접 insert) → complete → 상태 COMPLETED, 슬롯 COMPLETED. (2) 새 예약 → cancel → CANCELED, 슬롯 AVAILABLE(findByKey 확인). (3) COMPLETED 예약 재취소 시도 → IllegalStateException/409. (4) 타 userId로 transition → 404. MockMvc면 JWT 토큰 생성(JwtTokenProvider) 후 PATCH 호출. 기존 ReservationApiTest/ReservationConcurrencyTest 패턴 재사용.",
+      "verificationCriteria": "complete/cancel/슬롯 release/불가전이 409/비소유 404 시나리오가 통과. ./gradlew test 전건 green(기존 34건 + 신규).",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-5 완료. ReservationTransitionApiTest(@SpringBootTest+MockMvc, ObjectMapper로 confirm 응답 id 캡처) 5건: 세차완료→COMPLETED+슬롯 COMPLETED, 취소→슬롯 AVAILABLE release, COMPLETED 재취소→409 INVALID_TRANSITION, 비소유자→404, 무토큰→401. 슬롯 상태는 GET /api/slots로 검증. 고유 날짜(08-10~13)로 격리. ./gradlew test 전건 green(전이 5건 failures=0, 총 14개 테스트 클래스).",
+      "completedAt": "2026-06-20T18:55:25.708Z"
+    },
+    {
+      "id": "1912843b-3da7-49e3-ab0c-1610cd679063",
+      "name": "P5-6 FE 전이 서버 위임(serverId 캡처 + 스토어 async)",
+      "description": "reservation 스토어의 completeReservation/cancelReservation을 서버 PATCH 호출로 교체하고, confirmReservation이 서버 예약 id를 serverId로 캡처한다. domain.ts Reservation에 serverId 옵셔널 필드 추가. 페이지 마크업 무변경(버튼 핸들러는 async 스토어 액션 호출 그대로).",
+      "notes": "serverId 없으면(이론상 없음) 전이 호출 스킵 대신 false 반환 권장하나, confirm 성공 시 항상 채워지므로 정상 경로 보장. 페이지(reservations.vue) 마크업·핸들러 무변경(스토어 시그니처 Promise<boolean>으로 바뀌어도 @click 호출은 동일).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1f56ab6e-a3e4-4674-a3cb-b709b1b8119b"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:56:19.500Z",
+      "relatedFiles": [
+        {
+          "path": "app/types/domain.ts",
+          "type": "TO_MODIFY",
+          "description": "Reservation.serverId 추가",
+          "lineStart": 67,
+          "lineEnd": 80
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "TO_MODIFY",
+          "description": "confirm 응답 캡처 + complete/cancel async PATCH",
+          "lineStart": 41,
+          "lineEnd": 106
+        }
+      ],
+      "implementationGuide": "app/types/domain.ts Reservation에 serverId?: string 추가(주석: 'BE가 부여한 예약 id — 상태 전이 PATCH 호출용'). \n app/stores/reservation.ts: confirmReservation에서 const res = await $apiFetch<{id:string}>(`${base}/reservations/confirm`,{...}); 응답 캡처 → reservations.value.push({...reservation, status:'RESERVED', serverId: res.id}). \n completeReservation을 async로: target RESERVED 가드 후 try{ await $apiFetch(`${base}/reservations/${target.serverId}/complete`,{method:'PATCH'}) }catch{ return false }; 이후 로컬 status COMPLETED + slotStatus COMPLETED; return true. \n cancelReservation을 async로: target RESERVED/HOLDING 가드 후 try{ await $apiFetch(`${base}/reservations/${target.serverId}/cancel`,{method:'PATCH'}) }catch{ return false }; 이후 로컬 status CANCELED + slotStatus AVAILABLE; return true. \n $apiFetch=useNuxtApp().$apiFetch, base=useRuntimeConfig().public.apiBase(함수 본문 내). oxfmt 스타일(세미콜론 없음).",
+      "verificationCriteria": "npm run type-check 통과. confirmReservation이 serverId 저장. complete/cancel이 PATCH 호출 후 로컬 상태 전이. reservations.vue 마크업 diff 없음(스토어만 변경).",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-6 완료. domain.ts Reservation에 serverId?: string 추가(표시 id와 분리). reservation 스토어: confirmReservation이 $apiFetch<{id}> 응답을 캡처해 push 시 serverId 저장. completeReservation/cancelReservation을 async로 전환 — 가드 후 PATCH /reservations/{serverId}/complete|cancel 호출, 성공 시에만 로컬 상태·슬롯 전이(실패 시 false). reservations.vue 마크업·핸들러 무변경(additive). npm run type-check 0 에러.",
+      "completedAt": "2026-06-20T18:56:19.498Z"
+    },
+    {
+      "id": "5f57005b-efde-48c5-9c06-f3941133a406",
+      "name": "P5-7 Phase 5 게이트 + ROADMAP 갱신",
+      "description": "Phase 5 DoD 종합 게이트. BE 빌드(전이 테스트 포함)·FE 타입체크·E2E 회귀(reservations.spec 완료/취소, review.spec 세차완료→후기 흐름 포함) 전건 통과. ROADMAP_2 Phase 5 체크리스트/DoD 갱신 + M6 이연 결정 명시.",
+      "notes": "E2E가 서버 전이로 그린 유지가 핵심 DoD. PATCH CORS/인증 401 경로 확인. 게이트 통과 후 커밋·푸시는 사용자 확인 후.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d8a85673-268e-4ad1-b85b-b5791aae4629"
+        },
+        {
+          "taskId": "1912843b-3da7-49e3-ab0c-1610cd679063"
+        }
+      ],
+      "createdAt": "2026-06-20T18:51:54.067Z",
+      "updatedAt": "2026-06-20T18:57:52.348Z",
+      "relatedFiles": [
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 5 체크리스트/DoD 갱신",
+          "lineStart": 892,
+          "lineEnd": 972
+        },
+        {
+          "path": "e2e/reservations.spec.ts",
+          "type": "REFERENCE",
+          "description": "전이 E2E 회귀 대상",
+          "lineStart": 1,
+          "lineEnd": 76
+        },
+        {
+          "path": "e2e/review.spec.ts",
+          "type": "REFERENCE",
+          "description": "complete→review 회귀",
+          "lineStart": 1,
+          "lineEnd": 78
+        }
+      ],
+      "implementationGuide": "(1) JAVA_HOME export 후 cd backend && ./gradlew build — 전이 테스트 포함 전건 통과. (2) npm run type-check. (3) npm run test:e2e — BE+FE 동시 기동, 1차+전이 E2E 회귀(특히 reservations.spec '세차완료'/'취소 후 슬롯 AVAILABLE', review.spec complete→review). 실패 시 원인 수정. (4) docs/roadmaps/ROADMAP_2.md Phase 5 태스크 체크리스트/DoD 박스를 구현 결과로 체크([x])하고, approve(M6) 항목은 'Phase 6 BO 대행 이연'으로 명시. 구현 메모에 id serverId 캡처 방식·IllegalStateException→409 매핑 기록.",
+      "verificationCriteria": "./gradlew build BUILD SUCCESSFUL(전이 테스트 포함). npm run type-check 0 에러. npm run test:e2e 전건 통과. ROADMAP_2 Phase 5 DoD 체크·M6 이연 명시 반영.",
+      "analysisResult": "2차 Phase 5 — 예약 상태 전이 API(세차완료/취소) 서버화. 1차의 클라이언트 전이(reservation 스토어 completeReservation/cancelReservation)를 서버 PATCH API로 교체하고, 상태 가드를 서버 도메인 메서드로 강제한다.\n\n[Phase 0 정합 결정]\n- M6 예약 승인(PENDING 상태 신설)은 미도입 → Phase 6(BO 대행)로 이연. 근거: 1차 MVP는 confirm→즉시 RESERVED(승인 단계 없음), Phase 3에서도 승인 상태머신 이연됨(ROADMAP_2 라인 713). PENDING 도입 시 reservations.spec(confirm 직후 '예약 확정' RESERVED 기대)이 회귀로 깨짐. Phase 5 DoD는 approve를 강제하지 않음.\n- id 불일치 해결: BE confirm은 이미 ReservationResponse(서버 id 'rsv-<UUID>')를 반환하나 FE는 응답을 버리고 클라 시퀀스 id('rsv-1')로 로컬 푸시 중. → FE가 confirm 응답의 id를 serverId로 캡처(로컬 표시 id 'rsv-1'은 testid/표시용 유지), 전이 PATCH는 serverId로 호출. domain.ts Reservation에 serverId?: string 추가(additive optional).\n\n[현재 코드 사실 — 검증 완료]\n- ReservationMapper: findById(String)/findByUser/insert 보유, updateStatus 없음(추가 필요).\n- Reservation 도메인: 전이 메서드 없음(complete()/cancel() 추가 필요).\n- Slot 도메인: hold()/reserve()/release() 보유, complete() 없음(RESERVED→COMPLETED 추가 필요).\n- SlotMapper: findByKey/insertHold/findForUpdate/findByStoreAndDate/updateStatusWithVersion 보유(재사용).\n- GlobalExceptionHandler: SlotConflictException→409, Duplicate/DataIntegrity→409, MethodArgumentNotValid→400. RuntimeException 전역 catch 없음(ResponseStatusException 보존). → IllegalStateException(불가 전이)→409 매핑 추가.\n- ReservationController: /hold·/confirm 보유. /api/reservations/** 는 SecurityConfig anyRequest().authenticated() 자동 보호.\n- FE reservations.vue: 버튼이 reservation.completeReservation(r.id)/cancelReservation(r.id) 직접 호출. 마크업 무변경 가능(스토어 액션만 async 서버 위임).\n\n[불변 원칙] MyBatis only(JPA 금지), 매퍼/서비스/컨트롤러 계층 분리, FE↔BE 무변환 매핑, oxfmt(세미콜론 없음·작은따옴표), additive(컴포넌트/페이지 마크업 무변경). 2차는 shrimp-task-manager-phase2 서버만 사용.",
+      "summary": "P5-7 게이트 완료. (1) ./gradlew build BUILD SUCCESSFUL — 전이 통합테스트 5건 포함 전건 0실패(14개 테스트 클래스). (2) npm run type-check 0 에러(serverId 옵셔널 정합). (3) npm run test:e2e 25건 전건 통과(9.9s) — reservations.spec 세차완료/취소+슬롯 AVAILABLE release, review.spec complete→후기 흐름이 서버 전이로 회귀 그린. (4) ROADMAP_2 Phase 5 체크리스트·DoD 전부 [x] 갱신, M6 승인 미도입(Phase 6 이연)·serverId 분리·IllegalStateException→409 구현 메모 기록, 생성·수정 파일 목록 실구현 반영.",
+      "completedAt": "2026-06-20T18:57:52.344Z"
     }
   ]
 }

@@ -26,4 +26,9 @@
             (#{id}, #{userId}, #{storeId}, #{bayId}, #{managerId}, #{date}, #{timeSlot},
              #{carType}, #{serviceType}, #{amount}, #{status})
     </insert>
+
+    <!-- 상태 전이 — 세차완료/취소(Phase 5). enum은 name() 문자열로 바인딩 -->
+    <update id="updateStatus">
+        UPDATE reservation SET status = #{status} WHERE id = #{id}
+    </update>
 </mapper>
