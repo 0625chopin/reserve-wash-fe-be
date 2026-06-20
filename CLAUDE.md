@@ -58,3 +58,15 @@ E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 
 
 - 루트 `tsconfig.json`은 Nuxt가 생성하는 `./.nuxt/tsconfig.json`을 확장. `.nuxt/`는 `nuxt prepare`(postinstall) 시 자동 생성됨.
 - 타입 검사는 `tsc` 단독이 아닌 `nuxt typecheck`(내부 vue-tsc)로 수행됨 — 타입 검사는 반드시 `npm run type-check`를 사용.
+
+## Shrimp Task Manager 서버 선택 규칙 (개발 차수별)
+
+task 관리를 위해 Shrimp Task Manager MCP 서버를 사용할 때, **개발 차수에 따라 서버를 구분**한다.
+
+- **차수 판정**: 현재 작업이 정본으로 따르는 로드맵이 `docs/roadmaps/ROADMAP_{n}.md`이면 **n차 개발**로 간주한다. (예: `ROADMAP_1.md` → 1차, `ROADMAP_2.md` → 2차)
+- **서버 매핑**:
+  - **1차** → `shrimp-task-manager` (접미사 없음) → 도구 `mcp__shrimp-task-manager__*`
+  - **n차(n≥2)** → `shrimp-task-manager-phase{n}` → 도구 `mcp__shrimp-task-manager-phase{n}__*`
+  - 예: 2차(ROADMAP_2.md) → `shrimp-task-manager-phase2`(`mcp__shrimp-task-manager-phase2__*`), 3차 → `shrimp-task-manager-phase3`
+- **저장소 분리**: 각 서버는 독립된 `DATA_DIR`을 가진다 — 1차 `shrimp_data/`, n차 `shrimp_data_phase{n}/`. 차수가 섞이지 않도록 **반드시 해당 차수의 서버 도구만 호출**한다(1차 작업에 `-phase2` 도구를, 2차 작업에 접미사 없는 도구를 쓰지 마라).
+- **신규 차수 시작 시**: `.mcp.json`에 `shrimp-task-manager-phase{n}` 서버를 추가하고 `DATA_DIR`을 `shrimp_data_phase{n}`으로 지정해야 도구가 노출된다. 미등록 시 해당 차수 도구를 호출할 수 없다(현재 `.mcp.json`에는 1차·2차만 등록됨).

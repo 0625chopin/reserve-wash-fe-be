@@ -31,7 +31,16 @@
         "command": "node",
         "args": ["E:/claudeStudy/workspaces/mcp-shrimp-task-manager/dist/index.js"],
         "env": {
-          "DATA_DIR": "E:/claudeStudy/workspaces/START-KIT2/shrimp_data",
+          "DATA_DIR": "E:/claudeStudy/workspaces/reserve-wash-fe-be/shrimp_data",
+          "TEMPLATES_USE": "en",
+          "ENABLE_GUI": "true"
+        }
+      },
+      "shrimp-task-manager-phase2": {
+        "command": "node",
+        "args": ["E:/claudeStudy/workspaces/mcp-shrimp-task-manager/dist/index.js"],
+        "env": {
+          "DATA_DIR": "E:/claudeStudy/workspaces/reserve-wash-fe-be/shrimp_data_phase2",
           "TEMPLATES_USE": "en",
           "ENABLE_GUI": "true"
         }
