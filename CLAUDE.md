@@ -14,9 +14,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-**Nuxt 4** 기반 프론트엔드 프로젝트. 내부적으로 Vue 3 (`<script setup>` Composition API) + Vite + Nitro 서버를 사용하며, 라우팅은 Nuxt 파일 기반 라우팅, 상태 관리는 Pinia(`@pinia/nuxt`), 타입스크립트로 작성됨. 기본 렌더링은 SSR.
+자동차 **세차 예약 서비스**(MVP). 단일 저장소에 **프론트엔드(`app/`, 루트)와 백엔드(`backend/`)가 공존**한다.
+
+- **프론트엔드**: **Nuxt 4**(Vue 3 `<script setup>` Composition API + Vite + Nitro). 파일 기반 라우팅, 상태 관리 Pinia(`@pinia/nuxt`), TypeScript, 기본 SSR. 스타일은 Tailwind CSS v4(`@tailwindcss/vite`). 루트 `package.json`이 프론트엔드 빌드.
+- **백엔드**: **Spring Boot 3.3.5 / Java 21 / Gradle**. 영속 계층은 **MyBatis**(매퍼 인터페이스 + XML SQL, **JPA/Hibernate 미사용**), DB는 **H2 in-memory**(MySQL 호환 모드, 재기동 시 휘발). 인증은 **Spring Security + JWT**(HS256). `backend/` 하위가 별도 Gradle 프로젝트.
+- **데이터 진화 단계**: 1차(`ROADMAP_1.md`)는 FO 플로우를 프론트 더미·in-memory로 구현, 2차(`ROADMAP_2.md`)는 그 더미를 Spring Boot REST API + DB로 교체하고 **BO(매니저/매장관리자/관리자) 화면**을 추가한다. 현재 2차 진행 중 — 더미 데이터(`app/data/`)는 카탈로그 일부만 남고 대부분 백엔드로 이관됨.
+
+> 역할은 4종: **USER**(고객) · **MANAGER**(매장 매니저) · **STORE_ADMIN**(매장관리자) · **ADMIN**(전체 관리자). FE `app/types/enums.ts`의 `UserRole`과 BE `domain/enums/UserRole.java`가 **글자까지 일치**해야 한다.
 
 ## 주요 명령어
+
+### 프론트엔드 (루트에서 실행)
 
 ```sh
 npm install          # 의존성 설치 (postinstall 로 nuxt prepare 자동 실행)
@@ -32,7 +40,22 @@ npm run test:e2e     # Playwright E2E 테스트 (dev 서버 자동 기동)
 npm run test:e2e:ui  # Playwright UI 모드
 ```
 
-E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`, dev 서버 자동 기동). 단위 테스트 러너(vitest)는 미설치.
+E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 `e2e/`, baseURL `http://localhost:3000`, dev 서버 자동 기동). 셀렉터는 `data-testid` 기반. 단위 테스트 러너(vitest)는 미설치.
+
+### 백엔드 (`backend/`에서 실행)
+
+```sh
+./gradlew bootRun        # 개발 서버 기동 → http://localhost:8080 (Windows는 gradlew.bat)
+./gradlew build          # 프로덕션 빌드(테스트 포함)
+./gradlew compileJava    # 메인 소스 컴파일 (빠른 오류 점검)
+./gradlew test           # JUnit 5 단위/통합 테스트
+./gradlew test --tests 'com.carwash.SomeTest'  # 단일 테스트 클래스 실행
+./gradlew clean          # 빌드 산출물 정리
+```
+
+- **H2 콘솔**: http://localhost:8080/h2-console (JDBC `jdbc:h2:mem:carwash`, user `sa`, 비밀번호 없음). 기동 시 `resources/db/schema.sql`(DDL) → `data.sql`(시드)가 자동 실행되며 재기동 시 휘발된다.
+- IntelliJ 공유 Run Configuration: `backend/.run/CarwashApplication.run.xml`.
+- 도메인 POJO는 **Lombok**(`@Getter`·`@Builder` 등) 사용 — Gradle 빌드는 자동 처리하나 IntelliJ 에디터는 Lombok 플러그인 + 어노테이션 처리 활성이 필요(상세 `backend/README.md`). DTO는 Java `record`라 Lombok 미적용.
 
 ## 린트/포맷 파이프라인 (중요)
 
@@ -43,16 +66,44 @@ E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 
 - **oxfmt** (`.oxfmtrc.json`): 세미콜론 없음(`semi: false`), 작은따옴표(`singleQuote: true`). 코드 스타일은 이 설정을 따를 것 — 새 코드 작성 시 세미콜론을 붙이지 말 것.
 - VS Code는 저장 시 oxc 포매터(`oxc.oxc-vscode`)와 `source.fixAll`을 자동 적용 (`.vscode/settings.json`).
 
-## 구조
+## 프론트엔드 구조 (`app/`)
 
-- `nuxt.config.ts` — Nuxt 설정(모듈/CSS/별칭 등). 진입점 부트스트랩은 Nuxt가 담당하므로 별도 `main.ts`는 없음.
-- `app/app.vue` — 루트 컴포넌트(`<NuxtPage />` 포함).
-- `app/pages/` — **파일 기반 라우트** 페이지(`index.vue`=`/`, `about.vue`=`/about`). 자동 코드 스플리팅. 동적 라우트는 `[param].vue` 형식.
-- `app/middleware/` — 라우트 미들웨어(`defineNuxtRouteMiddleware`). 인증 가드 등.
-- `app/stores/` — Pinia 스토어(자동 임포트). setup 스토어 문법(`defineStore('id', () => {...})`) 사용.
+- `nuxt.config.ts` — Nuxt 설정(모듈/CSS/별칭/runtimeConfig). 진입점 부트스트랩은 Nuxt가 담당하므로 별도 `main.ts`는 없음.
+- `app/app.vue` — 루트 컴포넌트(`<NuxtPage />` 포함). 레이아웃은 `app/layouts/default.vue`.
+- `app/pages/` — **파일 기반 라우트**. FO: `login`·`signup`·`reserve/`(3단계 위저드: index→slot→done)·`reservations`·`review/[reservationId]`. BO: `admin/`·`manager/`·`store-admin/` 하위(역할별 로그인·승인·관리·매출 등). 동적 라우트는 `[param].vue`.
+- `app/middleware/` — 라우트 가드(`defineNuxtRouteMiddleware`): `auth`(인증)·`guest`(비로그인 전용)·`role-guard`(역할 인가)·`reservation-wizard-guard`·`reservation-fresh-entry`·`review-guard`.
+- `app/stores/` — Pinia 스토어(자동 임포트, **setup 문법** `defineStore('id', () => {...})`): `auth`·`reservation`·`reservationDraft`·`review`.
+- `app/services/` — **데이터 접근 추상화 계층**(`storeService`·`priceService`·`reservationService`·`catalogCache`). 단방향 의존(services → catalogCache·data·types). 2차에서 더미 직접 import를 서버 하이드레이트 캐시 동기 읽기로 교체하되 **시그니처를 유지**해 컴포넌트·스토어 무변경(additive)을 지향함 — 새 데이터 소스 연동 시 이 패턴을 따를 것.
+- `app/plugins/` — `catalog`(부팅 시 카탈로그 하이드레이트)·`auth-fetch`(JWT 주입 `$apiFetch` 제공).
 - `app/components/` — 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함).
-- `app/composables/` — 재사용 로직(자동 임포트).
+- `app/composables/` — 재사용 로직(자동 임포트, `useSlots`·`useToast` 등).
+- `app/data/` — 더미/정적 카탈로그 데이터, `app/types/`(`enums.ts`·`domain.ts`) — 도메인 타입.
 - `~`·`@` 별칭은 모두 `app/`(srcDir)를 가리킴 (Nuxt 자동 제공).
+
+## 백엔드 구조 (`backend/src/main/java/com/carwash/`)
+
+표준 레이어드 아키텍처(`controller` → `service` → `mapper`):
+
+- `controller/` — REST 엔드포인트(`/api/**`). 역할/도메인별로 다수 분리(`AuthController`·`ReservationController`·`Admin*Controller`·`Manager*Controller`·`StoreAdmin*Controller` 등).
+- `service/` — 비즈니스 로직(예약 동시성·슬롯 점유·승인 워크플로 등).
+- `mapper/` — MyBatis 매퍼 **인터페이스**. SQL은 `resources/mapper/*.xml`에 분리. `map-underscore-to-camel-case=true`로 snake_case 컬럼 ↔ camelCase 매핑.
+- `domain/` + `domain/enums/` — 가변 도메인 POJO(Lombok), enum. `dto/` — 요청/응답(Java `record`).
+- `config/` — `SecurityConfig`(아래)·`AppBeansConfig`. `security/` — `JwtTokenProvider`·`JwtAuthenticationFilter`.
+- `exception/` — `GlobalExceptionHandler`(도메인 예외 → JSON 에러 응답)·`SlotConflictException`.
+- `resources/` — `application.yml`·`db/schema.sql`·`db/data.sql`·`mapper/*.xml`.
+
+### 인증·인가 (SecurityConfig)
+
+- **stateless JWT**(세션 없음). `JwtAuthenticationFilter`가 `Authorization: Bearer` 토큰을 매 요청 검증.
+- 무인증 허용: `/api/auth/**`·`/api/health`·카탈로그 조회(`/api/stores`·`/api/managers`·`/api/bays`·`/api/prices`·`/api/slots`)·`/h2-console/**`.
+- 역할 인가(구체적 매처를 `anyRequest` 앞에 배치): `/api/store-admin/**`→`STORE_ADMIN`, `/api/manager/**`→`MANAGER`·`STORE_ADMIN`, `/api/admin/**`→`ADMIN`, 그 외 인증 필요. 미인증→**401**, 권한부족→403.
+- CORS는 SecurityConfig의 `corsConfigurationSource` 단일 소스에서 FE(`http://localhost:3000`)만 허용(credentials 포함).
+
+## FE ↔ BE 연동
+
+- FE는 `runtimeConfig.public.apiBase`(기본 `http://localhost:8080/api`, 환경변수 `NUXT_PUBLIC_API_BASE`로 override)로 백엔드를 호출한다.
+- 보호 API는 `auth-fetch` 플러그인이 제공하는 `useNuxtApp().$apiFetch`로 호출 — `access_token` 쿠키를 읽어 `Authorization: Bearer`를 자동 주입한다. 무인증 호출(login/signup·카탈로그 조회)은 일반 `$fetch` 사용.
+- 로컬 풀스택 구동: 백엔드 `./gradlew bootRun`(:8080) + 프론트 `npm run dev`(:3000)를 동시에 띄운다.
 
 ## TypeScript 설정
 
