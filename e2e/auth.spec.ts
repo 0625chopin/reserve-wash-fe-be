@@ -71,6 +71,35 @@ test('비밀번호와 비밀번호 확인이 다르면 에러가 보인다', asy
   await expect(page).toHaveURL(/\/signup/)
 })
 
+test('회원가입 분기: 매니저 선택 시 소속 매장 입력 후 신청하면 승인 대기 안내가 표시된다 (v1.12)', async ({
+  page,
+}) => {
+  await page.goto('/signup', { waitUntil: 'networkidle' })
+  // 매니저 탭 전환 → 소속 매장 입력란 노출
+  await page.getByTestId('signup-type-manager').click()
+  await expect(page.getByTestId('signup-store')).toBeVisible()
+  await page.getByTestId('signup-name').fill('분기매니저')
+  await page.getByTestId('signup-store').selectOption({ label: '강남점' })
+  await page.getByTestId('signup-email').fill('branch-mgr@test.com')
+  await page.getByTestId('signup-password').fill('password')
+  await page.getByTestId('signup-password-confirm').fill('password')
+  await page.getByTestId('signup-submit').click()
+  // 자동 로그인 없이 승인 대기 안내(매니저 가입은 PENDING_APPROVAL_L1)
+  await expect(page.getByTestId('manager-signup-done')).toBeVisible()
+})
+
+test('회원가입 분기: 매니저 선택 시 소속 매장 미입력이면 에러가 표시된다 (v1.12)', async ({ page }) => {
+  await page.goto('/signup', { waitUntil: 'networkidle' })
+  await page.getByTestId('signup-type-manager').click()
+  await page.getByTestId('signup-name').fill('매장누락')
+  await page.getByTestId('signup-email').fill('no-store-mgr@test.com')
+  await page.getByTestId('signup-password').fill('password')
+  await page.getByTestId('signup-password-confirm').fill('password')
+  await page.getByTestId('signup-submit').click()
+  await expect(page.getByTestId('signup-error')).toBeVisible()
+  await expect(page).toHaveURL(/\/signup/)
+})
+
 test('로그인 상태로 /signup에 진입하면 /reserve로 리다이렉트된다', async ({ page }) => {
   // 먼저 로그인
   await page.goto('/login', { waitUntil: 'networkidle' })

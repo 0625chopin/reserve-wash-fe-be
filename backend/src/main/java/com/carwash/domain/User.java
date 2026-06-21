@@ -22,6 +22,7 @@ public class User {
     private String passwordHash;          // BCrypt 해시 (Phase 3 인증) — 응답 DTO에는 절대 노출 금지
     private UserApprovalStatus approvalStatus;   // 가입 승인 상태 (require v1.7 §4.4) — ACTIVE만 로그인 가능
     private String storeId;               // 매니저 계열 소속 매장(USER/ADMIN은 null) — BO 매장 고정용
+    private String managerId;             // 로그인 계정 ↔ manager 엔티티 연결(require v1.10 §6.6) — MANAGER만 값, 담당 예약 조회 키. 그 외 null
 
     // 가입 1차 승인(M7) — 매장매니저관리자(STORE_ADMIN): PENDING_APPROVAL_L1 → PENDING_APPROVAL_L2.
     //   불가 전이 시 IllegalStateException → 409(GlobalExceptionHandler).

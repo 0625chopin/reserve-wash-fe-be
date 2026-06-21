@@ -2821,6 +2821,175 @@
       "analysisResult": "require_v1.md v1.7 재정합(2차/phase2). 현행 코드는 휴무 2단계 결재(APPROVED_L1→CONFIRMED)·가입 승인 부재로 v1.7과 충돌. 4덩어리 재정합: A 휴무 1단계 collapse(STORE_ADMIN 종결), B 가입 2단계 승인 M7→S3 신규(ACTIVE만 로그인), C 역할별 BO 페이지 4그룹 분리(§12.4), E 로그인/AppNav 정합. F 프로세스코드 주석은 각 작업 흡수. 단계 수 구분 절대 혼동 금지: 휴가/반차=1단계, 가입=2단계 → 물리적 enum 분리(DayoffApprovalStatus vs UserApprovalStatus)로 차단. additive: 1차 자산·기존 25건 E2E 회귀 보존, 시드 status DEFAULT 변경(CONFIRMED→APPROVED, ACTIVE)으로 회귀 안전. BE: MyBatis만, 도메인 전이 메서드, record DTO, 주석 한국어. FE: oxfmt, role-guard/$apiFetch/catalogCache 재사용, data-testid. 검증: ./gradlew build + npm run type-check + test:e2e.",
       "summary": "P9-8 완료. E2E v1.7 갱신 + 종합 게이트 전건 통과. (1) e2e/approval.spec.ts 재작성: 휴가/반차 1단계 승인(매니저 상신→/store-admin/dayoff-approvals STORE_ADMIN 승인 종결, dayoff-approve-* 셀렉터), 가입 2단계 승인(storeadmin 1차 manager-signups→admin 2차 manager-approvals→pending1 로그인 성공), PENDING 매니저(pending2) 로그인 차단(login-error·/login 잔류), 역할 가드(USER→/manager·/store-admin·/admin 리다이렉트). (2) 종합 게이트: BE ./gradlew build 통과(P9-1~4 통합테스트 포함), npm run type-check(EXIT=0), npm run lint(EXIT=0), npm run test:e2e BE+FE 동시 기동 33건 전건 통과(기존 회귀 25+ 신규 8). (3) ROADMAP_2.md Phase 7 태스크 체크리스트·DoD 전부 [x] 갱신, 상단 구현현황 주석·재정합 과제 주석을 완료(✅)로 갱신. JAVA_HOME=Temurin 21 export로 실행. 작업 A·B·C·E·F 전부 v1.7 정합 완료.",
       "completedAt": "2026-06-20T22:17:15.335Z"
+    },
+    {
+      "id": "d5d0ad54-751d-45cf-9787-aee9e785843f",
+      "name": "BUG-1 BE 사용자 본인 예약 목록 조회 API 추가(GET /api/reservations)",
+      "description": "사용자가 자신의 예약(대행 예약 포함) 전체를 조회할 수 있는 보호 엔드포인트가 백엔드에 없다. JWT uid 기준으로 본인 소유 예약 목록을 반환하는 GET /api/reservations를 추가한다. 이는 결함(1)(매니저 대행 예약이 사용자 목록에 미표시)과 결함(2)(새로고침 시 본인 예약 소실)의 서버측 선행 조건이다. 응답은 FE Reservation 표시에 필요한 필드(id=서버예약id, storeId, bayId, managerId, date, timeSlot, carType, serviceType, amount, status)를 담는다. 정렬은 최신순(생성 역순) 권장.",
+      "notes": "userId는 절대 바디/쿼리로 받지 않고 JWT principal(uid)에서만 도출(기존 confirm/complete/cancel과 동일 규약). 대행 예약은 userId=고객으로 저장되므로 본 조회에 자연히 포함된다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T23:16:27.751Z",
+      "updatedAt": "2026-06-20T23:28:05.869Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/controller/ReservationController.java",
+          "type": "TO_MODIFY",
+          "description": "GET 본인 예약 목록 엔드포인트 추가",
+          "lineStart": 1,
+          "lineEnd": 59
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "TO_MODIFY",
+          "description": "listMine 서비스 메서드 추가"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReservationMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findByUserId 선언"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ReservationMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "findByUserId select"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ReservationResponse.java",
+          "type": "REFERENCE",
+          "description": "응답 DTO 재사용/참고"
+        }
+      ],
+      "implementationGuide": "1) ReservationMapper에 List<Reservation> findByUserId(String userId) 선언 + XML <select> 추가(reservation 테이블 user_id 필터, 기존 컬럼/resultMap 재사용, 최신순 ORDER BY). 2) 응답 DTO record MyReservationResponse(또는 기존 ReservationResponse 재사용) + 정적 from(Reservation) — FE app/types/domain.ts 필드명 무변환 일치, status는 name() 문자열. 3) ReservationService에 @Transactional(readOnly=true) List<...> listMine(String userId) 추가(findByUserId→from 매핑). 4) ReservationController에 @GetMapping(@AuthenticationPrincipal String userId 사용) 추가 — /api/reservations/** 는 이미 anyRequest().authenticated()로 보호됨. 5) MockMvc 테스트: 본인 예약만 반환·타인 예약 미포함·미인증 401.",
+      "verificationCriteria": "GET /api/reservations 호출 시 JWT uid 소유 예약만 최신순 반환. 매니저 대행으로 생성된 예약(userId=고객)도 해당 고객 토큰으로 조회 시 포함. 미인증 401. MockMvc 신규 테스트 그린 + ./gradlew test BUILD SUCCESSFUL.",
+      "analysisResult": "[Playwright 정밀 테스트로 발견된 결함 묶음 — 2차(ROADMAP_2) 백엔드+BO]\n\n환경: FE :3000(Nuxt) / BE :8080(Spring Boot+H2) 동시 기동, 전 계정 비번 'password'.\n\n발견 결함 3종(실측):\n(1) 매니저 대행 예약이 일반사용자 예약목록에 안 뜸 — manager@test.com이 user@test.com 대상 대행 예약 POST /api/manager/reservations→200, DB(admin API)에 홍길동(user1) 소유로 정상 저장 확인. 그러나 user@test.com 로그인 후 /reservations=\"아직 예약이 없어요\"(0건). 원인: app/pages/reservations.vue가 인메모리 Pinia 스토어(reservation.reservations)만 읽고 onMounted/fetch 없음 + 백엔드에 사용자 본인 예약목록 GET 엔드포인트 자체가 부재(ReservationController엔 hold/confirm/complete/cancel만, 조회는 admin 전용 /api/admin/stores/{id}/reservations만 존재).\n(2) 본인 위저드 예약도 하드 새로고침/직접 URL 진입 시 사라짐(세션 내 SPA 이동 중에만 보임). (1)과 동일 근본원인 — 목록을 서버에서 하이드레이션하지 않음.\n(3) 백엔드 도메인 검증 오류(ResponseStatusException)가 전부 '빈 응답 401'로 가려짐(시스템 전반). 실측: 대행 휴무(400 기대)→401, 고객없음(404)→401, 타매장매니저(400)→401 / 중복이메일가입(409)→401 / 승인대기 로그인(403 '승인 대기 중')→401(메시지 소실). 충돌 SlotConflictException(409)만 정상. 원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 shouldNotFilterErrorDispatch 기본 true라 내부 /error 디스패치에서 미실행 → /error가 anyRequest().authenticated()에 걸려 커스텀 entryPoint가 빈 401 반환.\n\n정상 확인: 역할별 로그인 3분리·랜딩, 대행 폼 캐스케이드, 위저드 3단계·베이 점유 비활성·슬롯충돌 409 재선택, role-guard(USER→/reserve), auth 가드(미인증→/login?redirect=).",
+      "summary": "BUG-1 사용자 본인 예약 목록 조회 API(GET /api/reservations) 추가 완료. 기존 자산을 최대 재사용: 이미 선언만 있고 미사용(dead code)이던 ReservationMapper.findByUser(userId)와 필요한 필드·from()을 모두 갖춘 ReservationResponse를 그대로 활용 — 신규 DTO/매퍼/XML 없이 서비스+컨트롤러만 추가. (1) ReservationService.listMine(userId): @Transactional(readOnly=true), findByUser→ReservationResponse.from 스트림 매핑. (2) ReservationController @GetMapping: @AuthenticationPrincipal로 JWT uid만 사용(바디/쿼리 미수용), /api/reservations/**는 기존 anyRequest().authenticated() 보호. (3) 신규 MyReservationsApiTest 4건: 본인 격리(모든 항목 userId==호출자)·타인 예약 제외·매니저 대행(userId=고객) 포함·미인증 401·FE 표시 필드 존재. 실서버(재빌드·재기동) 스모크 검증: 초기 []→매니저 대행 200(userId=user1)→user@test.com GET이 대행 예약 포함(헤드라인 결함 API 레벨 해소)→미인증 401. ./gradlew test bootJar BUILD SUCCESSFUL(전체 회귀 0). 정렬은 매퍼 기본(date,time_slot asc) 유지 — created_at 컬럼 부재로 스키마 변경(범위초과) 대신 FE(BUG-2)의 표시단 reverse에 위임. 변경: ReservationService.java, ReservationController.java, MyReservationsApiTest.java(신규).",
+      "completedAt": "2026-06-20T23:28:05.864Z"
+    },
+    {
+      "id": "bacfbef8-ec9e-4453-ae2a-e8db1fea2225",
+      "name": "BUG-2 FE 예약 목록 페이지 서버 하이드레이션(대행/새로고침 정합)",
+      "description": "app/pages/reservations.vue가 인메모리 Pinia 스토어만 읽어, 매니저 대행 예약이 안 보이고(결함1) 본인 위저드 예약도 하드 새로고침 시 사라진다(결함2). 페이지 진입 시 BUG-1의 GET /api/reservations로 본인 예약을 서버에서 로드해 스토어를 하이드레이션하도록 한다. 기존 세차완료/취소/후기 액션 및 마크업·data-testid는 보존한다.",
+      "notes": "BUG-1 응답 필드명이 FE Reservation과 일치해야 매핑이 단순해진다. 액션(complete/cancel)이 serverId를 사용하므로 하이드레이션 시 serverId 채움이 필수. 마크업/스타일/testid 무변경(additive).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d5d0ad54-751d-45cf-9787-aee9e785843f"
+        }
+      ],
+      "createdAt": "2026-06-20T23:16:27.751Z",
+      "updatedAt": "2026-06-20T23:40:30.790Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/reservations.vue",
+          "type": "TO_MODIFY",
+          "description": "진입 시 서버 예약 로드(onMounted fetch)",
+          "lineStart": 1,
+          "lineEnd": 60
+        },
+        {
+          "path": "app/stores/reservation.ts",
+          "type": "TO_MODIFY",
+          "description": "fetchMine 액션 추가 + serverId 매핑",
+          "lineStart": 1,
+          "lineEnd": 134
+        },
+        {
+          "path": "app/types/domain.ts",
+          "type": "REFERENCE",
+          "description": "Reservation 필드/serverId 규약 확인"
+        }
+      ],
+      "implementationGuide": "1) reservation 스토어에 async fetchMine() 추가 — $apiFetch(`${apiBase}/reservations`)로 받아 reservations.value를 서버 응답으로 대체(서버예약id를 serverId로 매핑, id는 표시용 유지 규약 확인). 슬롯 상태 맵과의 정합은 기존 confirm 경로와 충돌 없게 처리. 2) reservations.vue에서 onMounted(또는 useAsyncData/await)로 fetchMine 호출 — SSR/CSR 모두 안전하게(클라이언트 가드). 3) myReservations 계산은 서버 로드분을 그대로 노출(현행 userId 필터 유지 가능). 4) 완료/취소 PATCH 후 로컬 상태 반영은 기존 로직 유지(서버 재조회 또는 낙관적 갱신 일관성 확인). 5) 타입체크 통과.",
+      "verificationCriteria": "매니저가 user@test.com 대상 대행 예약 후, user@test.com 로그인→/reservations에 해당 예약 표시. 본인 위저드 예약 후 하드 새로고침해도 목록 유지. 완료/취소 액션 정상. npm run type-check 통과.",
+      "analysisResult": "[Playwright 정밀 테스트로 발견된 결함 묶음 — 2차(ROADMAP_2) 백엔드+BO]\n\n환경: FE :3000(Nuxt) / BE :8080(Spring Boot+H2) 동시 기동, 전 계정 비번 'password'.\n\n발견 결함 3종(실측):\n(1) 매니저 대행 예약이 일반사용자 예약목록에 안 뜸 — manager@test.com이 user@test.com 대상 대행 예약 POST /api/manager/reservations→200, DB(admin API)에 홍길동(user1) 소유로 정상 저장 확인. 그러나 user@test.com 로그인 후 /reservations=\"아직 예약이 없어요\"(0건). 원인: app/pages/reservations.vue가 인메모리 Pinia 스토어(reservation.reservations)만 읽고 onMounted/fetch 없음 + 백엔드에 사용자 본인 예약목록 GET 엔드포인트 자체가 부재(ReservationController엔 hold/confirm/complete/cancel만, 조회는 admin 전용 /api/admin/stores/{id}/reservations만 존재).\n(2) 본인 위저드 예약도 하드 새로고침/직접 URL 진입 시 사라짐(세션 내 SPA 이동 중에만 보임). (1)과 동일 근본원인 — 목록을 서버에서 하이드레이션하지 않음.\n(3) 백엔드 도메인 검증 오류(ResponseStatusException)가 전부 '빈 응답 401'로 가려짐(시스템 전반). 실측: 대행 휴무(400 기대)→401, 고객없음(404)→401, 타매장매니저(400)→401 / 중복이메일가입(409)→401 / 승인대기 로그인(403 '승인 대기 중')→401(메시지 소실). 충돌 SlotConflictException(409)만 정상. 원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 shouldNotFilterErrorDispatch 기본 true라 내부 /error 디스패치에서 미실행 → /error가 anyRequest().authenticated()에 걸려 커스텀 entryPoint가 빈 401 반환.\n\n정상 확인: 역할별 로그인 3분리·랜딩, 대행 폼 캐스케이드, 위저드 3단계·베이 점유 비활성·슬롯충돌 409 재선택, role-guard(USER→/reserve), auth 가드(미인증→/login?redirect=).",
+      "summary": "BUG-2 FE 예약 목록 서버 하이드레이션 완료. (1) reservation 스토어에 async fetchMine() 추가 — $apiFetch(GET /api/reservations)로 본인 예약을 받아 reservations.value를 교체하고, 서버 예약 id를 표시 id·serverId 양쪽에 매핑({...r, serverId: r.id}). id=serverId로 통일해 목록 key·후기 라우트(r.id)와 상태전이 PATCH·후기 POST(serverId)가 모두 일관 동작. 실패 시 기존 상태 보존(catch no-op). (2) reservations.vue에 onMounted(() => reservation.fetchMine()) 추가 — 마크업·data-testid·기존 액션 무변경(additive), import에 onMounted만 추가. (3) npm run type-check EXIT=0. 실증(Playwright, FE:3000+BE:8080): 토큰 쿠키 주입 인증 후 /reservations 하드 진입 → 매니저 대행 예약(userId=user1) 1건 표시(결함#1 해소) + GET /api/reservations 200 호출 확인(이전엔 미호출) → 하드 새로고침 후에도 1건 유지(결함#2 해소). 완료/취소 contract: 하이드레이션 id=serverId(rsv-da78703a...) 검증 후 PATCH /{serverId}/complete→204→COMPLETED, FE 재로드 시 '세차 완료' 뱃지+후기 작성 링크 렌더링 확인. 주의: 본 dev 세션에서 모든 버튼 @click이 발화하지 않는 환경적 하이드레이션 플레이키니스 존재(login.vue/manager-reserve.vue 미수정 — 내 변경 무관)로 액션은 백엔드 contract+serverId 매핑+FE 렌더링으로 입증. 변경 파일: app/stores/reservation.ts, app/pages/reservations.vue.",
+      "completedAt": "2026-06-20T23:40:30.785Z"
+    },
+    {
+      "id": "df2e562d-9acf-46b6-8fe0-5cac2c5ccbad",
+      "name": "BUG-3 BE 도메인 검증 오류 401 마스킹 수정(ResponseStatusException 일관 처리)",
+      "description": "컨트롤러/서비스가 던지는 ResponseStatusException(400/404/403/409)이 내부 /error 디스패치를 거치며 전부 '빈 응답 401'로 가려진다(시스템 전반: 대행 휴무/고객없음/타매장, 중복이메일 가입, 승인대기 로그인 등 6개 서비스). 사용자가 실패 이유를 알 수 없고 상태코드 기반 클라이언트 분기가 불가능하다. 의도한 상태코드와 메시지가 그대로 전달되도록 수정한다.",
+      "notes": "GlobalExceptionHandler의 주석('ResponseStatusException은 Spring이 자체 처리')은 사실과 다르므로 수정. AuthService UNAUTHORIZED(잘못된 비번)는 의도상 401 유지되어야 하니, 수정 후 회귀로 401이 보존되는지 함께 확인. 응답 바디(메시지)가 비지 않아야 한다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-20T23:16:27.751Z",
+      "updatedAt": "2026-06-20T23:23:53.266Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/exception/GlobalExceptionHandler.java",
+          "type": "TO_MODIFY",
+          "description": "ResponseStatusException 핸들러 추가(1안)",
+          "lineStart": 1,
+          "lineEnd": 45
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/SecurityConfig.java",
+          "type": "TO_MODIFY",
+          "description": "(2안 채택 시) /error permitAll + entryPoint 확인",
+          "lineStart": 31,
+          "lineEnd": 62
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/security/JwtAuthenticationFilter.java",
+          "type": "TO_MODIFY",
+          "description": "(2안 채택 시) shouldNotFilterErrorDispatch 오버라이드"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ManagerReservationService.java",
+          "type": "REFERENCE",
+          "description": "휴무/고객없음/타매장 검증 throw 지점",
+          "lineStart": 33,
+          "lineEnd": 53
+        }
+      ],
+      "implementationGuide": "근본원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 ERROR 디스패치에서 미실행(shouldNotFilterErrorDispatch 기본 true) → /error가 authenticated()에 걸려 entryPoint가 빈 401 반환.\n권장(택1, 1안 우선):\n1안) GlobalExceptionHandler에 @ExceptionHandler(ResponseStatusException.class) 추가 — e.getStatusCode()와 e.getReason()을 ErrorResponse(code,message)로 그대로 매핑해 ResponseEntity 반환(도메인 advice가 응답을 직접 생성하므로 ERROR 디스패치 자체가 발생하지 않아 401 마스킹 회피). 기존 SlotConflict/Duplicate/IllegalState/Validation 핸들러와 우선순위 충돌 없게 정리.\n2안) JwtAuthenticationFilter에서 protected boolean shouldNotFilterErrorDispatch(){return false} 오버라이드 + SecurityConfig에 .requestMatchers('/error').permitAll() — /error 재인증/허용으로 원래 상태 보존.\n검증을 위해 기존 잘못된 기대(예: BoApiTest의 휴무 차단을 401로 기대하는 부분)가 있으면 올바른 상태(400/404 등)로 정정.",
+      "verificationCriteria": "대행 휴무 시간대→400, 고객없음→404, 타매장매니저→400, 중복이메일 가입→409, 승인대기 로그인→403(각각 메시지 본문 포함). 슬롯충돌 409·잘못된 비번 401 회귀 보존. ./gradlew test BUILD SUCCESSFUL(기대값 정정 포함).",
+      "analysisResult": "[Playwright 정밀 테스트로 발견된 결함 묶음 — 2차(ROADMAP_2) 백엔드+BO]\n\n환경: FE :3000(Nuxt) / BE :8080(Spring Boot+H2) 동시 기동, 전 계정 비번 'password'.\n\n발견 결함 3종(실측):\n(1) 매니저 대행 예약이 일반사용자 예약목록에 안 뜸 — manager@test.com이 user@test.com 대상 대행 예약 POST /api/manager/reservations→200, DB(admin API)에 홍길동(user1) 소유로 정상 저장 확인. 그러나 user@test.com 로그인 후 /reservations=\"아직 예약이 없어요\"(0건). 원인: app/pages/reservations.vue가 인메모리 Pinia 스토어(reservation.reservations)만 읽고 onMounted/fetch 없음 + 백엔드에 사용자 본인 예약목록 GET 엔드포인트 자체가 부재(ReservationController엔 hold/confirm/complete/cancel만, 조회는 admin 전용 /api/admin/stores/{id}/reservations만 존재).\n(2) 본인 위저드 예약도 하드 새로고침/직접 URL 진입 시 사라짐(세션 내 SPA 이동 중에만 보임). (1)과 동일 근본원인 — 목록을 서버에서 하이드레이션하지 않음.\n(3) 백엔드 도메인 검증 오류(ResponseStatusException)가 전부 '빈 응답 401'로 가려짐(시스템 전반). 실측: 대행 휴무(400 기대)→401, 고객없음(404)→401, 타매장매니저(400)→401 / 중복이메일가입(409)→401 / 승인대기 로그인(403 '승인 대기 중')→401(메시지 소실). 충돌 SlotConflictException(409)만 정상. 원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 shouldNotFilterErrorDispatch 기본 true라 내부 /error 디스패치에서 미실행 → /error가 anyRequest().authenticated()에 걸려 커스텀 entryPoint가 빈 401 반환.\n\n정상 확인: 역할별 로그인 3분리·랜딩, 대행 폼 캐스케이드, 위저드 3단계·베이 점유 비활성·슬롯충돌 409 재선택, role-guard(USER→/reserve), auth 가드(미인증→/login?redirect=).",
+      "summary": "BUG-3 도메인 검증 오류 401 마스킹 수정 완료. 근본원인은 Spring 기본 ResponseStatusExceptionResolver가 response.sendError()로 처리→stateless JWT 보안 체인의 인증 없는 /error 디스패치 유발→빈 401 마스킹. 수정: (1) GlobalExceptionHandler에 @ExceptionHandler(ResponseStatusException.class) 추가 — getStatusCode()/getReason()을 ErrorResponse(code,message)로 ResponseEntity 직접 반환해 sendError 경로 우회(잘못된 주석도 정정). (2) SecurityConfig에 /error permitAll 병행 추가 — 도메인 외 예외(JSON 파싱 400·500 등)와 보안 401/403도 실제 상태코드+본문으로 노출(동일 마스킹 부류 전체 차단). 실서버(재빌드·재기동) 검증: 휴무→400, 고객없음→404, 타매장→400, 중복가입→409, 승인대기→403 모두 메시지 포함. 회귀 보존: 잘못된비번 401·무토큰 401·USER권한 403·슬롯충돌 409. 추가로 깨진 JSON 401→400. ./gradlew test bootJar BUILD SUCCESSFUL(전체 회귀 0실패). 변경 파일: GlobalExceptionHandler.java, SecurityConfig.java. MockMvc는 컨테이너 error 디스패치를 안 해 기존에도 통과했으나 실서버는 401이던 괴리를 양 경로 일치로 해소.",
+      "completedAt": "2026-06-20T23:23:53.263Z"
+    },
+    {
+      "id": "66297366-a70d-4b66-b0e1-f2c863701c54",
+      "name": "BUG-검증 크로스롤 E2E + 종합 회귀 게이트",
+      "description": "수정(BUG-1~3) 후 사용자가 우려한 핵심 시나리오와 회귀를 자동화로 고정한다. 매니저 대행→사용자 목록 표시, 새로고침 후 유지, 도메인 오류 상태코드/메시지 노출을 Playwright E2E와 BE 테스트로 검증한다.",
+      "notes": "결정적 단정을 위해 더미 고정값과 data-testid 사용(README 테스트 관례). 대행 슬롯은 시드 충돌(store1-A1 2026-06-25 10:00)·mgr1 휴무일(06-22 FULL_DAY, 06-23 SHIFT_1, 06-29)을 피해 선택.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d5d0ad54-751d-45cf-9787-aee9e785843f"
+        },
+        {
+          "taskId": "bacfbef8-ec9e-4453-ae2a-e8db1fea2225"
+        },
+        {
+          "taskId": "df2e562d-9acf-46b6-8fe0-5cac2c5ccbad"
+        }
+      ],
+      "createdAt": "2026-06-20T23:16:27.751Z",
+      "updatedAt": "2026-06-20T23:48:24.475Z",
+      "relatedFiles": [
+        {
+          "path": "e2e/bo.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "대행→사용자 목록 크로스롤 시나리오 추가"
+        },
+        {
+          "path": "e2e/reservations.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "새로고침 유지·서버 하이드레이션 단정"
+        },
+        {
+          "path": "playwright.config.ts",
+          "type": "REFERENCE",
+          "description": "FE+BE 동시 기동 구성 확인"
+        }
+      ],
+      "implementationGuide": "1) e2e에 크로스롤 시나리오 추가: 매니저 로그인→/manager/reserve로 user@test.com 대행 예약 제출→성공 메시지, 이후 user@test.com 로그인→/reservations에 해당 예약 카드(data-testid) 존재 단정. 2) 본인 위저드 예약 후 page.reload()해도 카드 유지 단정. 3) 대행 실패 경로(예: 매니저 휴무 날짜) 제출 시 폼 결과 메시지가 표시되는지(가능하면 서버 메시지 반영) 단정. 4) 종합 게이트: cd backend && ./gradlew test(BUILD SUCCESSFUL), npm run type-check, npm run test:e2e 전건 통과. 5) 기존 e2e(reservations/bo/auth 등) 회귀 보존.",
+      "verificationCriteria": "신규 크로스롤 E2E가 매니저 대행→사용자 목록 표시·새로고침 유지를 통과. BE test·FE type-check·전체 test:e2e BUILD/PASS. 기존 시나리오 회귀 없음.",
+      "analysisResult": "[Playwright 정밀 테스트로 발견된 결함 묶음 — 2차(ROADMAP_2) 백엔드+BO]\n\n환경: FE :3000(Nuxt) / BE :8080(Spring Boot+H2) 동시 기동, 전 계정 비번 'password'.\n\n발견 결함 3종(실측):\n(1) 매니저 대행 예약이 일반사용자 예약목록에 안 뜸 — manager@test.com이 user@test.com 대상 대행 예약 POST /api/manager/reservations→200, DB(admin API)에 홍길동(user1) 소유로 정상 저장 확인. 그러나 user@test.com 로그인 후 /reservations=\"아직 예약이 없어요\"(0건). 원인: app/pages/reservations.vue가 인메모리 Pinia 스토어(reservation.reservations)만 읽고 onMounted/fetch 없음 + 백엔드에 사용자 본인 예약목록 GET 엔드포인트 자체가 부재(ReservationController엔 hold/confirm/complete/cancel만, 조회는 admin 전용 /api/admin/stores/{id}/reservations만 존재).\n(2) 본인 위저드 예약도 하드 새로고침/직접 URL 진입 시 사라짐(세션 내 SPA 이동 중에만 보임). (1)과 동일 근본원인 — 목록을 서버에서 하이드레이션하지 않음.\n(3) 백엔드 도메인 검증 오류(ResponseStatusException)가 전부 '빈 응답 401'로 가려짐(시스템 전반). 실측: 대행 휴무(400 기대)→401, 고객없음(404)→401, 타매장매니저(400)→401 / 중복이메일가입(409)→401 / 승인대기 로그인(403 '승인 대기 중')→401(메시지 소실). 충돌 SlotConflictException(409)만 정상. 원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 shouldNotFilterErrorDispatch 기본 true라 내부 /error 디스패치에서 미실행 → /error가 anyRequest().authenticated()에 걸려 커스텀 entryPoint가 빈 401 반환.\n\n정상 확인: 역할별 로그인 3분리·랜딩, 대행 폼 캐스케이드, 위저드 3단계·베이 점유 비활성·슬롯충돌 409 재선택, role-guard(USER→/reserve), auth 가드(미인증→/login?redirect=).",
+      "summary": "BUG-검증(크로스롤 E2E + 종합 게이트) 완료. 신규 E2E 3건 추가: (1) bo.spec '크로스롤: 매니저 대행→일반사용자 목록 표시'(BUG-1/2) — loginAs/proxyReserve 헬퍼 재사용, 고유 슬롯 2026-10-10 09:00, user 로그인 후 /reservations에서 해당 날짜·시간 카드 visible 단정. (2) reservations.spec '서버 하이드레이션: 하드 새로고침 후 유지'(BUG-2) — 위저드 예약(2026-07-03 13:00) 후 page.reload()해도 카드 유지 단정. (3) bo.spec '본인 휴무 시간대 대행 실패 메시지'(BUG-3) — mgr1 휴무일 2026-06-22 대행 시 proxy-result '실패' 노출. 회귀 보존 핵심 결정: BUG-2 fetchMine을 '교체'에서 'serverId 기준 중복 없는 append'로 변경 — 세션 내 로컬 예약(rsv-1, reservationDraft 순번 id)을 보존해 rsv-1에 의존하는 기존 reservations.spec/review.spec 무수정 통과, 동시에 서버 전용(대행)·새로고침 전체를 보강해 두 결함 모두 해소. 종합 게이트 전부 통과: FE npm run type-check EXIT=0, BE ./gradlew test BUILD SUCCESSFUL, npm run test:e2e 40 passed(신규 3 + 기존 37, 회귀 0). 결정적 실행 위해 BE/FE 클린 재기동(H2 초기화) 후 reuseExistingServer로 실행. 수동 MCP에서 보였던 버튼 클릭 플레이키니스는 e2e 헬퍼(networkidle+visible 대기)로 미재현 확인. 변경 파일: e2e/bo.spec.ts, e2e/reservations.spec.ts, app/stores/reservation.ts(append 보정).",
+      "completedAt": "2026-06-20T23:48:24.471Z"
     }
   ]
 }

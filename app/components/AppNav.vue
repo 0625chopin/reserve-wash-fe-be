@@ -37,7 +37,15 @@ function onLogout() {
 
       <!-- 네비 + 인증 상태 -->
       <nav class="flex items-center gap-1 sm:gap-2">
-        <NuxtLink data-testid="nav-reserve" to="/reserve" class="nav-link">예약</NuxtLink>
+        <!-- 예약(부킹)은 관리자에게 노출하지 않음 — 관리자는 예약을 생성하지 않는다 -->
+        <NuxtLink
+          v-if="!isAdmin"
+          data-testid="nav-reserve"
+          to="/reserve"
+          class="nav-link"
+        >
+          예약
+        </NuxtLink>
         <NuxtLink data-testid="nav-reservations" to="/reservations" class="nav-link">
           예약 목록
         </NuxtLink>
@@ -68,15 +76,15 @@ function onLogout() {
           </NuxtLink>
         </template>
         <template v-if="isAdmin">
+          <NuxtLink data-testid="nav-admin-managers" to="/admin/managers" class="nav-link">
+            매니저 등록
+          </NuxtLink>
           <NuxtLink
             data-testid="nav-admin-manager-approvals"
             to="/admin/manager-approvals"
             class="nav-link"
           >
             가입 최종 승인
-          </NuxtLink>
-          <NuxtLink data-testid="nav-admin-approvals" to="/admin/approvals" class="nav-link">
-            휴일 결재
           </NuxtLink>
           <NuxtLink data-testid="nav-admin-sales" to="/admin/sales" class="nav-link">
             매출

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// BO 일반매장매니저 휴가/반차·매장휴일 신청(M6) — require v1.7 §8.2.
+// BO 일반매장매니저 휴가/반차 신청(M6) — require v1.7 §8.2.
 //   승인(M8)은 매장매니저관리자 전용 /store-admin/dayoff-approvals 에서 처리(역할별 페이지 분리 §12.4).
+//   ※ 매장 휴일 신청은 관리자 '휴일 결재' 메뉴 제거(v1.11)에 따라 승인 경로가 끊겨 본 화면에서 제외(v1.15).
 import { computed, onMounted, ref, watch } from 'vue'
 import { getApprovedStores, getManagersByStore } from '~/services/storeService'
 import type { DayoffType } from '~/types/enums'
@@ -38,11 +39,31 @@ const myStore = computed(() => stores.find((s) => s.id === storeId.value) ?? nul
 const managerId = ref('')
 const dayoffDate = ref('')
 const dayoffType = ref<DayoffType | ''>('')
-const holidayDate = ref('')
 const rows = ref<DayoffApproval[]>([])
 const message = ref('')
 
 const managerOptions = computed(() => (storeId.value ? getManagersByStore(storeId.value) : []))
+
+// 날짜 선택을 일반예약(/reserve/slot)과 동일한 휠로 통일 (require v1.14) — 오늘부터 21일 날짜 휠.
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+function buildDateItems() {
+  const result: { label: string; value: string }[] = []
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 21; i++) {
+    const d = new Date(base)
+    d.setDate(base.getDate() + i)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    result.push({
+      label: `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`,
+      value: `${y}-${m}-${day}`,
+    })
+  }
+  return result
+}
+const dateItems = buildDateItems()
 
 function base() {
   return useRuntimeConfig().public.apiBase
@@ -73,7 +94,11 @@ watch(storeId, () => {
 onMounted(loadDayoffs)
 
 async function submitDayoff() {
-  if (!managerId.value || !dayoffDate.value || !dayoffType.value) return
+  // 미선택 시 조용히 무시되지 않도록 안내(휠 날짜 미선택 등)
+  if (!managerId.value || !dayoffType.value || !dayoffDate.value) {
+    message.value = '매니저 · 휴무 유형 · 날짜를 모두 선택하세요.'
+    return
+  }
   const { $apiFetch } = useNuxtApp()
   try {
     await $apiFetch(`${base()}/manager/dayoffs`, {
@@ -86,21 +111,6 @@ async function submitDayoff() {
     await loadDayoffs()
   } catch {
     message.value = '휴무 신청에 실패했습니다.'
-  }
-}
-
-async function submitHoliday() {
-  if (!storeId.value || !holidayDate.value) return
-  const { $apiFetch } = useNuxtApp()
-  try {
-    await $apiFetch(`${base()}/manager/holidays`, {
-      method: 'POST',
-      body: { storeId: storeId.value, date: holidayDate.value },
-    })
-    message.value = '매장 휴일이 상신되었습니다.'
-    holidayDate.value = ''
-  } catch {
-    message.value = '매장 휴일 신청에 실패했습니다.'
   }
 }
 
@@ -120,9 +130,9 @@ async function resubmit(id: number) {
   <section data-testid="page-manager-dayoffs" class="mx-auto max-w-2xl">
     <header class="mb-8">
       <span class="badge-accent mb-3">백오피스 · 신청</span>
-      <h1 class="text-3xl font-bold">휴가/반차 · 휴일 신청</h1>
+      <h1 class="text-3xl font-bold">휴가/반차 신청</h1>
       <p class="mt-2 text-sm text-[--color-content-muted]">
-        휴가/반차는 매장매니저관리자 승인(1단계)으로 확정됩니다. 매장 휴일은 관리자 승인으로 확정됩니다.
+        휴가/반차는 매장매니저관리자 승인(1단계)으로 확정됩니다.
       </p>
     </header>
 
@@ -136,7 +146,7 @@ async function resubmit(id: number) {
       </div>
 
       <!-- 매니저 휴무 신청 -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label class="field-label" for="dayoff-manager">매니저</label>
           <select
@@ -156,17 +166,18 @@ async function resubmit(id: number) {
             <option v-for="t in DAYOFF_TYPES" :key="t.code" :value="t.code">{{ t.label }}</option>
           </select>
         </div>
-        <div>
-          <label class="field-label" for="dayoff-date">날짜</label>
-          <input
-            id="dayoff-date"
-            v-model="dayoffDate"
-            data-testid="dayoff-date"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            class="bo-input"
-          />
-        </div>
+      </div>
+      <!-- 날짜 — 일반예약(/reserve/slot)과 동일한 휠 선택기 (require v1.14) -->
+      <div>
+        <span class="field-label">날짜</span>
+        <ClientOnly>
+          <WheelPicker v-model="dayoffDate" testid="dayoff-date-wheel" :items="dateItems" />
+          <template #fallback>
+            <div
+              class="h-[200px] animate-pulse rounded-xl border border-[--color-line-soft] bg-[--color-surface-1]"
+            />
+          </template>
+        </ClientOnly>
       </div>
       <button
         data-testid="dayoff-submit"
@@ -176,24 +187,6 @@ async function resubmit(id: number) {
       >
         휴무 신청 상신
       </button>
-
-      <!-- 매장 휴일 신청 -->
-      <div class="flex items-end gap-3 border-t border-[--color-line-soft] pt-5">
-        <div class="flex-1">
-          <label class="field-label" for="holiday-date">매장 휴일 날짜</label>
-          <input
-            id="holiday-date"
-            v-model="holidayDate"
-            data-testid="holiday-date"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            class="bo-input"
-          />
-        </div>
-        <button data-testid="holiday-submit" type="button" class="btn btn-ghost" @click="submitHoliday">
-          휴일 상신
-        </button>
-      </div>
 
       <p v-if="message" data-testid="dayoff-message" class="text-sm text-[--color-brand-accent]">
         {{ message }}

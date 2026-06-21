@@ -10,6 +10,7 @@ import com.carwash.dto.ReservationResponse;
 import com.carwash.exception.SlotConflictException;
 import com.carwash.mapper.ReservationMapper;
 import com.carwash.mapper.SlotMapper;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,26 @@ public class ReservationService {
     public ReservationService(SlotMapper slotMapper, ReservationMapper reservationMapper) {
         this.slotMapper = slotMapper;
         this.reservationMapper = reservationMapper;
+    }
+
+    // 본인 예약 목록(FW6 require 6.1) — userId 소유 예약 전체. 매니저 대행 예약(userId=고객)도 포함된다.
+    //   userId는 호출부에서 JWT principal(uid)로만 도출(요청 바디/쿼리로 받지 않음).
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> listMine(String userId) {
+        return reservationMapper.findByUser(userId).stream().map(ReservationResponse::from).toList();
+    }
+
+    // 담당 매니저 예약 목록(require v1.10 §6.6) — managerId(manager 엔티티 id) 귀속 예약 전체.
+    //   사용자가 그 매니저를 지정한 일반 예약 + 매니저 대행 예약이 모두 포함된다. managerId는 호출부가 로그인 계정에서 해석.
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> listByManagerId(String managerId) {
+        return reservationMapper.findByManager(managerId).stream().map(ReservationResponse::from).toList();
+    }
+
+    // 매장 전체 예약 목록(require v1.10 §6.6 STORE_ADMIN) — storeId 귀속 예약 전체(매장 내 모든 매니저 예약 건).
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> listByStoreId(String storeId) {
+        return reservationMapper.findByStore(storeId).stream().map(ReservationResponse::from).toList();
     }
 
     // 점유 — INSERT HOLDING. 이미 점유/예약된 슬롯이면 uk 위반(DataIntegrityViolation)→409

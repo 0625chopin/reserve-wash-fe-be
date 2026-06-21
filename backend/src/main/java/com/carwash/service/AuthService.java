@@ -4,6 +4,7 @@ import com.carwash.domain.User;
 import com.carwash.domain.enums.UserApprovalStatus;
 import com.carwash.domain.enums.UserRole;
 import com.carwash.dto.LoginResponse;
+import com.carwash.dto.ManagerSignupResponse;
 import com.carwash.dto.UserResponse;
 import com.carwash.mapper.UserMapper;
 import com.carwash.security.JwtTokenProvider;
@@ -80,5 +81,31 @@ public class AuthService {
                 .storeId(storeId)
                 .build();
         userMapper.insert(user);
+    }
+
+    // 관리자 직접 매니저 등록 (require v1.12 §4.1) — role(MANAGER|STORE_ADMIN) 지정, PENDING_APPROVAL_L2로 생성.
+    //   1차(매장매니저관리자) 승인은 생략하되, 2차 최종 승인(S3)은 동일하게 거쳐야 ACTIVE가 된다(자동 로그인 없음).
+    //   생성된 계정은 곧장 '가입 최종 승인'(GET /api/admin/manager-approvals = PENDING_APPROVAL_L2) 목록에 합류한다.
+    @Transactional
+    public ManagerSignupResponse adminCreateManager(
+            String email, String rawPassword, String name, String storeId, UserRole role) {
+        if (role != UserRole.MANAGER && role != UserRole.STORE_ADMIN) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "매니저 계열 역할(MANAGER/STORE_ADMIN)만 등록할 수 있습니다.");
+        }
+        if (userMapper.findByEmail(email) != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
+        }
+        User user = User.builder()
+                .id("mgr-" + UUID.randomUUID())
+                .email(email)
+                .name(name)
+                .role(role)
+                .passwordHash(passwordEncoder.encode(rawPassword))
+                .approvalStatus(UserApprovalStatus.PENDING_APPROVAL_L2)   // 2차 최종 승인 대기(1차 생략)
+                .storeId(storeId)
+                .build();
+        userMapper.insert(user);
+        return ManagerSignupResponse.from(user);
     }
 }

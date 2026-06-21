@@ -17,6 +17,12 @@
         WHERE user_id = #{userId} ORDER BY `date`, time_slot
     </select>
 
+    <!-- 담당 매니저별 예약 — 매니저 담당 목록(require v1.10 §6.6). 사용자가 그 매니저를 지정한 예약 + 대행 예약 모두 포함 -->
+    <select id="findByManager" resultType="com.carwash.domain.Reservation">
+        SELECT <include refid="columns"/> FROM reservation
+        WHERE manager_id = #{managerId} ORDER BY `date`, time_slot
+    </select>
+
     <!-- 매장별 예약 — BO 관리자 화면(S4·S5, Phase 6) -->
     <select id="findByStore" resultType="com.carwash.domain.Reservation">
         SELECT <include refid="columns"/> FROM reservation

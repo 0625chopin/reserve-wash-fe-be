@@ -10,6 +10,8 @@
 > - **프로세스 코드 재정의(require v1.7 §11.1)**: M6=휴가/반차 신청, M7=일반매장매니저 가입 1차 승인(매장매니저관리자), **M8=휴가/반차 승인(신설, 매장매니저관리자 1단계 종결)**, S3=매니저 가입 2차 최종 승인(관리자), **S9=매장별 매니저 근무상태 확인(신설)**. 구 "M6=예약승인" 표기 제거.
 > - **역할별 BO 페이지 4그룹 분리**(require v1.7 §12.4): 일반매장매니저/매장매니저관리자/관리자별 화면 경로를 Phase 6~8에 반영.
 >
+> **🔄 v1.10 정합(require v1.10 — 매니저 예약 목록 의미 정정 & 대행 날짜·시간 통일)**: ① **매니저 예약 목록(`/manager/reservations`)은 본인(`userId`)이 아니라 담당(`managerId`) 예약**(대행 등록분 + 사용자가 그 매니저를 지정한 분)을 노출한다 — 사용자 본인 목록(`GET /api/reservations`)과 별도 화면·별도 조회. **Phase 6에 신규 요구로 추가**(`findByManager` + `GET /api/manager/reservations` + FE `manager/reservations.vue`). ⚠ **`User`↔`Manager` 연결(매니저 식별자) 결정 선행 필요** — 현행 미보유(블로킹). ② 매니저 대행 폼 날짜·시간을 일반예약과 **동일한 휠 선택기**로 통일(구현 완료, require §6.2). 상세는 **Phase 6 — 🆕 v1.10 추가 요구** 참조.
+>
 > **🔄 v1.8 정합 반영(2026-06-21 구현 완료)**: ① **매니저 계열 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면 매장 select를 **본인 소속 매장으로 고정**(`disabled`). BE `users.store_id`·`User.storeId`·`UserResponse.storeId`(로그인 응답) 신설, 매니저 시드에 소속 매장 부여(`USER`/`ADMIN`은 NULL). ② **개발용 빠른 로그인 역할별 랜딩** + **AppNav 역할별 BO 메뉴 분기**. (상세: §12.4 제안 경로 하단 v1.8 반영 노트)
 >
 > **🔄 v1.9 정합 반영(Phase 3 증분)**: **로그인 페이지 역할군별 3분리**(`/login`·`/manager/login`·`/admin/login`, 각 역할별 빠른 로그인) + **매니저 회원가입**(`/manager/signup` + `POST /api/auth/signup-manager`, 소속 매장 선택·`PENDING_APPROVAL_L1` 신청·자동 로그인 없음 → 2단계 승인 후 `ACTIVE`). 관리자 회원가입 폼 없음. (Phase 3 체크리스트 반영)
@@ -996,6 +998,14 @@ public void cancel(Long reservationId) {
 #### 목표
 1차에서 문서화만 했던 BO를 착수한다. **매니저 예약 대행(M3)** — 매니저가 소속 매장 기준으로 사용자 예약을 대행 — 과 **관리자 매장별 예약자 관리(S4)·사용자 관리(S5)** 를 구현한다. 인가는 Phase 3의 역할 가드를 재사용한다.
 
+> **🆕 v1.10 추가 요구 (require v1.10 §6.2·§6.6)**
+>
+> 1. **예약 목록 역할별 분기 (`/reservations`) — 구현 완료 (v1.11)**. 매니저의 예약 목록은 **본인(`userId`) 예약이 아니라, 그 매니저가 담당(`managerId`)으로 지정된 예약**(매니저 대행 등록분 + 일반사용자가 그 매니저를 지정한 분)을 노출한다. `/reservations` 한 화면을 **역할별로 분기**: USER=본인(userId), MANAGER=내 예약+담당 2탭, STORE_ADMIN=매장 전체(storeId). 담당/매장 목록 기반으로 세차완료(M4)·취소(M5) 보조를 수행한다(현재 담당/매장 뷰는 읽기 전용).
+>    - BE(완료): `ReservationMapper.findByManager(managerId)` + `GET /api/manager/reservations`(담당, MANAGER/STORE_ADMIN 인가) + `GET /api/store-admin/reservations`(매장 전체, STORE_ADMIN 인가) 신설.
+>    - FE(완료): `/reservations`에 역할 분기 + 매니저 2탭. 공통 카드 컴포넌트 `ReservationCard.vue` 추출, 스토어 `fetchManagerAssigned`/`fetchStoreReservations` 추가(본인 `fetchMine`과 분리).
+>    - ✅ **데이터 모델 연결 해소**: v1.10에서 블로킹이던 사용자↔매니저 연결을 **`users.manager_id` FK 컬럼 신설**로 해결(시드 `manager1→mgr1`). schema/data.sql·`User.managerId`·`UserMapper` 보강 완료.
+> 2. **매니저 대행 폼 날짜·시간 입력 통일 (구현 완료)** — `manager/reserve.vue`의 자유 텍스트 날짜·시간 입력을 일반예약(`reserve/slot.vue`)과 **동일한 휠 선택기**(`WheelPicker`, 오늘+21일 날짜 휠·30분 시간 휠, 대행 매니저 휴무 비활성)로 교체. 대행 가능 날짜는 휠 범위(21일)로 제한된다.
+
 #### 태스크 체크리스트
 - [x] `POST /api/manager/reservations` — 매니저 대행 예약(M3), 소속 매장·본인 휴무 반영(require 6.2) *(P6-3·P6-5)*
 - [x] 대행 예약도 동일 동시성 경로(Phase 4 `confirm`) + 동일 베이 노출 규칙(Phase 0 Q7) 재사용 *(proxyReserve가 reservationService.confirm 위임)*
@@ -1004,6 +1014,9 @@ public void cancel(Long reservationId) {
 - [x] 역할 인가: M3=MANAGER/STORE_ADMIN, S4·S5=ADMIN (require 3.2) *(SecurityConfig 경로 기반)*
 - [x] FE BO 화면(신규): 매니저 대행 예약(`manager/reserve.vue`), 관리자 예약자/사용자 관리(`admin/stores/[id]/reservations.vue`·`users.vue`)
 - [x] FE 라우트 가드 `role-guard` 적용 — 권한 외 접근 차단(`meta.roles`)
+- [x] *(v1.10)* 매니저 대행 폼 날짜·시간을 일반예약과 동일한 **휠 선택기**(`WheelPicker`)로 통일 — 자유 텍스트 입력 폐지, 대행 매니저 휴무 비활성(require §6.2)
+- [x] *(v1.11)* **예약 목록 역할별 분기**: `ReservationMapper.findByManager` + `GET /api/manager/reservations`(담당, managerId) + `GET /api/store-admin/reservations`(매장 전체, storeId) + FE `/reservations` 역할 분기(USER 본인 / MANAGER 내예약+담당 2탭 / STORE_ADMIN 매장전체), `ReservationCard.vue` 추출 (require §6.6)
+- [x] *(v1.11)* **사용자↔매니저 연결**: `users.manager_id` FK 컬럼 신설(시드 `manager1→mgr1`), `User.managerId`·`UserMapper` 보강 — v1.10 블로킹 해소
 
 #### 생성·수정 파일
 `controller/ManagerReservationController.java`, `controller/AdminController.java`, `service/ManagerReservationService.java`, `service/AdminService.java`, `dto/ProxyReservationRequest.java`, `dto/AdminReservationResponse.java`, `dto/AdminUserResponse.java`, FE `app/pages/manager/reserve.vue`(신규), FE `app/pages/admin/stores/[id]/reservations.vue`·`users.vue`(신규), FE `app/middleware/role-guard.ts`(적용)

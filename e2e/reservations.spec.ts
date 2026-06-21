@@ -53,6 +53,20 @@ test('예약 목록: RESERVED로 표시되고 세차완료로 전이된다', asy
   await expect(page.getByTestId('completed-rsv-1')).toContainText('세차가 완료')
 })
 
+test('서버 하이드레이션: 본인 예약이 하드 새로고침 후에도 목록에 유지된다 (BUG-2)', async ({ page }) => {
+  // 위저드로 본인 예약 생성(고유 슬롯) → 목록 진입
+  await createReservation(page, '2026-07-03', '13:00')
+  await page.getByTestId('nav-reservations').click()
+  await expect(page).toHaveURL(/\/reservations$/)
+  await expect(page.getByText('2026-07-03 13:00')).toBeVisible()
+
+  // 하드 새로고침 → 인메모리 스토어 초기화에도 서버에서 재로딩되어 카드가 유지되어야 한다
+  // (이전: 새로고침/직접 URL 진입 시 본인 예약이 사라지던 결함의 회귀 가드)
+  await page.reload({ waitUntil: 'networkidle' })
+  await expect(page.getByTestId('page-reservations')).toBeVisible()
+  await expect(page.getByText('2026-07-03 13:00')).toBeVisible()
+})
+
 test('예약 취소 시 CANCELED로 전이되고 슬롯이 다시 AVAILABLE로 release된다', async ({ page }) => {
   await createReservation(page, '2026-06-27', '09:00')
   await page.getByTestId('nav-reservations').click()

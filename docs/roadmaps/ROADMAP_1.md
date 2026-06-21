@@ -7,6 +7,8 @@
 > **연계 문서**: [`docs/require_v1.md`](../require_v1.md) (요구사항 정의서 v1.1 → **v1.9**)
 > **범위**: 데이터 진화 **1단계(프론트엔드 더미 데이터)** + **FO 플로우(로그인/예약/취소/후기)** 집중 상세화. 2~3단계(Spring Boot → MySQL)는 마일스톤 개요만 기재.
 >
+> **🔄 v1.10 정합 메모 (require v1.10)**: ① **`/reservations`(Phase 6, `reservations.vue`)는 `userId` 기준 "본인 예약" 목록임을 명확히 한다** — 매니저가 이 화면을 보면 "매니저 본인이 고객으로서 예약한 건"만 보인다. require **v1.10 §6.6**에서 신설된 **매니저 담당(`managerId`) 예약 목록**(`/manager/reservations` — 매니저 대행 등록분 + 사용자가 그 매니저를 지정한 분)은 **본인 목록과 다른 별도 화면**이며 **2차(ROADMAP_2 Phase 6) 과제**다. 1차 FO `/reservations`의 의미·구현은 변동 없음(userId 필터 유지). ② 매니저 대행 폼의 날짜·시간 휠 통일(require §6.2)도 BO 영역이라 **2차 과제**다. 1차 Phase 구성·공수 변동 없음(표기 정합만).
+>
 > **🔄 v1.9 정합 메모 (require v1.9)**: 로그인 페이지를 **역할군별 3분리**(일반사용자 `/login`·매니저 `/manager/login`·관리자 `/admin/login`)하고 **매니저 회원가입(`/manager/signup`)** 을 신설한다. **1차 범위는 일반사용자 로그인(`/login`)·USER 회원가입(`/signup`)으로 그대로 유지**되며, 매니저/관리자 로그인 페이지·매니저 회원가입(소속 매장 선택 + `PENDING_APPROVAL_L1` 신청 → 2단계 승인)은 모두 **2차(ROADMAP_2 Phase 3) 과제**다. 1차 Phase 구성·공수 변동 없음(표기 정합만).
 >
 > **🔄 v1.8 정합 메모 (require v1.8)**: ① `login.vue` 개발용 빠른 로그인을 **역할별 시드 계정 + 역할군별 기본 화면 랜딩**으로 정리(dev 전용, Phase 3 체크리스트 반영) — 일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`. ② 매니저 계열 BO 매장 컨텍스트 고정·`User.storeId`는 **2차(ROADMAP_2) 과제**이며 1차 `USER` 플로우엔 영향 없음(표기 정합만). 1차 FO 범위·Phase 구성·공수 변동 없음.
@@ -407,7 +409,7 @@ Nuxt 파일 기반 라우팅에서 **파일 경로가 곧 URL**입니다. 동적
 | 로그인 (FW2) | `/login` | `login.vue` | — |
 | 회원가입 (FW1) | `/signup` | `signup.vue` | `middleware: 'guest'` |
 | 예약 (FW3~FW5) | `/reserve` | `reserve.vue` | `middleware: 'auth'` |
-| 예약 목록/취소/완료 (FW6/FW7) | `/reservations` | `reservations.vue` | `middleware: 'auth'` |
+| 예약 목록/취소/완료 (FW6/FW7) — **`userId` 기준 본인 예약**(USER 뷰) *(v1.10, 매니저 담당·매장 전체는 역할 분기로 구현 v1.11 → ROADMAP_2 Phase 6)* | `/reservations` | `reservations.vue` | `middleware: 'auth'` |
 | 후기 작성 | `/review/:reservationId` | `review/[reservationId].vue` | `middleware: 'auth'` |
 
 #### 구현 예시 — `app/app.vue` (레이아웃 + 페이지 슬롯)

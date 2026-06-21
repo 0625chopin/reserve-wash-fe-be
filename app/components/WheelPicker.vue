@@ -20,6 +20,15 @@ const ITEM_HEIGHT = 40
 const listRef = ref<HTMLElement | null>(null)
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
 
+// 마우스 드래그 스크롤 상태 — 데스크톱에서 휠을 끌어서 이동(터치/펜은 네이티브 스크롤 사용)
+// pointerActive: 버튼이 눌린 상태(클릭 후보) / dragging: 임계값 초과 이동으로 실제 드래그 engage됨
+let pointerActive = false
+let dragging = false
+let dragStartY = 0
+let dragStartScroll = 0
+let dragMoved = false
+const DRAG_THRESHOLD = 4 // px — 이 미만 이동은 클릭으로 간주(항목 선택 보존)
+
 function clampIndex(index: number): number {
   return Math.max(0, Math.min(props.items.length - 1, index))
 }
@@ -48,20 +57,76 @@ function commitIndex(index: number) {
   if (item) model.value = item.value
 }
 
-// 스크롤이 멈추면 중앙 항목을 선택값으로 확정
+// 현재 스크롤 위치에서 가장 가까운(활성) 항목으로 스냅·확정
+function snapToNearest() {
+  const el = listRef.value
+  if (!el) return
+  const raw = clampIndex(Math.round(el.scrollTop / ITEM_HEIGHT))
+  const index = nearestEnabled(raw)
+  if (index !== raw) scrollToIndex(index)
+  commitIndex(index)
+}
+
+// 스크롤이 멈추면 중앙 항목을 선택값으로 확정(드래그 중에는 release 시점에 스냅)
 function onScroll() {
   const el = listRef.value
   if (!el) return
   if (scrollTimer) clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
-    const raw = clampIndex(Math.round(el.scrollTop / ITEM_HEIGHT))
-    const index = nearestEnabled(raw)
-    if (index !== raw) scrollToIndex(index)
-    commitIndex(index)
+    if (dragging) return
+    snapToNearest()
   }, 120)
 }
 
+// 버튼 누름 — 클릭/드래그 후보 시작. 캡처는 실제 드래그가 시작될 때까지 미루어 항목 click을 보존.
+function onPointerDown(e: PointerEvent) {
+  if (e.pointerType !== 'mouse') return
+  const el = listRef.value
+  if (!el) return
+  pointerActive = true
+  dragging = false
+  dragMoved = false
+  dragStartY = e.clientY
+  dragStartScroll = el.scrollTop
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!pointerActive) return
+  const el = listRef.value
+  if (!el) return
+  const dy = e.clientY - dragStartY
+  // 임계값을 넘는 순간에만 드래그 engage(이때부터 캡처·스냅 비활성). 그 전엔 클릭 후보 유지.
+  if (!dragging) {
+    if (Math.abs(dy) <= DRAG_THRESHOLD) return
+    dragging = true
+    dragMoved = true
+    el.style.scrollSnapType = 'none' // 드래그 중 스냅 비활성 → 끊김 없이 따라옴
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {
+      // pointerId가 유효하지 않아도 드래그 자체는 동작
+    }
+  }
+  el.scrollTop = dragStartScroll - dy
+}
+
+// 버튼 뗌 — 드래그였으면 스냅 복원·확정, 순수 클릭이면 selectItem이 처리하도록 둠
+function endDrag() {
+  if (!pointerActive) return
+  pointerActive = false
+  const wasDragging = dragging
+  dragging = false
+  const el = listRef.value
+  if (el) el.style.scrollSnapType = ''
+  if (wasDragging) snapToNearest()
+}
+
 function selectItem(index: number) {
+  // 드래그 끝에 발생하는 click은 무시(드래그로 이동한 위치 유지)
+  if (dragMoved) {
+    dragMoved = false
+    return
+  }
   const item = props.items[index]
   if (!item || item.disabled) return
   scrollToIndex(index)
@@ -80,7 +145,15 @@ onMounted(() => {
   <div class="wheel" :data-testid="testid">
     <!-- 중앙 선택 밴드 -->
     <div class="wheel-band" aria-hidden="true" />
-    <ul ref="listRef" class="wheel-list" @scroll="onScroll">
+    <ul
+      ref="listRef"
+      class="wheel-list"
+      @scroll="onScroll"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="endDrag"
+      @pointercancel="endDrag"
+    >
       <li
         v-for="(item, index) in items"
         :key="item.value"
@@ -130,6 +203,12 @@ onMounted(() => {
   overscroll-behavior: contain; /* 휠 스크롤이 페이지로 전파돼 흔들리는 것 방지 */
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
+  cursor: grab; /* 데스크톱: 끌어서 스크롤 가능함을 시사 */
+  user-select: none; /* 드래그 중 텍스트 선택 방지 */
+  touch-action: pan-y; /* 터치: 세로 네이티브 스크롤 유지 */
+}
+.wheel-list:active {
+  cursor: grabbing;
 }
 .wheel-list::-webkit-scrollbar {
   display: none;

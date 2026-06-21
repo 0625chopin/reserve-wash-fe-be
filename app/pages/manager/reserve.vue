@@ -6,8 +6,11 @@ import {
   getApprovedStores,
   getBaysForCar,
   getCarTypes,
+  getManager,
   getManagersByStore,
   getServiceTypes,
+  isManagerFullDayOff,
+  isManagerOffAt,
 } from '~/services/storeService'
 import { getPrice } from '~/services/priceService'
 import type { CarType, ServiceType } from '~/types/enums'
@@ -49,6 +52,48 @@ const bayOptions = computed(() =>
 )
 const amount = computed(() =>
   carType.value && serviceType.value ? getPrice(carType.value, serviceType.value) : 0,
+)
+
+// 대행자(매니저) 휴무 컨텍스트 — 날짜·시간 휠 비활성 처리에 사용 (require 5.5/6.1)
+const selectedManager = computed(() => (managerId.value ? getManager(managerId.value) : undefined))
+
+// 일반예약(reserve/slot)과 동일한 날짜·시간 휠 — 오늘부터 21일, 30분 단위 48슬롯
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+function buildDateItems() {
+  const result: { label: string; value: string }[] = []
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 21; i++) {
+    const d = new Date(base)
+    d.setDate(base.getDate() + i)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    result.push({
+      label: `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`,
+      value: `${y}-${m}-${day}`,
+    })
+  }
+  return result
+}
+const baseDates = buildDateItems()
+
+// 전일(FULL_DAY) 휴무 날짜는 날짜 휠에서 비활성, 교대조 휴무는 시간 휠에서 처리 (require 5.5/6.1)
+const dateItems = computed(() =>
+  baseDates.map((d) => ({
+    ...d,
+    disabled: selectedManager.value ? isManagerFullDayOff(selectedManager.value, d.value) : false,
+  })),
+)
+const timeItems = computed(() =>
+  generateTimeSlots().map((t) => ({
+    label: t,
+    value: t,
+    disabled:
+      selectedManager.value && date.value
+        ? isManagerOffAt(selectedManager.value, date.value, t)
+        : false,
+  })),
 )
 
 const canSubmit = computed(
@@ -174,28 +219,6 @@ async function onSubmit() {
           </select>
         </div>
         <div>
-          <label class="field-label" for="proxy-date">날짜</label>
-          <input
-            id="proxy-date"
-            v-model="date"
-            data-testid="proxy-date"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            class="bo-input"
-          />
-        </div>
-        <div>
-          <label class="field-label" for="proxy-time">시간</label>
-          <input
-            id="proxy-time"
-            v-model="time"
-            data-testid="proxy-time"
-            type="text"
-            placeholder="HH:mm"
-            class="bo-input"
-          />
-        </div>
-        <div>
           <label class="field-label" for="proxy-bay">베이</label>
           <select id="proxy-bay" v-model="bayId" data-testid="proxy-bay" class="bo-input">
             <option value="" disabled>선택</option>
@@ -208,6 +231,28 @@ async function onSubmit() {
             {{ amount.toLocaleString('ko-KR') }}원
           </p>
         </div>
+      </div>
+
+      <!-- 날짜·시간 선택 — 일반예약(reserve/slot)과 동일한 휠 UI -->
+      <div>
+        <span class="field-label">날짜 · 시간 선택</span>
+        <p
+          v-if="selectedManager?.dayoffs.length"
+          class="mb-2 text-xs text-[--color-content-muted]"
+        >
+          취소선 표시된 휴무(전일·교대조) 시간대는 선택할 수 없어요.
+        </p>
+        <ClientOnly>
+          <div class="grid grid-cols-2 gap-3">
+            <WheelPicker v-model="date" testid="proxy-date-wheel" :items="dateItems" />
+            <WheelPicker v-model="time" testid="proxy-time-wheel" :items="timeItems" />
+          </div>
+          <template #fallback>
+            <div
+              class="h-[200px] animate-pulse rounded-xl border border-[--color-line-soft] bg-[--color-surface-1]"
+            />
+          </template>
+        </ClientOnly>
       </div>
 
       <div class="border-t border-[--color-line-soft] pt-5">

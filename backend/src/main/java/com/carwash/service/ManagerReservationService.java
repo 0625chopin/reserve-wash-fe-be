@@ -9,8 +9,10 @@ import com.carwash.dto.ProxyReservationRequest;
 import com.carwash.dto.ReservationResponse;
 import com.carwash.mapper.ManagerMapper;
 import com.carwash.mapper.UserMapper;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 // 매니저 대행 예약 (M3, require 6.2·3.2) — 인가는 경로 기반(MANAGER/STORE_ADMIN).
@@ -50,6 +52,27 @@ public class ManagerReservationService {
                 req.storeId(), req.bayId(), req.date(), req.timeSlot(),
                 req.managerId(), req.carType(), req.serviceType(), req.amount());
         return reservationService.confirm(customer.getId(), cr);
+    }
+
+    // 로그인 매니저의 담당 예약 목록(require v1.10 §6.6) — 계정(uid)→manager_id 해석 후 managerId 귀속 예약 조회.
+    //   managerId 미연결(NULL)이면 빈 목록(가입 직후 매니저 등). 본인 예약(userId 기준)과는 분리된 목록이다.
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> listAssignedToManager(String userId) {
+        User me = userMapper.findById(userId);
+        if (me == null || me.getManagerId() == null) {
+            return List.of();
+        }
+        return reservationService.listByManagerId(me.getManagerId());
+    }
+
+    // 매장매니저관리자(STORE_ADMIN)의 매장 전체 예약 목록(require v1.10 §6.6) — 계정(uid)→store_id 해석 후 매장 귀속 예약 전체 조회.
+    @Transactional(readOnly = true)
+    public List<ReservationResponse> listStoreReservations(String userId) {
+        User me = userMapper.findById(userId);
+        if (me == null || me.getStoreId() == null) {
+            return List.of();
+        }
+        return reservationService.listByStoreId(me.getStoreId());
     }
 
     // 매니저가 (날짜, 시간)에 휴무인지 — 전일이면 항상, 교대조면 해당 시간대만 (require 5.5)

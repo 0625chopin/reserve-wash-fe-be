@@ -13,6 +13,10 @@ export const useReservationStore = defineStore('reservation', () => {
   // 런타임 슬롯 상태 맵 (1단계 클라이언트 시뮬레이션, require 7.1)
   const slotStatus = ref<Record<string, SlotStatus>>({})
   const reservations = ref<Reservation[]>([])
+  // 매니저 담당 예약(managerId 기준) — 본인 예약(reservations)과 분리. MANAGER 역할 /reservations '담당' 탭 (require v1.10 §6.6)
+  const managerAssigned = ref<Reservation[]>([])
+  // 매장 전체 예약(storeId 기준) — STORE_ADMIN 역할 /reservations '매장 전체' 뷰 (require v1.10 §6.6)
+  const storeReservations = ref<Reservation[]>([])
 
   // 슬롯 상태 조회 — 런타임 맵 우선, 없으면 service 더미 시드와 합성 (require 7.1)
   // release로 'AVAILABLE'을 명시 기록하면 시드(RESERVED)를 오버라이드한다.
@@ -73,6 +77,68 @@ export const useReservationStore = defineStore('reservation', () => {
     }
   }
 
+  // 본인 예약 서버 하이드레이션 (require 6.1) — /reservations 진입 시 서버에서 본인 예약을 1회 로드한다.
+  // 매니저 대행 예약(userId=고객)도 서버 조회에 포함되고, 하드 새로고침/직접 URL 진입에도 목록이 유지된다.
+  // 서버 예약 id를 표시 id·serverId 양쪽에 매핑한다 — 목록 key/후기 라우트는 id, 상태 전이 PATCH·후기 POST는 serverId 사용.
+  async function fetchMine(): Promise<void> {
+    const { $apiFetch } = useNuxtApp()
+    const base = useRuntimeConfig().public.apiBase
+    try {
+      const rows = await $apiFetch<Reservation[]>(`${base}/reservations`)
+      // 세션 내 생성·전이된 로컬 예약은 serverId로 식별해 보존(표시 id 유지)하고,
+      // 서버에만 있는 예약(매니저 대행 등)·새로고침 후 전체를 중복 없이 보강(append)한다.
+      const known = new Set(
+        reservations.value.map((r) => r.serverId).filter((id): id is string => !!id),
+      )
+      const additions = rows
+        .filter((r) => !known.has(r.id))
+        .map((r) => ({ ...r, serverId: r.id }))
+      reservations.value = [...reservations.value, ...additions]
+    } catch {
+      // 미인증/네트워크 실패 — 기존 세션 상태를 비우지 않는다(낙관적 보존)
+    }
+  }
+
+  // 매니저 담당 예약 하이드레이션 (require v1.10 §6.6) — MANAGER가 /reservations 진입 시 본인이 담당(managerId)인 예약을 로드한다.
+  //   사용자가 그 매니저를 지정한 예약 + 대행 예약이 모두 포함된다. 본인 예약(fetchMine)과 분리된 목록(managerAssigned)에 저장.
+  //   serverId를 표시 id로도 매핑(상태 전이 PATCH는 미사용, 읽기 전용 표시 목적).
+  async function fetchManagerAssigned(): Promise<void> {
+    const { $apiFetch } = useNuxtApp()
+    const base = useRuntimeConfig().public.apiBase
+    try {
+      const rows = await $apiFetch<Reservation[]>(`${base}/manager/reservations`)
+      managerAssigned.value = rows.map((r) => ({ ...r, serverId: r.id }))
+    } catch {
+      // 미인증/권한 없음/네트워크 실패 — 기존 목록 보존
+    }
+  }
+
+  // 매장 전체 예약 하이드레이션 (require v1.10 §6.6) — STORE_ADMIN이 /reservations 진입 시 소속 매장의 모든 예약을 로드한다.
+  async function fetchStoreReservations(): Promise<void> {
+    const { $apiFetch } = useNuxtApp()
+    const base = useRuntimeConfig().public.apiBase
+    try {
+      const rows = await $apiFetch<Reservation[]>(`${base}/store-admin/reservations`)
+      storeReservations.value = rows.map((r) => ({ ...r, serverId: r.id }))
+    } catch {
+      // 미인증/권한 없음/네트워크 실패 — 기존 목록 보존
+    }
+  }
+
+  // 관리자(ADMIN) 매장별 예약 하이드레이션 (require v1.11 §6.6) — 관리자는 소속 매장이 없어 매장을 선택해 조회한다.
+  //   기존 S4 엔드포인트(GET /api/admin/stores/{id}/reservations, ADMIN 인가)를 재사용한다.
+  //   응답(AdminReservationResponse)은 Reservation의 상위집합(userName/userEmail 추가)이라 표시에 그대로 사용 가능.
+  async function fetchAdminStoreReservations(storeId: string): Promise<void> {
+    const { $apiFetch } = useNuxtApp()
+    const base = useRuntimeConfig().public.apiBase
+    try {
+      const rows = await $apiFetch<Reservation[]>(`${base}/admin/stores/${storeId}/reservations`)
+      storeReservations.value = rows.map((r) => ({ ...r, serverId: r.id }))
+    } catch {
+      storeReservations.value = []
+    }
+  }
+
   // 점유(HOLDING) 해제 → AVAILABLE 복귀 (취소/충돌 시)
   function releaseSlot(slot: Slot) {
     const key = slotKey(slot.storeId, slot.bayId, slot.date, slot.timeSlot)
@@ -123,10 +189,16 @@ export const useReservationStore = defineStore('reservation', () => {
   return {
     slotStatus,
     reservations,
+    managerAssigned,
+    storeReservations,
     reservedCount,
     getStatus,
     holdSlot,
     confirmReservation,
+    fetchMine,
+    fetchManagerAssigned,
+    fetchStoreReservations,
+    fetchAdminStoreReservations,
     releaseSlot,
     completeReservation,
     cancelReservation,

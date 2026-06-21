@@ -45,6 +45,11 @@ public class SecurityConfig {
                                 "/api/stores", "/api/managers", "/api/bays", "/api/prices",
                                 "/api/slots")
                         .permitAll()
+                        // 컨트롤러 예외 시 컨테이너가 내부 포워딩하는 ERROR 디스패치(/error)를 허용한다.
+                        //   OncePerRequestFilter가 ERROR 디스패치엔 미실행(JWT 미재인증)이라, /error가 인증을
+                        //   요구하면 도메인 외 예외(JSON 파싱 400·500 등)까지 빈 401로 가려진다 — BUG-3 근본 메커니즘.
+                        //   도메인 예외는 GlobalExceptionHandler가 이미 직접 처리하므로 이 허용은 그 외 예외의 정상 노출용.
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         // BO 역할 인가 (require v1.7 §3.2·§8.3·§12.4) — 구체적 경로 매처를 anyRequest 이전에 둔다.
                         //   권한 외 역할 → 403(기본 AccessDeniedHandler), 미인증 → 401(위 entryPoint)

@@ -38,15 +38,17 @@ INSERT INTO manager_dayoff (manager_id, `date`, dayoff_type) VALUES
 
 -- 사용자 (app/data/users.ts) — password_hash = BCrypt('password') 통일(1차 더미 비번과 동일)
 --   approval_status: 기존 계정은 ACTIVE(로그인 가능). pending* 2명은 매니저 가입 2단계 승인(M7→S3) 검증용 더미.
-INSERT INTO users (id, email, name, role, password_hash, approval_status, store_id) VALUES
- ('user1', 'user@test.com', '홍길동', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL),
- ('user2', 'user2@test.com', '김고객', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL),
- ('manager1', 'manager@test.com', '김매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', 'store1'),
- ('storeadmin1', 'storeadmin@test.com', '매장관리자', 'STORE_ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', 'store1'),
- ('admin1', 'admin@test.com', '관리자', 'ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL),
- -- 매니저 계열 가입 2단계 승인 대기 더미(store1 소속, 1차 승인 대기 PENDING_APPROVAL_L1)
- ('pending1', 'pending1@test.com', '신입매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1', 'store1'),
- ('pending2', 'pending2@test.com', '대기매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1', 'store1');
+--   manager_id: 로그인 매니저 계정 ↔ manager 엔티티 연결(require v1.10 §6.6). manager1→mgr1(담당 예약 조회 키). USER/STORE_ADMIN/ADMIN은 NULL.
+--     (STORE_ADMIN은 매장 전체 예약을 store_id로 조회하므로 manager_id 불필요.)
+INSERT INTO users (id, email, name, role, password_hash, approval_status, store_id, manager_id) VALUES
+ ('user1', 'user@test.com', '홍길동', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL, NULL),
+ ('user2', 'user2@test.com', '김고객', 'USER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL, NULL),
+ ('manager1', 'manager@test.com', '김매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', 'store1', 'mgr1'),
+ ('storeadmin1', 'storeadmin@test.com', '매장관리자', 'STORE_ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', 'store1', NULL),
+ ('admin1', 'admin@test.com', '관리자', 'ADMIN', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'ACTIVE', NULL, NULL),
+ -- 매니저 계열 가입 2단계 승인 대기 더미(store1 소속, 1차 승인 대기 PENDING_APPROVAL_L1) — 승인 전이라 manager 엔티티 미연결(NULL)
+ ('pending1', 'pending1@test.com', '신입매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1', 'store1', NULL),
+ ('pending2', 'pending2@test.com', '대기매니저', 'MANAGER', '$2a$10$k5ibZ1m9eEpsN1ZnJsGNhedyyMqtrWWPhz2UUFcFmeBdg5EnivgSq', 'PENDING_APPROVAL_L1', 'store1', NULL);
 
 -- 가격 매트릭스 20행 (app/data/prices.ts = require 10.3 확정 단가)
 INSERT INTO price (car_type, service_type, amount) VALUES

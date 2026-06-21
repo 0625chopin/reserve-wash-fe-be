@@ -5,8 +5,10 @@ import com.carwash.dto.HoldRequest;
 import com.carwash.dto.ReservationResponse;
 import com.carwash.service.ReservationService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +27,12 @@ public class ReservationController {
 
     public ReservationController(ReservationService reservationService) {
         this.reservationService = reservationService;
+    }
+
+    // 본인 예약 목록(FW6 require 6.1) — JWT uid 소유 예약 전체(대행 예약 포함). userId는 토큰(uid)에서 도출.
+    @GetMapping
+    public List<ReservationResponse> listMine(@AuthenticationPrincipal String userId) {
+        return reservationService.listMine(userId);
     }
 
     // 슬롯 점유 — INSERT HOLDING(충돌 시 409)
