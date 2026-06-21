@@ -17,7 +17,7 @@ async function loginAs(page: Page, email: string) {
 // 매니저 대행 폼 채우고 제출 (매장=본인 소속 고정, 김매니저·소형·외부세차·A2)
 // 날짜·시간은 일반예약과 동일한 휠에서 선택(data-value 클릭). date/time은 오늘+21일 범위 내여야 한다.
 async function proxyReserve(page: Page, date: string, time: string) {
-  await page.goto('/manager/reserve')
+  await page.goto('/manager/reserve', { waitUntil: 'networkidle' })
   await expect(page.getByTestId('page-manager-reserve')).toBeVisible()
   // 매장은 본인 소속(강남점)으로 고정·disabled — 매니저 옵션이 채워질 때까지 대기
   await expect(page.getByTestId('proxy-manager')).toContainText('김매니저')
@@ -134,13 +134,13 @@ test('관리자: 매니저를 직접 등록(매장관리매니저)하면 가입 
 
 test('역할 가드: USER가 매니저 대행 페이지에 진입하면 /reserve로 리다이렉트된다', async ({ page }) => {
   await loginAs(page, 'user@test.com')
-  await page.goto('/manager/reserve')
+  await page.goto('/manager/reserve', { waitUntil: 'networkidle' })
   await expect(page).toHaveURL(/\/reserve$/)
 })
 
 test('역할 가드: USER가 관리자 페이지에 진입하면 /reserve로 리다이렉트된다', async ({ page }) => {
   await loginAs(page, 'user@test.com')
-  await page.goto('/admin/stores/store1/reservations')
+  await page.goto('/admin/stores/store1/reservations', { waitUntil: 'networkidle' })
   await expect(page).toHaveURL(/\/reserve$/)
 })
 
@@ -152,11 +152,11 @@ test('관리자: 매장별 예약자(S4)·사용자(S5) 목록을 조회한다',
 
   // 관리자로 전환해 매장 예약자/사용자 조회
   await loginAs(page, 'admin@test.com')
-  await page.goto('/admin/stores/store1/reservations')
+  await page.goto('/admin/stores/store1/reservations', { waitUntil: 'networkidle' })
   await expect(page.getByTestId('page-admin-reservations')).toBeVisible()
   await expect(page.getByText('user@test.com').first()).toBeVisible()
 
-  await page.goto('/admin/stores/store1/users')
+  await page.goto('/admin/stores/store1/users', { waitUntil: 'networkidle' })
   await expect(page.getByTestId('page-admin-users')).toBeVisible()
   await expect(page.getByText('user@test.com').first()).toBeVisible()
 })

@@ -41,6 +41,14 @@ export function catalogPrices(): Price[] {
 export async function loadCatalog(): Promise<void> {
   const loaded = loadedState()
   if (loaded.value) return
+  // Nuxt 컴포저블(useState/useRuntimeConfig)은 반드시 await 이전에 호출한다.
+  //   await 경계를 넘으면 Nuxt 인스턴스 컨텍스트가 유실되어 "composable ... outside of a plugin"
+  //   에러가 난다(특히 BE 다운으로 $fetch가 실패할 때). state 참조를 미리 확보하고, await 이후에는
+  //   .value 할당만 수행한다.
+  const stores = storesState()
+  const managers = managersState()
+  const bays = baysState()
+  const prices = pricesState()
   const base = useRuntimeConfig().public.apiBase
   try {
     const [s, m, b, p] = await Promise.all([
@@ -49,10 +57,10 @@ export async function loadCatalog(): Promise<void> {
       $fetch<Bay[]>(`${base}/bays`),
       $fetch<Price[]>(`${base}/prices`),
     ])
-    storesState().value = s
-    managersState().value = m
-    baysState().value = b
-    pricesState().value = p
+    stores.value = s
+    managers.value = m
+    bays.value = b
+    prices.value = p
     loaded.value = true
   } catch (e) {
     console.warn('[catalog] 카탈로그 로드 실패 — 백엔드(:8080) 기동 여부를 확인하세요', e)
