@@ -41,6 +41,17 @@ public class NotificationService {
         dispatch("EMAIL_VERIFICATION", to, subject, body);
     }
 
+    // ①' 이메일 인증 코드 (가입 1단계, require §4.4) — 6자리 코드 발송(유효 3분).
+    //   수신자는 호출 측(EmailVerificationService)이 가진 가입 이메일을 그대로 전달.
+    public void notifyEmailVerificationCode(String email, String name, String code) {
+        String subject = SUBJECT_PREFIX + "이메일 인증 코드 안내";
+        String recipientName = isBlank(name) ? DEFAULT_NAME : name;
+        String body = recipientName + "님, 회원가입 이메일 인증 코드는 다음과 같습니다.\n\n"
+                + "    인증 코드: " + code + "\n\n"
+                + "코드는 발급 후 3분간 유효합니다. 본인이 요청하지 않았다면 무시하세요.";
+        dispatch("EMAIL_VERIFICATION", email, subject, body);
+    }
+
     // ② 예약 확정 안내 (예약 RESERVED) — userId로 수신자를 동기 해석(호출자 tx 컨텍스트)
     public void notifyReservationConfirmed(String userId) {
         User user = userMapper.findById(userId);

@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 // Phase 1 DoD 게이트 — H2(schema.sql/data.sql 로드)에서 스키마 무결성 단정
 //   ROADMAP_2 466~469: 도메인 10테이블 + slot UNIQUE 제약 + price 20행.
-//   Phase 9에서 알림 발송 이력 테이블(notification_log)이 가산되어 총 11테이블.
+//   Phase 9에서 notification_log, 이메일 인증에서 email_verification 가산되어 총 12테이블.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class SchemaIntegrityTest {
 
@@ -17,13 +17,13 @@ class SchemaIntegrityTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void 전체_테이블_11종이_생성된다() {
-        // 도메인 10테이블(Phase 1) + notification_log(Phase 9 알림 이력) = 11
+    void 전체_테이블_12종이_생성된다() {
+        // 도메인 10테이블(Phase 1) + notification_log(Phase 9) + email_verification(이메일 인증) = 12
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
                         + "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_TYPE = 'BASE TABLE'",
                 Integer.class);
-        assertThat(count).isEqualTo(11);
+        assertThat(count).isEqualTo(12);
     }
 
     @Test

@@ -53,3 +53,10 @@ logging:
 jwt:
   secret: carwash-dev-secret-key-please-change-in-production-0123456789
   expiration-ms: 86400000   # 24시간
+
+# 회원가입 이메일 인증 설정
+app:
+  signup:
+    # 개발/테스트에서만 인증 코드 조회(GET /api/auth/signup/dev-code) 허용 — 운영(application-prod)에선 false.
+    #   실제 운영은 코드를 메일로만 전달하며 이 백도어를 노출하지 않는다.
+    dev-code-peek: ${SIGNUP_DEV_CODE_PEEK:true}

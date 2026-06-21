@@ -7,6 +7,7 @@
 --   테스트에서 여러 Spring 컨텍스트가 spring.sql.init을 재실행하면 data.sql INSERT가 중복된다.
 --   매 초기화 시 DROP 후 CREATE로 깨끗이 재생성(AUTO_INCREMENT도 리셋)하여 시드 중복을 방지한다.
 
+DROP TABLE IF EXISTS email_verification;
 DROP TABLE IF EXISTS notification_log;
 DROP TABLE IF EXISTS store_holiday;
 DROP TABLE IF EXISTS review;
@@ -130,4 +131,20 @@ CREATE TABLE IF NOT EXISTS notification_log (
     subject     VARCHAR(255) NOT NULL,
     status      VARCHAR(20)  NOT NULL,               -- QUEUED(발송 시도)/SKIPPED(수신자 없음)
     created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 이메일 인증 대기 가입(create-after-verify) — 가입 시 6자리 코드 인증(유효 3분).
+--   인증 성공 시에만 users 로 승격(반쪽 계정 방지). email 단위 1건(재요청·재전송 시 갱신).
+--   expires_at = epoch millis(BIGINT) — H2/MySQL 공통 비교, Java 에서 만료 판정.
+--   ⚠ Phase 10(R2P10-2) Flyway V1 에도 포함할 것.
+CREATE TABLE IF NOT EXISTS email_verification (
+    email          VARCHAR(255) PRIMARY KEY,         -- 인증 대상 이메일(가입 예정)
+    code           VARCHAR(6)   NOT NULL,            -- 6자리 숫자 코드
+    role           VARCHAR(20)  NOT NULL,            -- 가입 역할: USER / MANAGER (인증 후 생성)
+    name           VARCHAR(100) NOT NULL,
+    password_hash  VARCHAR(100) NOT NULL,            -- BCrypt 해시(원문 미보관)
+    store_id       VARCHAR(64),                      -- 매니저 가입 소속 매장(USER 는 NULL)
+    expires_at     BIGINT       NOT NULL,            -- 만료 시각(epoch millis)
+    attempts       INT          NOT NULL DEFAULT 0,  -- 코드 입력 시도 횟수(초과 차단)
+    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );

@@ -90,6 +90,46 @@ public class AuthService {
         notificationService.notifyEmailVerification(user);   // 이메일 인증 안내(Phase 9, 비동기 발송)
     }
 
+    // ── 이메일 인증 완료 후 가입 확정 (create-after-verify) ────────────────
+    //   비밀번호는 인증 대기 단계에서 이미 해시됨(원문 미보유) → 재해시하지 않는다. 인증 메일은 이미 발송됨.
+
+    // 인증 완료 USER 생성 — 즉시 ACTIVE + 자동 로그인 토큰(require §4.4)
+    @Transactional
+    public LoginResponse createVerifiedUser(String email, String passwordHash, String name) {
+        if (userMapper.findByEmail(email) != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
+        }
+        User user = User.builder()
+                .id("user-" + UUID.randomUUID())
+                .email(email)
+                .name(name)
+                .role(UserRole.USER)
+                .passwordHash(passwordHash)
+                .approvalStatus(UserApprovalStatus.ACTIVE)
+                .build();
+        userMapper.insert(user);
+        return new LoginResponse(tokenProvider.createToken(user), UserResponse.from(user));
+    }
+
+    // 인증 완료 매니저 계열 생성 — PENDING_APPROVAL_L1(자동 로그인 없음, 2단계 승인 후 ACTIVE)
+    @Transactional
+    public void createVerifiedManager(
+            String email, String passwordHash, String name, String storeId, UserRole role) {
+        if (userMapper.findByEmail(email) != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.");
+        }
+        User user = User.builder()
+                .id("mgr-" + UUID.randomUUID())
+                .email(email)
+                .name(name)
+                .role(role)
+                .passwordHash(passwordHash)
+                .approvalStatus(UserApprovalStatus.PENDING_APPROVAL_L1)
+                .storeId(storeId)
+                .build();
+        userMapper.insert(user);
+    }
+
     // 관리자 직접 매니저 등록 (require v1.12 §4.1) — role(MANAGER|STORE_ADMIN) 지정, PENDING_APPROVAL_L2로 생성.
     //   1차(매장매니저관리자) 승인은 생략하되, 2차 최종 승인(S3)은 동일하게 거쳐야 ACTIVE가 된다(자동 로그인 없음).
     //   생성된 계정은 곧장 '가입 최종 승인'(GET /api/admin/manager-approvals = PENDING_APPROVAL_L2) 목록에 합류한다.
