@@ -1,5 +1,10 @@
 # 2차 백엔드 런타임 설정 (2단계: H2 in-memory)
 spring:
+  # 로컬 환경변수 파일(.env, properties 형식)을 읽어 ${MAIL_*} 등 자리표시자를 채운다.
+  #   optional: 파일이 없어도 기동 실패 없이 기본값(MailHog) 사용. [.properties]는 .env를 properties로 파싱.
+  #   .env는 자격증명 포함 → .gitignore로 커밋 제외(템플릿은 .env.example).
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     # 인메모리 H2, MySQL 호환 모드 (재기동 시 휘발 — require 7.2)
     url: jdbc:h2:mem:carwash;DB_CLOSE_DELAY=-1;MODE=MySQL

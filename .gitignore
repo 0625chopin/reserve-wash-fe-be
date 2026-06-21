@@ -57,3 +57,6 @@ backend/build/
 backend/.gradle/
 *.class
 *.iml
+
+# Backend 로컬 환경변수(자격증명 — SMTP 앱 비밀번호 등). 템플릿(.env.example)은 커밋 유지
+backend/.env
