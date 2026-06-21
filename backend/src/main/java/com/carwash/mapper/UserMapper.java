@@ -24,4 +24,8 @@ public interface UserMapper {
 
     // 가입 승인 대기 목록 조회(1차 PENDING_APPROVAL_L1 / 2차 PENDING_APPROVAL_L2)
     List<User> findByApprovalStatus(@Param("approvalStatus") String approvalStatus);
+
+    // 매니저 엔티티 id로 로그인 계정 조회 (Phase 9) — 휴가/반차 결재 수신자 해석.
+    //   users.manager_id FK(require v1.10 §6.6) 재사용. 미연결(NULL)이면 결과 없음 → 발송 skip.
+    User findByManagerId(@Param("managerId") String managerId);
 }

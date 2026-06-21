@@ -25,10 +25,15 @@ public class ApprovalService {
 
     private final ManagerDayoffMapper dayoffMapper;
     private final StoreHolidayMapper holidayMapper;
+    private final NotificationService notificationService;
 
-    public ApprovalService(ManagerDayoffMapper dayoffMapper, StoreHolidayMapper holidayMapper) {
+    public ApprovalService(
+            ManagerDayoffMapper dayoffMapper,
+            StoreHolidayMapper holidayMapper,
+            NotificationService notificationService) {
         this.dayoffMapper = dayoffMapper;
         this.holidayMapper = holidayMapper;
+        this.notificationService = notificationService;
     }
 
     // ── 매니저 휴가/반차 결재 (1단계, 매장매니저관리자 종결) ──────────────
@@ -51,6 +56,7 @@ public class ApprovalService {
         ManagerDayoff dayoff = loadDayoff(id);
         dayoff.approve();   // SUBMITTED → APPROVED (불가 전이 시 예외)
         dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
+        notificationService.notifyDayoffApprovalResult(dayoff.getManagerId(), "승인");   // 결재 결과 통지(Phase 9)
     }
 
     @Transactional
@@ -58,6 +64,7 @@ public class ApprovalService {
         ManagerDayoff dayoff = loadDayoff(id);
         dayoff.reject();
         dayoffMapper.updateStatus(dayoff.getId(), dayoff.getStatus().name());
+        notificationService.notifyDayoffApprovalResult(dayoff.getManagerId(), "반려");   // 결재 결과 통지(Phase 9)
     }
 
     @Transactional

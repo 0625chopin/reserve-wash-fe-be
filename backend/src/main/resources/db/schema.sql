@@ -7,6 +7,7 @@
 --   테스트에서 여러 Spring 컨텍스트가 spring.sql.init을 재실행하면 data.sql INSERT가 중복된다.
 --   매 초기화 시 DROP 후 CREATE로 깨끗이 재생성(AUTO_INCREMENT도 리셋)하여 시드 중복을 방지한다.
 
+DROP TABLE IF EXISTS notification_log;
 DROP TABLE IF EXISTS store_holiday;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS reservation;
@@ -118,4 +119,15 @@ CREATE TABLE IF NOT EXISTS store_holiday (
     store_id  VARCHAR(64) NOT NULL,
     `date`    VARCHAR(10) NOT NULL,
     status    VARCHAR(20) NOT NULL                 -- ApprovalStatus enum (SUBMITTED→CONFIRMED/REJECTED)
+);
+
+-- 알림 발송 이력 — 발송 시도/스킵 추적 (Phase 9, require §13.2 항목 7). FK 없는 독립 테이블.
+--   ⚠ Phase 10(R2P10-2) Flyway V1__init_schema.sql에 반드시 포함할 것(누락 시 운영 DB에 테이블 부재).
+CREATE TABLE IF NOT EXISTS notification_log (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,   -- 내부 surrogate
+    recipient   VARCHAR(255),                        -- 수신자 email (스킵 시 NULL)
+    type        VARCHAR(40)  NOT NULL,               -- EMAIL_VERIFICATION/RESERVATION_CONFIRMED/APPROVAL_RESULT
+    subject     VARCHAR(255) NOT NULL,
+    status      VARCHAR(20)  NOT NULL,               -- QUEUED(발송 시도)/SKIPPED(수신자 없음)
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );

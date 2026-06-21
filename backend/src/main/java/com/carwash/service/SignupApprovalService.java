@@ -19,9 +19,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class SignupApprovalService {
 
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
-    public SignupApprovalService(UserMapper userMapper) {
+    public SignupApprovalService(UserMapper userMapper, NotificationService notificationService) {
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     // 1차 승인 대기 목록(M7 검토용)
@@ -44,6 +46,7 @@ public class SignupApprovalService {
         User user = loadUser(userId);
         user.approveSignupL1();
         userMapper.updateApprovalStatus(user.getId(), user.getApprovalStatus().name());
+        notificationService.notifySignupApprovalResult(user, "1차 승인");   // 결재 결과 통지(Phase 9)
     }
 
     // S3 2차 최종 승인 — PENDING_APPROVAL_L2 → ACTIVE (관리자)
@@ -52,6 +55,7 @@ public class SignupApprovalService {
         User user = loadUser(userId);
         user.confirmSignupL2();
         userMapper.updateApprovalStatus(user.getId(), user.getApprovalStatus().name());
+        notificationService.notifySignupApprovalResult(user, "최종 승인");   // 결재 결과 통지(Phase 9)
     }
 
     // 어느 단계든 반려 — → REJECTED
@@ -60,6 +64,7 @@ public class SignupApprovalService {
         User user = loadUser(userId);
         user.rejectSignup();
         userMapper.updateApprovalStatus(user.getId(), user.getApprovalStatus().name());
+        notificationService.notifySignupApprovalResult(user, "반려");   // 결재 결과 통지(Phase 9)
     }
 
     private User loadUser(String userId) {

@@ -1,6 +1,6 @@
 # 자동차 세차 예약 서비스 (MVP) 개발 로드맵 — 2차 백엔드 진화(Spring Boot) + BO 전체
 
-> **문서 버전**: v2.2 (require_v1.md **v1.7** 정합 — 4역할·가입 2단계 승인·휴가/반차 1단계 승인·역할별 BO 페이지 분리)
+> **문서 버전**: v2.3 (require_v1.md **v1.15** 정합 — 4역할·가입 2단계 승인·휴가/반차 1단계 승인·역할별 BO 페이지 분리 + v1.11~v1.15: 예약 목록 역할 분기·`users.manager_id`·관리자 매니저 직접 등록·가입 승인 상세 모달·휴무 WheelPicker·매장 휴일 영역 제거)
 > **작성일**: 2026-06-20 (최종 수정: 2026-06-21)
 > **작성자**: PM/PL
 >
@@ -11,6 +11,16 @@
 > - **역할별 BO 페이지 4그룹 분리**(require v1.7 §12.4): 일반매장매니저/매장매니저관리자/관리자별 화면 경로를 Phase 6~8에 반영.
 >
 > **🔄 v1.10 정합(require v1.10 — 매니저 예약 목록 의미 정정 & 대행 날짜·시간 통일)**: ① **매니저 예약 목록(`/manager/reservations`)은 본인(`userId`)이 아니라 담당(`managerId`) 예약**(대행 등록분 + 사용자가 그 매니저를 지정한 분)을 노출한다 — 사용자 본인 목록(`GET /api/reservations`)과 별도 화면·별도 조회. **Phase 6에 신규 요구로 추가**(`findByManager` + `GET /api/manager/reservations` + FE `manager/reservations.vue`). ⚠ **`User`↔`Manager` 연결(매니저 식별자) 결정 선행 필요** — 현행 미보유(블로킹). ② 매니저 대행 폼 날짜·시간을 일반예약과 **동일한 휠 선택기**로 통일(구현 완료, require §6.2). 상세는 **Phase 6 — 🆕 v1.10 추가 요구** 참조.
+>
+> **🔄 v1.11 정합 반영(require v1.11 — 예약 목록 역할별 분기 + 사용자↔매니저 연결, 2026-06-21 구현 완료)**: 예약 목록 `/reservations`를 **역할별로 분기**(USER=본인 userId / MANAGER=내 예약+담당 2탭 managerId / STORE_ADMIN=매장 전체 storeId / ADMIN=매장 선택형 담당 예약 단일 뷰)하고, v1.10의 블로킹이던 사용자↔매니저 연결을 **`users.manager_id` FK 컬럼 신설**(시드 `manager1→mgr1`)로 해소. BE `ReservationMapper.findByManager` + `GET /api/manager/reservations`(담당) + `GET /api/store-admin/reservations`(매장 전체) 추가. **관리자 네비에서 "예약"(부킹)·"휴일 결재" 메뉴 제거**. 상세는 **Phase 6 — 🆕 v1.10/v1.11 추가 요구** 참조.
+>
+> **🔄 v1.12 정합 반영(require v1.12 — 회원가입 유형 분기 + 관리자 매니저 직접 등록, 2026-06-21 구현 완료)**: ① **`/signup`을 일반/매니저 토글로 분기** — 일반=`USER` 즉시 가입(기존 유지), 매니저=소속 매장 추가 입력 → `signupManager`(`PENDING_APPROVAL_L1`, 자동 로그인 없음). v1.9 `/manager/signup`과 동일 BE 재사용. ② **관리자 매니저 직접 등록(`/admin/managers`)** 신설 — 역할(`MANAGER`/`STORE_ADMIN`) 선택 + 소속 매장 지정, **`POST /api/admin/managers`** 로 생성. 관리자 등록분은 **1차(매장매니저관리자) 승인을 생략하고 `PENDING_APPROVAL_L2`로 생성**되어 기존 "가입 최종 승인"(S3) 목록에 합류 → **2차 최종 승인 후 `ACTIVE`**. 관리자 네비에 "매니저 등록" 메뉴 추가. **Phase 3(회원가입 토글)·Phase 7(관리자 직접 등록·승인 합류)** 에 반영(require §4.1).
+>
+> **🔄 v1.13 정합 반영(require v1.13 — 가입 최종 승인 상세 모달, 2026-06-21 구현 완료)**: `/admin/manager-approvals`에서 **신청 행 클릭 시 상세 모달**을 띄워 이름·이메일·역할(라벨)·**소속 매장**·승인 상태를 표시하고, 모달 안에서 최종 승인/반려를 수행한다. BE `ManagerSignupResponse`에 **`storeId` 추가**(상세 표시용, 가산적). **Phase 7**에 반영(require §12.4).
+>
+> **🔄 v1.14 정합 반영(require v1.14 — 휴무/휴일 신청 날짜 입력 통일, 2026-06-21 구현 완료)**: `/manager/dayoffs`의 **휴무 날짜 입력을 일반예약(`/reserve/slot`)과 동일한 `WheelPicker`**(오늘+21일 날짜 휠)로 교체 — 자유 텍스트(`YYYY-MM-DD`) 입력 폐지. 날짜 선택 UX를 예약/대행/휴무 전반에 일관화. **Phase 7**에 반영(require §6.5·§8).
+>
+> **🔄 v1.15 정합 반영(require v1.15 — 매장 휴일 신청 영역 제거, 2026-06-21 구현 완료)**: `/manager/dayoffs`의 **"매장 휴일 날짜" 신청 영역을 제거**한다(v1.11에서 관리자 "휴일 결재" 메뉴를 제거하면서 매장 휴일은 상신해도 승인 진입 메뉴가 없어 end-to-end가 단절된 **고아 기능** 정리). 페이지는 **휴가/반차 신청 전용**으로 정리하고, 휴무 신청 버튼에 **미선택 시 안내 메시지**를 추가(휠 날짜 미선택으로 인한 "무반응" 혼동 해소). ⚠ BE `POST /api/manager/holidays`·`/admin/approvals` 페이지·승인 로직은 **존속**(메뉴만 미노출)하므로 Phase 7 매장 휴일 구현은 유지된다. **Phase 7**에 반영(require §8·§12.4).
 >
 > **🔄 v1.8 정합 반영(2026-06-21 구현 완료)**: ① **매니저 계열 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면 매장 select를 **본인 소속 매장으로 고정**(`disabled`). BE `users.store_id`·`User.storeId`·`UserResponse.storeId`(로그인 응답) 신설, 매니저 시드에 소속 매장 부여(`USER`/`ADMIN`은 NULL). ② **개발용 빠른 로그인 역할별 랜딩** + **AppNav 역할별 BO 메뉴 분기**. (상세: §12.4 제안 경로 하단 v1.8 반영 노트)
 >
@@ -615,6 +625,7 @@ export function getBaysForCar(storeId: string, carType: CarType): Promise<Bay[]>
 - [ ] FE 미들웨어 `auth.ts`·역할 가드를 토큰 기반으로 교체(ROADMAP_1 Phase 3 자산 위에 증분)
 - [ ] *(v1.9)* **로그인 페이지 역할군별 3분리**: `/login`(일반사용자, 1차 유지)·`/manager/login`(일반매장매니저+매장매니저관리자)·`/admin/login`(관리자). 각 페이지에 `guest` 가드 + 역할별 (개발용) 빠른 로그인. `/login` 빠른 로그인은 일반사용자만 남기고 매니저/관리자 버튼은 각 페이지로 이전
 - [ ] *(v1.9)* **매니저 회원가입 API + 화면**: `POST /api/auth/signup-manager`(이메일/비번/이름/소속 매장 `storeId`) — 중복 409 → `role=MANAGER`·`approvalStatus=PENDING_APPROVAL_L1`로 영속(**자동 로그인·토큰 발급 없음**) → 2단계 승인(M7→S3) 후 `ACTIVE`. FE `app/pages/manager/signup.vue`(매장 select + 폼, 가입 후 "승인 대기" 안내 → `/manager/login`). 관리자 회원가입은 두지 않음
+- [x] *(v1.12)* **`/signup` 회원가입 유형 분기**: 1차 `app/pages/signup.vue`(USER 즉시 가입)에 **일반/매니저 토글**을 증분으로 추가 — 일반=`USER` 즉시 가입(자동 로그인, 기존 흐름 유지), 매니저=**소속 매장 select 추가 입력** → 위 `POST /api/auth/signup-manager` 재사용(`PENDING_APPROVAL_L1`, 자동 로그인 없음 → "승인 대기" 안내). v1.9 `/manager/signup`과 **동일 BE 재사용**(신규 엔드포인트 없음), `/manager/signup`은 매니저 로그인 동선에서 별도 유지(require §4.1)
 
 > ⚠️ **SSR 토큰 보관**: 1차 ROADMAP_1 Phase 3에서 안내했듯 `localStorage`는 SSR에서 접근 불가입니다. JWT는 **`useCookie`(httpOnly 권장)** 로 보관해 SSR 미들웨어 단계에서도 인증 상태를 읽게 하세요.
 
@@ -1000,10 +1011,11 @@ public void cancel(Long reservationId) {
 
 > **🆕 v1.10 추가 요구 (require v1.10 §6.2·§6.6)**
 >
-> 1. **예약 목록 역할별 분기 (`/reservations`) — 구현 완료 (v1.11)**. 매니저의 예약 목록은 **본인(`userId`) 예약이 아니라, 그 매니저가 담당(`managerId`)으로 지정된 예약**(매니저 대행 등록분 + 일반사용자가 그 매니저를 지정한 분)을 노출한다. `/reservations` 한 화면을 **역할별로 분기**: USER=본인(userId), MANAGER=내 예약+담당 2탭, STORE_ADMIN=매장 전체(storeId). 담당/매장 목록 기반으로 세차완료(M4)·취소(M5) 보조를 수행한다(현재 담당/매장 뷰는 읽기 전용).
->    - BE(완료): `ReservationMapper.findByManager(managerId)` + `GET /api/manager/reservations`(담당, MANAGER/STORE_ADMIN 인가) + `GET /api/store-admin/reservations`(매장 전체, STORE_ADMIN 인가) 신설.
->    - FE(완료): `/reservations`에 역할 분기 + 매니저 2탭. 공통 카드 컴포넌트 `ReservationCard.vue` 추출, 스토어 `fetchManagerAssigned`/`fetchStoreReservations` 추가(본인 `fetchMine`과 분리).
+> 1. **예약 목록 역할별 분기 (`/reservations`) — 구현 완료 (v1.11)**. 매니저의 예약 목록은 **본인(`userId`) 예약이 아니라, 그 매니저가 담당(`managerId`)으로 지정된 예약**(매니저 대행 등록분 + 일반사용자가 그 매니저를 지정한 분)을 노출한다. `/reservations` 한 화면을 **역할별로 분기**: USER=본인(userId), MANAGER=내 예약+담당 2탭, STORE_ADMIN=매장 전체(storeId), **ADMIN=매장 선택형 담당 예약 단일 뷰**(소속 매장이 없으므로 매장을 선택하면 그 매장의 예약만 노출 — 기존 S4 `GET /api/admin/stores/{id}/reservations` 재사용, 본인/내 예약 뷰 미제공). 담당/매장 목록 기반으로 세차완료(M4)·취소(M5) 보조를 수행한다(현재 담당/매장 뷰는 읽기 전용).
+>    - BE(완료): `ReservationMapper.findByManager(managerId)` + `GET /api/manager/reservations`(담당, MANAGER/STORE_ADMIN 인가) + `GET /api/store-admin/reservations`(매장 전체, STORE_ADMIN 인가) 신설. ADMIN은 기존 `GET /api/admin/stores/{id}/reservations`(S4) 재사용.
+>    - FE(완료): `/reservations`에 역할 분기 + 매니저 2탭 + 관리자 매장 선택 뷰. 공통 카드 컴포넌트 `ReservationCard.vue` 추출, 스토어 `fetchManagerAssigned`/`fetchStoreReservations` 추가(본인 `fetchMine`과 분리).
 >    - ✅ **데이터 모델 연결 해소**: v1.10에서 블로킹이던 사용자↔매니저 연결을 **`users.manager_id` FK 컬럼 신설**로 해결(시드 `manager1→mgr1`). schema/data.sql·`User.managerId`·`UserMapper` 보강 완료.
+>    - ✅ **관리자 메뉴 정리(v1.11)**: 관리자(ADMIN) 네비게이션에서 **"예약"(부킹, `/reserve`)·"휴일 결재"(`/admin/approvals`) 메뉴를 제거**한다(관리자는 예약을 생성하지 않으며 예약 목록은 매장 선택형 담당 예약으로 일원화). "예약 목록"·"가입 최종 승인"·"매출"은 유지. ⚠ `/admin/approvals` 페이지·BE 휴일 승인 로직 자체는 존속(메뉴 미노출) — v1.15의 `/manager/dayoffs` 매장 휴일 신청 영역 제거와 짝을 이루는 동선 단절 정리.
 > 2. **매니저 대행 폼 날짜·시간 입력 통일 (구현 완료)** — `manager/reserve.vue`의 자유 텍스트 날짜·시간 입력을 일반예약(`reserve/slot.vue`)과 **동일한 휠 선택기**(`WheelPicker`, 오늘+21일 날짜 휠·30분 시간 휠, 대행 매니저 휴무 비활성)로 교체. 대행 가능 날짜는 휠 범위(21일)로 제한된다.
 
 #### 태스크 체크리스트
@@ -1092,6 +1104,13 @@ require v1.7의 **두 승인 워크플로우**를 구현한다.
 2. **가입 2단계 승인**(M7 매장매니저관리자 1차 → S3 관리자 2차)을 구현하여 매니저 계열 가입자를 `PENDING_APPROVAL_L1 → PENDING_APPROVAL_L2 → ACTIVE`로 전이한다(require §4.4). 두 워크플로우는 "신청 → 검토자 승인" 패턴을 공유하되 **단계 수가 다르다**.
 3. **매장 휴일(8.1)**: 등록 주체는 require v1.7에서 추후 확정(관리자 또는 매장매니저관리자 운영 가정, §13.2). 본 로드맵은 매니저 신청 → 관리자 승인의 단일 승인으로 처리한다.
 
+> **🆕 v1.12~v1.15 추가 요구 (require v1.12·v1.13·v1.14·v1.15 — 2026-06-21 구현 완료)**
+>
+> 1. **관리자 매니저 직접 등록 (v1.12, `/admin/managers` + `POST /api/admin/managers`)**: 관리자가 매니저를 **직접 등록**하는 경로를 신설한다. 역할(일반매니저 `MANAGER`/매장관리매니저 `STORE_ADMIN`) 선택 + 소속 매장 지정으로 생성하며, **1차(매장매니저관리자 M7) 승인을 생략하고 `PENDING_APPROVAL_L2`로 생성**되어 기존 가입 최종 승인(S3) 목록(`/admin/manager-approvals`)에 합류 → **2차 최종 승인 후 `ACTIVE`**. 잘못된 역할·중복 이메일은 400/409. (구현: `AdminManagerController` + `AdminCreateManagerRequest` + `AuthService.adminCreateManager` + FE `app/pages/admin/managers.vue`, 관리자 네비 "매니저 등록" 추가)
+> 2. **가입 최종 승인 상세 모달 (v1.13, `/admin/manager-approvals`)**: 신청 행 클릭 시 **상세 모달**(이름·이메일·역할 라벨·**소속 매장**·승인 상태)을 띄우고 모달 안에서 최종 승인/반려. BE `ManagerSignupResponse`에 **`storeId` 추가**(상세 표시용, 가산적 — 기존 필드 무변경). 일반 신청분(v1.9)·관리자 직접 등록분(v1.12)을 **공통 처리**한다.
+> 3. **휴무 신청 날짜 WheelPicker 통일 (v1.14, `/manager/dayoffs`)**: 휴무 날짜 입력을 일반예약(`reserve/slot.vue`)·대행(`manager/reserve.vue`)과 **동일한 `WheelPicker`**(오늘+21일 날짜 휠)로 교체 — 자유 텍스트(`YYYY-MM-DD`) 입력 폐지(require §6.5·§8).
+> 4. **매장 휴일 신청 영역 제거 (v1.15, `/manager/dayoffs`)**: v1.11에서 관리자 "휴일 결재" 메뉴를 제거하면서 매장 휴일은 상신해도 **승인 진입 메뉴가 없어 end-to-end가 단절**된 고아 기능이 됐으므로, `/manager/dayoffs`의 **"매장 휴일 날짜" 신청 영역을 제거**하고 페이지를 **휴가/반차 신청 전용**으로 정리한다. 휴무 신청 버튼에 **미선택 시 안내 메시지** 추가(휠 미선택 "무반응" 혼동 해소). ⚠ **BE `POST /api/manager/holidays`·`/admin/approvals` 페이지·승인 로직(아래 매장 휴일 8.1)은 존속**(메뉴·신청 UI만 제거)하므로 본 Phase의 매장 휴일 구현 자체는 유지된다.
+
 #### 태스크 체크리스트 — ✅ 2026-06-21 완료(v1.7 재정합)
 - [x] `ManagerDayoff`에 **휴가/반차 1단계** `DayoffApprovalStatus` enum(`SUBMITTED/APPROVED/REJECTED`, require §8.3) — 구 `APPROVED_L1/L2` 2단계 enum을 1단계로 정정(공용 `ApprovalStatus`는 휴일 전용 잔존)
 - [x] `POST /api/manager/dayoffs` — 일반매장매니저 휴가/반차 신청(M6, `SUBMITTED`), 휴무유형 포함(require 5.5)
@@ -1101,11 +1120,15 @@ require v1.7의 **두 승인 워크플로우**를 구현한다.
 - [x] 매장 휴일(8.1): 매니저 신청(`POST /api/manager/holidays`) → 관리자 단일 승인(`PATCH /api/admin/holidays/{id}/approve`) — 기존 구현 유지
 - [x] `APPROVED`(휴가/반차) 시 슬롯 비활성 반영: FULL_DAY=그날 전체, SHIFT_n=해당 교대 시간대만(require 5.5·6.1) — 카탈로그 노출(`status='APPROVED'`만)→`isManagerOffAt` 게이팅
 - [x] 역할 인가: **휴가/반차 승인(M8)=STORE_ADMIN 종결**, **가입 1차(M7)=STORE_ADMIN·2차(S3)=ADMIN** (require 3.2·§4.4·§8.3) — SecurityConfig `/api/store-admin/**`=STORE_ADMIN, `/api/admin/**`=ADMIN
+- [x] *(v1.12)* **관리자 매니저 직접 등록**: `POST /api/admin/managers`(`AdminManagerController`) — `AdminCreateManagerRequest`(email/password/name/storeId/role) → `AuthService.adminCreateManager` 가 **1차 생략·`PENDING_APPROVAL_L2`로 생성**(잘못된 역할 400, 중복 이메일 409) → S3 목록 합류. FE `app/pages/admin/managers.vue`(역할 select + 매장 select + 폼), 관리자 네비 "매니저 등록" 추가
+- [x] *(v1.13)* **가입 최종 승인 상세 모달**: FE `app/pages/admin/manager-approvals.vue` 행 클릭 → 상세 모달(이름·이메일·역할 라벨·소속 매장·상태)에서 승인/반려. BE `ManagerSignupResponse`에 **`storeId` 추가**(가산적), 일반 신청분·관리자 직접 등록분 공통 처리
+- [x] *(v1.14)* **휴무 신청 날짜 WheelPicker 통일**: FE `app/pages/manager/dayoffs.vue` 의 자유 텍스트 날짜 입력을 일반예약과 동일한 `WheelPicker`(오늘+21일 날짜 휠)로 교체 — 자유 텍스트 폐지(require §6.5·§8)
+- [x] *(v1.15)* **매장 휴일 신청 영역 제거**: FE `app/pages/manager/dayoffs.vue` 에서 "매장 휴일 날짜" 신청 영역 제거(휴가/반차 신청 전용으로 정리), 휴무 신청 버튼에 미선택 안내 메시지 추가. BE 매장 휴일 신청/승인 로직은 **존속**(메뉴·신청 UI만 제거)
 
 > ✅ **현행 코드 재정합 완료(2026-06-21)**: 기존 Phase 7 BE 구현(휴무 2단계 `approve-l1`/`approve-l2`)을 v1.7 1단계로 재정합 완료. ① `ManagerDayoff` 상태 enum을 `DayoffApprovalStatus(SUBMITTED/APPROVED/REJECTED)`로 축소, ② `approve-l2`(관리자 휴무 승인) 엔드포인트·인가·테스트 제거, ③ `approve-l1`을 `/api/store-admin/dayoffs/{id}/approve`(STORE_ADMIN 종결)로 변경, ④ 카탈로그 노출 필터 `status='CONFIRMED'` → `'APPROVED'`. 가입 2단계 승인(M7→S3)은 신규 도입(역할별 BO 페이지 §12.4 분리: `/store-admin/*`·`/admin/manager-approvals` 신설). 역할별 AppNav 메뉴·로그인 STORE_ADMIN 빠른버튼 정합 완료.
 
 #### 생성·수정 파일
-`domain/ManagerDayoff.java`(휴가/반차 1단계 승인상태·휴무유형), `domain/StoreHoliday.java`(승인상태), `domain/User.java`(가입 2단계 승인상태 `PENDING_APPROVAL_L1/L2`), `mapper/ManagerDayoffMapper.java`·`mapper/StoreHolidayMapper.java`·`mapper/UserMapper.java` + XML, `controller/DayoffController.java`, `controller/StoreHolidayController.java`, `controller/ManagerSignupController.java`(가입 1차 승인), `controller/AdminApprovalController.java`(가입 2차 승인), `service/DayoffApprovalService.java`(휴가/반차 1단계), `service/SignupApprovalService.java`(가입 2단계), `dto/DayoffRequest.java`, `dto/ApprovalResponse.java`, FE `app/pages/manager/dayoffs.vue`(휴가/반차 신청 M6)·`app/pages/store-admin/dayoff-approvals.vue`(휴가/반차 승인 M8)·`app/pages/store-admin/manager-signups.vue`(가입 1차 승인 M7)·`app/pages/admin/manager-approvals.vue`(가입 2차 승인 S3)(신규)
+`domain/ManagerDayoff.java`(휴가/반차 1단계 승인상태·휴무유형), `domain/StoreHoliday.java`(승인상태), `domain/User.java`(가입 2단계 승인상태 `PENDING_APPROVAL_L1/L2`), `mapper/ManagerDayoffMapper.java`·`mapper/StoreHolidayMapper.java`·`mapper/UserMapper.java` + XML, `controller/DayoffController.java`, `controller/StoreHolidayController.java`, `controller/ManagerSignupController.java`(가입 1차 승인), `controller/AdminApprovalController.java`(가입 2차 승인), **`controller/AdminManagerController.java`*(v1.12 관리자 직접 등록)***, `service/DayoffApprovalService.java`(휴가/반차 1단계), `service/SignupApprovalService.java`(가입 2단계), `service/AuthService.java`(수정 — `adminCreateManager` *(v1.12)*), `dto/DayoffRequest.java`, `dto/ApprovalResponse.java`, **`dto/AdminCreateManagerRequest.java`*(v1.12)***, `dto/ManagerSignupResponse.java`(수정 — `storeId` 추가 *(v1.13)*), FE `app/pages/manager/dayoffs.vue`(휴가/반차 신청 M6 — **WheelPicker 통일 *(v1.14)*** · **매장 휴일 영역 제거 *(v1.15)***)·`app/pages/store-admin/dayoff-approvals.vue`(휴가/반차 승인 M8)·`app/pages/store-admin/manager-signups.vue`(가입 1차 승인 M7)·`app/pages/admin/manager-approvals.vue`(가입 2차 승인 S3 — **상세 모달 *(v1.13)***)·**`app/pages/admin/managers.vue`*(v1.12 관리자 직접 등록)***(신규)
 
 #### 휴가/반차 1단계 결재 상태 머신 (require §8.3)
 
@@ -1191,7 +1214,10 @@ public void confirmL2(Long userId) {
 #### 완료기준 (DoD) — ✅ 2026-06-21 충족(v1.7 재정합 완료)
 - [x] 휴가/반차가 **1단계 승인**(매장매니저관리자 `SUBMITTED → APPROVED`)으로 **종결**되며, **관리자 승인 단계가 없다**(require §8.2) — ApprovalApiTest: STORE_ADMIN approve 종결·ADMIN 휴무승인 권한없음 403
 - [x] 매니저 가입이 **2단계 승인**(매장매니저관리자 1차 M7 → 관리자 2차 S3)을 거쳐 `ACTIVE`가 되고, `ACTIVE` 전에는 로그인 불가다(require §4.4) — SignupApprovalApiTest + e2e 가입 2단계
-- [x] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 확정된다(require §8.1) — 기존 구현 회귀 통과
+- [x] 매장 휴일이 단일 승인(매니저 신청 → 관리자)으로 확정된다(require §8.1) — 기존 구현 회귀 통과(⚠ v1.15에서 `/manager/dayoffs`의 신청 UI만 제거, BE 승인 로직은 존속)
+- [x] *(v1.12)* 관리자가 `/admin/managers`에서 매니저를 직접 등록하면 `PENDING_APPROVAL_L2`로 생성되어 가입 최종 승인(S3) 목록에 합류하고, 2차 최종 승인 후 `ACTIVE`가 된다(1차 M7 생략). 잘못된 역할 400·중복 이메일 409
+- [x] *(v1.13)* 가입 최종 승인 목록에서 행 클릭 시 상세 모달이 열리고(이름·이메일·역할·소속 매장·상태), 모달 안에서 승인/반려가 동작한다(`ManagerSignupResponse.storeId` 노출)
+- [x] *(v1.14)* `/manager/dayoffs` 휴무 날짜를 `WheelPicker`로 선택하며 자유 텍스트 입력이 없다. *(v1.15)* 매장 휴일 신청 영역이 화면에 없고, 날짜 미선택 시 안내 메시지가 노출된다
 - [x] 휴가/반차 `APPROVED` 시 FULL_DAY는 그날 전체, SHIFT_n은 해당 교대 시간대만 슬롯이 비활성된다(require 5.5·6.1) — ApprovalApiTest 대행 차단/허용
 - [x] 어느 단계든 반려(REJECTED) 후 재신청이 가능하다
 - [x] 권한 외 승인이 차단된다(휴가/반차 승인=STORE_ADMIN, 가입 1차=STORE_ADMIN·2차=ADMIN) (require 3.2·§4.4·§8.3)
@@ -1202,6 +1228,9 @@ public void confirmL2(Long userId) {
 - 📌 **슬롯 비활성 = 승인된 휴무의 카탈로그 반영**: 희소 슬롯 행을 변형하지 않는다. 휴무는 카탈로그와 **동일 `manager_dayoff` 테이블**을 쓰고, 카탈로그 쿼리는 `status='APPROVED'`만 노출(`ManagerMapper` LEFT JOIN 필터). 승인된 휴무는 `Manager.dayoffs`에 나타나 기존 `isManagerOffAt`(FULL_DAY 전일/SHIFT_n 해당 교대) 게이팅으로 **FE 슬롯/시간 선택 비활성 + 서버 대행 예약 차단(400)** 을 동시에 실현. 기존 시드 휴무는 `status DEFAULT 'APPROVED'`로 회귀 안전.
 - 📌 **역할 세분 인가**: 휴가/반차 승인(M8)은 `PATCH /api/store-admin/dayoffs/*/approve` → `hasRole('STORE_ADMIN')` 종결(관리자 매처 없음). 가입 1차(M7)는 `PATCH /api/store-admin/manager-signups/*/approve` → STORE_ADMIN, 가입 2차(S3)는 `PATCH /api/admin/manager-approvals/*/confirm` → ADMIN. STORE_ADMIN 데모용 시드 유저(`storeadmin@test.com`) 추가.
 - 📌 ⚠️ **현행 코드 재정합 필요(v1.7 충돌)**: 본 저장소의 기존 Phase 7 BE 구현은 휴무를 **2단계(`approve-l1`/`approve-l2`, `ApprovalStatus.APPROVED_L1→CONFIRMED`)** 로 작성되어 있어 v1.7(휴가/반차 1단계 종결)과 **충돌**한다. 재정합 작업: ① `ManagerDayoff` enum을 `SUBMITTED/APPROVED/REJECTED` 1단계로 축소, ② 관리자 휴무 승인(`approve-l2`) 엔드포인트·인가·테스트 제거, ③ `approve-l1`을 `approve`(STORE_ADMIN 종결)로 변경, ④ 카탈로그 노출 필터 `CONFIRMED → APPROVED`, ⑤ 가입 2단계 승인(M7→S3)을 신규 도입. 위 DoD는 이 재정합 기준으로 갱신(체크 해제 = 재정합 미완료).
+- 📌 *(v1.12)* **관리자 직접 등록 = 승인 분기 합류**: `AdminManagerController(POST /api/admin/managers)` → `AuthService.adminCreateManager(email,password,name,storeId,role)`. **신청(M1)/1차 승인(M7)을 건너뛰고 `PENDING_APPROVAL_L2`로 바로 생성**해 기존 가입 최종 승인(S3) 목록(`GET /api/admin/manager-approvals`)에 합류시킨다 — 별도 최종 승인 경로를 만들지 않고 **2차 승인 흐름을 재사용**(일반 신청분과 단일 처리). 인가는 `/api/admin/**`=ADMIN 경로 기반(Phase 6 방식 일관). 역할은 `MANAGER`/`STORE_ADMIN`만 허용(그 외 400), 이메일 중복 409.
+- 📌 *(v1.13)* **상세 모달 = 가산적 필드만 추가**: 최종 승인 목록 응답 `ManagerSignupResponse`에 `storeId`만 추가하고 기존 필드(이름·이메일·역할·상태)는 무변경 → FE는 행 클릭 시 모달에 매장명을 매핑 표시(매장 목록 캐시 조인). 일반 신청분(`storeId` 존재)·관리자 직접 등록분(`storeId` 존재) 모두 동일 모달로 처리.
+- 📌 *(v1.14·v1.15)* **`/manager/dayoffs` 정리**: `WheelPicker` 재사용(ROADMAP_1 Phase 5.1 컴포넌트)으로 날짜를 선택하며(자유 텍스트 폐지), 매장 select는 v1.8대로 본인 소속 매장 `disabled` 고정. **매장 휴일 신청 영역은 화면에서 제거**(v1.15)하되 **BE 매장 휴일 신청/승인(`POST /api/manager/holidays`·`/admin/approvals`)은 존속** — 승인 진입 메뉴 부재로 단절된 FE 상신 동선만 정리한 것이며, 추후 휴일 결재 메뉴가 복원되면 BE를 그대로 재활용한다. 휴무 신청 버튼은 날짜 미선택 시 안내 메시지를 노출(휠 미선택 "무반응" 혼동 해소).
 
 ---
 
@@ -1286,18 +1315,18 @@ public SalesResponse storeSales(Long storeId) {
 > **공수: 2.5일** · **선행조건: Phase 3·7(인증·결재 이벤트 발생 지점)** · **require_v1.md 참조: 13.2 항목 6·7**
 
 #### 목표
-require 13.2가 2차 과제로 이관한 **SMTP 발송 인프라 선정(항목 6)** 과 **알림(메일/푸시) 정책 수립(항목 7)** 을 구현한다. Phase 3에서 인터페이스만 선언한 `EmailSender`를 실제 SMTP 구현으로 채우고, 발송 시점(이메일 인증·예약 확정·결재 결과)을 정책으로 정의한다.
+require 13.2가 2차 과제로 이관한 **SMTP 발송 인프라 선정(항목 6)** 과 **알림(메일/푸시) 정책 수립(항목 7)** 을 구현한다. `EmailSender` 인터페이스를 신설하고(⚠ Phase 3에 스텁이 실재하지 않아 신규 구축) 실제 SMTP 구현으로 채우며, 발송 시점(이메일 인증·예약 확정·결재 결과)을 정책으로 정의한다.
 
-#### 태스크 체크리스트
-- [ ] `EmailSender` 구현(`JavaMailSender` 기반 SMTP) — Phase 3 스텁 교체
-- [ ] `application.yml`에 `spring.mail.*`(host/port/username/password) 설정
-- [ ] 발송 정책 정의: ① 이메일 인증 링크(require 4.4), ② 예약 확정 안내, ③ 결재 결과(승인/반려) 통지
-- [ ] **비동기 발송**(`@Async`) + 실패 재시도/로깅 — 발송 실패가 본 트랜잭션을 막지 않도록 분리
-- [ ] (선택) 푸시 채널 추상화(`NotificationChannel`) — 메일/푸시 정책 확장 포인트
-- [ ] 발송 이력 로깅(추적성)
+#### 태스크 체크리스트 — ✅ 2026-06-21 완료
+- [x] `EmailSender` 인터페이스 신설 + `SmtpEmailSender`(`JavaMailSender` 기반 SMTP) — ⚠ Phase 3 스텁 부재로 신규 *(R2P9-2)*
+- [x] `application.yml`에 `spring.mail.*` 설정 — 개발 기본 `${MAIL_HOST:localhost}:${MAIL_PORT:1025}`(로컬 캐처, auth off), 운영 자격증명은 환경변수 *(R2P9-1)*
+- [x] 발송 정책 정의: ① 이메일 인증 링크(require 4.4), ② 예약 확정 안내, ③ 결재 결과(승인/반려) 통지 — `NotificationService` 정책 3종 *(R2P9-2·R2P9-3)*
+- [x] **비동기 발송**(`@Async("mailTaskExecutor")`) + 발송 실패 격리 + 이력 로깅 — 발송 실패가 본 트랜잭션을 막지 않도록 분리(`AsyncConfig` 전용 풀). ~~실패 재시도~~는 후속 과제 *(R2P9-1·R2P9-2)*
+- [ ] (선택) 푸시 채널 추상화(`NotificationChannel`) — **미구현(후속)**. `EmailSender` 인터페이스가 채널 확장 포인트로 충분
+- [x] 발송 이력 로깅(추적성) — `NotificationLog` + `NotificationLogMapper`(QUEUED/SKIPPED 기록) *(R2P9-3)*
 
-#### 생성·수정 파일
-`service/SmtpEmailSender.java`, `service/NotificationService.java`, `config/AsyncConfig.java`, `application.yml`(수정 — `spring.mail`), `domain/NotificationLog.java` + `mapper/NotificationLogMapper.java`(선택)
+#### 생성·수정 파일 *(실제 구현 반영)*
+**신규** `service/EmailSender.java`, `service/SmtpEmailSender.java`, `service/NotificationService.java`, `config/AsyncConfig.java`, `domain/NotificationLog.java`, `mapper/NotificationLogMapper.java`(+XML). **수정(additive)** `build.gradle`(`spring-boot-starter-mail`), `application.yml`(`spring.mail`), `db/schema.sql`(`notification_log` 테이블), `mapper/UserMapper.java`(+XML, `findByManagerId` — 휴가/반차 수신자 해석), `service/AuthService`·`ReservationService`·`ApprovalService`·`SignupApprovalService`(발송 호출 1줄). **테스트** `NotificationPolicyTest`(5건)·`NotificationNonRollbackTest`(1건), `SchemaIntegrityTest`(테이블 10→11 갱신)
 
 #### 알림 정책 표 (require 13.2 항목 7)
 
@@ -1340,15 +1369,20 @@ public class SmtpEmailSender implements EmailSender {
 }
 ```
 
-#### 완료기준 (DoD)
-- [ ] SMTP 설정으로 실제(또는 테스트용 메일 캐처) 메일이 발송된다
-- [ ] 이메일 인증·예약 확정·결재 결과 시점에 정책대로 알림이 발송된다(정책 표 3건)
-- [ ] 발송이 **비동기**로 처리되어 발송 실패가 본 트랜잭션(가입/예약/결재)을 롤백시키지 않는다
-- [ ] 발송 이력이 로깅된다(추적성)
-- [ ] `./gradlew build` 통과
+#### 완료기준 (DoD) — ✅ 2026-06-21 충족(Phase 9 완료)
+- [x] SMTP 설정으로 메일이 발송된다 — `SmtpEmailSender`가 `JavaMailSender`로 발송, 개발은 로컬 캐처(localhost:1025) *(테스트는 MockBean으로 결정적 검증)*
+- [x] 이메일 인증·예약 확정·결재 결과 시점에 정책대로 알림이 발송된다(정책 표 3건) — `NotificationPolicyTest` 5건(인증·예약확정·휴가반차 승인·SKIPPED·가입 2단계)
+- [x] 발송이 **비동기**로 처리되어 발송 실패가 본 트랜잭션(가입/예약/결재)을 롤백시키지 않는다 — `NotificationNonRollbackTest`(`JavaMailSender` throw 주입에도 가입 커밋)
+- [x] 발송 이력이 로깅된다(추적성) — `notification_log`에 QUEUED/SKIPPED 기록
+- [x] `./gradlew build` 통과(알림 6건 포함 전건) + `npm run test:e2e` 회귀(콜드 45건 green)
 
 #### 구현 메모 (📌)
-- 📌 **개발 환경 메일 캐처**: 실제 SMTP 대신 MailHog/Mailpit 같은 로컬 메일 캐처로 발송을 검증하면 외부 의존 없이 테스트할 수 있습니다. `application.yml`의 `spring.mail.host`만 로컬 캐처로 바꾸면 됩니다.
+- 📌 **2계층 분리 + 트랜잭션-비동기 race 회피(핵심)**: `EmailSender`(전송)=@Async dispatch만, `NotificationService`(정책)=호출자 트랜잭션 내에서 **수신자·본문을 동기 해석 + 이력 insert**. 수신자를 동기 해석하므로 비동기 스레드의 uncommitted-read(커밋 전 재조회 → 수신자 null)를 피하고, 실제 발송만 별도 스레드(`mailTaskExecutor`)라 발송 실패가 도메인 트랜잭션에 전파되지 않는다. 별도 빈이라 `@Async` self-invocation 무효화도 없음.
+- 📌 **휴가/반차 수신자 해석**: `ManagerDayoff`는 `managerId`만 보유해 email이 없다. `UserMapper.findByManagerId`를 신설(`users.manager_id` FK 재사용, require v1.10 §6.6)해 로그인 계정 email을 해석한다. 미연결(`manager_id` NULL, 예: 시드 `mgr2`)이면 발송하지 않고 `NotificationLog` 에 **SKIPPED** 만 남긴다.
+- 📌 **`EmailSender` 스텁 부재(요구↔구현 불일치 정정)**: 본 Phase 진입 시 `EmailSender`/`@Async`/`spring-boot-starter-mail`가 코드에 전무함을 grep으로 확인 — "Phase 3에서 인터페이스 선언"이라던 기존 기술은 실재하지 않아 **인터페이스부터 신규**로 구축했다.
+- 📌 **결정적 테스트(외부 SMTP 의존 0)**: 정책/이력은 `@MockBean EmailSender`(@Async 제거→동기 verify), 비롤백은 `@MockBean JavaMailSender`(실제 `SmtpEmailSender` @Async가 호출→throw 주입)로 분리 검증. GreenMail 임베디드도 후보였으나 async 타이밍 flakiness·의존 추가를 피해 MockBean 채택.
+- 📌 **Phase 10 연계(중요)**: `notification_log` 테이블을 **R2P10-2 Flyway `V1__init_schema.sql`에 반드시 포함**할 것(누락 시 운영 DB에 테이블 부재 → 발송 시 `notificationLogMapper.insert`가 동기 경로라 도메인 트랜잭션이 깨진다). `schema.sql`에 경고 주석 명시.
+- 📌 **개발 환경 메일 캐처**: 실제 SMTP 대신 MailHog/Mailpit 로컬 캐처로 외부 의존 없이 발송 확인 가능. `application.yml`의 `spring.mail.host`만 로컬 캐처로 두면 된다(기본값이 이미 localhost:1025).
 
 ---
 
@@ -1608,8 +1642,8 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 | Phase 3 | 인증/인가(JWT·이메일 인증·승인 분리, 가입 2단계 상태머신) | 4장(4.2·4.4)·3.2 | **FW2, M2, S2 / M7·S3(가입 2단계 승인 연계)** |
 | Phase 4 | 예약 API + 동시성 2단계(낙관/비관 락) | 6장·7장(7.3) | **FW5** |
 | Phase 5 | 예약 상태 전이(완료/취소) | 11.3 | **FW6, FW7 / M4, M5** |
-| Phase 6 | BO 예약 대행 + 매장 관리 | 3.2·11.1 | **M3 / S4, S5** |
-| Phase 7 | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 | 4장(4.4)·8장(8.1·8.2·8.3)·5.5 | **M6·M8(휴가/반차 1단계) / M7·S3(가입 2단계) / 8.1(매장휴일)** |
+| Phase 6 | BO 예약 대행 + 매장 관리 + **예약 목록 역할 분기(v1.10/v1.11)** | 3.2·11.1·**6.6** | **M3 / S4, S5** |
+| Phase 7 | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 + **관리자 매니저 직접 등록(v1.12)·가입 승인 상세 모달(v1.13)·휴무 WheelPicker(v1.14)·매장 휴일 영역 제거(v1.15)** | 4장(4.1·4.4)·8장(8.1·8.2·8.3)·5.5·6.5·**12.4** | **M6·M8(휴가/반차 1단계) / M7·S3(가입 2단계) / 8.1(매장휴일)** |
 | Phase 8 | 후기/평점 API + BO 확인·매출 | 9장·11.1 | **S6, S8** |
 | Phase 9 | 알림 — SMTP 인프라 + 정책 | 13.2 항목 6·7 | — |
 | Phase 10 | 데이터 3단계 — MySQL 이행 | 7장·12장(12.3) | — |
@@ -1618,14 +1652,20 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 
 > ℹ️ **require_v1.md 12장(스택) 참조 시 주의**: require 12.1(FE)은 Nuxt 4 확정, 12.2(BE)는 "Java(LTS) + Spring Boot(최신 무료), 2단계에서 도입"입니다. 본 로드맵 BE 스택(Java 21 + Spring Boot 3.x + H2→MySQL)은 12.2를 정본으로 따릅니다.
 
-> ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로**: ① 일반매장매니저 — `/manager/reserve`(대행)·`/manager/reservations`(취소·완료 보조)·`/manager/dayoffs`(휴가/반차 신청 M6). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8). ③ 관리자 — `/admin/manager-approvals`(가입 2차 최종 승인 S3)·`/admin/sales`(매출 S8)·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9). 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
+> ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로** *(v1.11~v1.15 갱신 반영)*: ① 일반매장매니저 — `/manager/reserve`(대행, 날짜·시간 WheelPicker v1.10·v1.14)·`/reservations`(역할 분기: 내 예약+담당 2탭 v1.11)·`/manager/dayoffs`(휴가/반차 신청 M6 — **날짜 WheelPicker v1.14·매장 휴일 영역 제거 v1.15**). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8) + `/reservations`(매장 전체 v1.11). ③ 관리자 — `/admin/managers`(**매니저 직접 등록 v1.12**)·`/admin/manager-approvals`(가입 2차 최종 승인 S3 — **상세 모달 v1.13**)·`/admin/sales`(매출 S8)·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9)·`/reservations`(매장 선택형 담당 예약 단일 뷰 v1.11). **관리자 네비에서 "예약"(부킹)·"휴일 결재" 메뉴는 제거(v1.11)**. 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
 
 > ✅ **v1.8 반영(2026-06-21 구현 완료)**: ① **매니저 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면(`/manager/reserve`·`/manager/dayoffs`)에서 매장 select가 **본인 소속 매장으로 고정·`disabled`**(변경 불가)된다. 이를 위해 BE `users.store_id` 컬럼·`User.storeId` 필드·`UserResponse.storeId`(로그인 응답)를 신설하고, 매니저 계열 시드(`manager1`·`storeadmin1`·`pending1/2` → `store1`)에 소속 매장을 부여한다(`USER`/`ADMIN`은 `NULL`). FE는 `auth.currentUser.storeId`로 매장을 고정. ② **개발용 빠른 로그인 역할별 랜딩**(`login.vue`, dev 전용) — 일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`. ③ **AppNav 역할별 BO 메뉴 분기** 노출.
 
 > ✅ **v1.9 반영**: **로그인 페이지 역할군별 3분리** — `/login`(일반사용자, 유지)·`/manager/login`(일반매장매니저+매장매니저관리자)·`/admin/login`(관리자), 각 페이지에 역할별 빠른 로그인. **매니저 회원가입** `/manager/signup`(+ `POST /api/auth/signup-manager`) — 소속 매장 선택 + `role=MANAGER` 신청 → `PENDING_APPROVAL_L1`(자동 로그인 없음) → 2단계 승인(M7→S3) 후 `ACTIVE`. 관리자 회원가입 폼은 두지 않는다(시드/내부 생성).
 
+> ✅ **v1.10·v1.11 반영(2026-06-21 구현 완료, Phase 6)**: **예약 목록 역할별 분기** — `/reservations`를 USER=본인(userId) / MANAGER=내 예약+담당 2탭(managerId) / STORE_ADMIN=매장 전체(storeId) / ADMIN=매장 선택형 담당 예약 단일 뷰(S4 재사용)로 분기. 매니저 담당 예약 = 대행 등록분 + 사용자가 그 매니저를 지정한 분. **사용자↔매니저 연결을 `users.manager_id` FK 컬럼 신설로 해소**(시드 `manager1→mgr1`). BE `ReservationMapper.findByManager` + `GET /api/manager/reservations` + `GET /api/store-admin/reservations`. 매니저 대행 폼 날짜·시간 `WheelPicker` 통일. **관리자 네비 "예약"(부킹)·"휴일 결재" 메뉴 제거**.
+
+> ✅ **v1.12·v1.13 반영(2026-06-21 구현 완료, Phase 3·7)**: **회원가입 유형 분기**(`/signup` 일반/매니저 토글 — 일반=USER 즉시, 매니저=소속 매장 입력→`PENDING_APPROVAL_L1`, `signup-manager` 재사용) + **관리자 매니저 직접 등록**(`/admin/managers` + `POST /api/admin/managers`, `MANAGER`/`STORE_ADMIN` 선택·매장 지정 → **1차 생략 `PENDING_APPROVAL_L2` 생성** → 가입 최종 승인(S3) 목록 합류 → 2차 승인 후 `ACTIVE`). **가입 최종 승인 상세 모달**(`/admin/manager-approvals` 행 클릭 → 이름·이메일·역할·소속 매장·상태 표시, 모달 내 승인/반려) + BE `ManagerSignupResponse.storeId` 추가(가산적).
+
+> ✅ **v1.14·v1.15 반영(2026-06-21 구현 완료, Phase 7)**: `/manager/dayoffs` **휴무 날짜 입력을 일반예약과 동일한 `WheelPicker`(오늘+21일)로 통일**(자유 텍스트 폐지, v1.14) + **"매장 휴일 날짜" 신청 영역 제거**(휴일 결재 메뉴 제거로 승인 경로 단절된 고아 기능 정리, 페이지는 휴가/반차 신청 전용, 휴무 신청 버튼에 미선택 안내 메시지 추가, v1.15). ⚠ BE 매장 휴일 신청/승인 로직은 **존속**(FE 상신·승인 진입 동선만 정리).
+
 > ℹ️ **명세 Q1~Q8 참조 시 주의**: 예약_규칙_명세_v1.md 8장의 미해결 질문은 **Phase 0 결정표에서 확정**되며, 그 결과가 Phase 1(도메인·스키마)·Phase 4(베이 노출)에 반영됩니다. 명세 문서 자체는 읽기 전용입니다.
 
 ---
 
-> **문서 끝.** 본 로드맵(**v2.2**)은 require_v1.md **v1.7**와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(4역할 기반 매니저·관리자 프로세스·승인 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. v1.7 정합으로 **가입 승인은 2단계(매장매니저관리자 1차 → 관리자 2차), 휴가/반차 승인은 1단계(매장매니저관리자 종결)** 로 단계 수를 구분하며, 역할별 BO 페이지를 4그룹으로 분리합니다(§12.4). 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다. ⚠️ 기존 BE 구현의 휴무 2단계 결재는 v1.7(1단계)과 충돌하므로 Phase 7 구현 메모의 재정합 과제를 따릅니다.
+> **문서 끝.** 본 로드맵(**v2.3**)은 require_v1.md **v1.15**와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(4역할 기반 매니저·관리자 프로세스·승인 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. v1.7 정합으로 **가입 승인은 2단계(매장매니저관리자 1차 → 관리자 2차), 휴가/반차 승인은 1단계(매장매니저관리자 종결)** 로 단계 수를 구분하며, 역할별 BO 페이지를 4그룹으로 분리합니다(§12.4). **v1.11~v1.15 후속 델타**(예약 목록 역할별 분기·`users.manager_id` FK·관리자 메뉴 정리 / `/signup` 유형 분기·관리자 매니저 직접 등록 / 가입 최종 승인 상세 모달 / 휴무 신청 WheelPicker 통일·매장 휴일 영역 제거)는 Phase 3·6·7에 반영했습니다(모두 2026-06-21 구현 완료). 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다. ⚠️ 기존 BE 구현의 휴무 2단계 결재는 v1.7(1단계)과 충돌하므로 Phase 7 구현 메모의 재정합 과제를 따릅니다.

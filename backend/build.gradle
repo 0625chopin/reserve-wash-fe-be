@@ -33,6 +33,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     // 2단계 인메모리 DB (H2)
     runtimeOnly 'com.h2database:h2'
+    // 알림(Phase 9): SMTP 메일 발송 — JavaMailSender 자동설정(spring.mail.*)
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     // 도메인 POJO 보일러플레이트 축소(@Getter·@Builder·@NoArgsConstructor) — 컴파일 전용 (ROADMAP_2 2.3)
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

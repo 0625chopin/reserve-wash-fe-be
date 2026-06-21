@@ -24,10 +24,15 @@ public class ReservationService {
 
     private final SlotMapper slotMapper;
     private final ReservationMapper reservationMapper;
+    private final NotificationService notificationService;
 
-    public ReservationService(SlotMapper slotMapper, ReservationMapper reservationMapper) {
+    public ReservationService(
+            SlotMapper slotMapper,
+            ReservationMapper reservationMapper,
+            NotificationService notificationService) {
         this.slotMapper = slotMapper;
         this.reservationMapper = reservationMapper;
+        this.notificationService = notificationService;
     }
 
     // 본인 예약 목록(FW6 require 6.1) — userId 소유 예약 전체. 매니저 대행 예약(userId=고객)도 포함된다.
@@ -70,6 +75,7 @@ public class ReservationService {
         // 3) 예약 영속(앱이 id 부여)
         Reservation reservation = buildReservation(userId, req);
         reservationMapper.insert(reservation);
+        notificationService.notifyReservationConfirmed(userId);   // 예약 확정 안내(Phase 9, 비동기 발송)
         return ReservationResponse.from(reservation);
     }
 
@@ -84,6 +90,7 @@ public class ReservationService {
         slotMapper.updateStatusWithVersion(slot.getId(), "RESERVED", slot.getVersion());
         Reservation reservation = buildReservation(userId, req);
         reservationMapper.insert(reservation);
+        notificationService.notifyReservationConfirmed(userId);   // 예약 확정 안내(Phase 9, 비동기 발송)
         return ReservationResponse.from(reservation);
     }
 

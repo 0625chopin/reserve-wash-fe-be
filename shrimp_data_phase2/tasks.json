@@ -2990,6 +2990,513 @@
       "analysisResult": "[Playwright 정밀 테스트로 발견된 결함 묶음 — 2차(ROADMAP_2) 백엔드+BO]\n\n환경: FE :3000(Nuxt) / BE :8080(Spring Boot+H2) 동시 기동, 전 계정 비번 'password'.\n\n발견 결함 3종(실측):\n(1) 매니저 대행 예약이 일반사용자 예약목록에 안 뜸 — manager@test.com이 user@test.com 대상 대행 예약 POST /api/manager/reservations→200, DB(admin API)에 홍길동(user1) 소유로 정상 저장 확인. 그러나 user@test.com 로그인 후 /reservations=\"아직 예약이 없어요\"(0건). 원인: app/pages/reservations.vue가 인메모리 Pinia 스토어(reservation.reservations)만 읽고 onMounted/fetch 없음 + 백엔드에 사용자 본인 예약목록 GET 엔드포인트 자체가 부재(ReservationController엔 hold/confirm/complete/cancel만, 조회는 admin 전용 /api/admin/stores/{id}/reservations만 존재).\n(2) 본인 위저드 예약도 하드 새로고침/직접 URL 진입 시 사라짐(세션 내 SPA 이동 중에만 보임). (1)과 동일 근본원인 — 목록을 서버에서 하이드레이션하지 않음.\n(3) 백엔드 도메인 검증 오류(ResponseStatusException)가 전부 '빈 응답 401'로 가려짐(시스템 전반). 실측: 대행 휴무(400 기대)→401, 고객없음(404)→401, 타매장매니저(400)→401 / 중복이메일가입(409)→401 / 승인대기 로그인(403 '승인 대기 중')→401(메시지 소실). 충돌 SlotConflictException(409)만 정상. 원인: GlobalExceptionHandler가 ResponseStatusException 미처리 + JwtAuthenticationFilter(OncePerRequestFilter)가 shouldNotFilterErrorDispatch 기본 true라 내부 /error 디스패치에서 미실행 → /error가 anyRequest().authenticated()에 걸려 커스텀 entryPoint가 빈 401 반환.\n\n정상 확인: 역할별 로그인 3분리·랜딩, 대행 폼 캐스케이드, 위저드 3단계·베이 점유 비활성·슬롯충돌 409 재선택, role-guard(USER→/reserve), auth 가드(미인증→/login?redirect=).",
       "summary": "BUG-검증(크로스롤 E2E + 종합 게이트) 완료. 신규 E2E 3건 추가: (1) bo.spec '크로스롤: 매니저 대행→일반사용자 목록 표시'(BUG-1/2) — loginAs/proxyReserve 헬퍼 재사용, 고유 슬롯 2026-10-10 09:00, user 로그인 후 /reservations에서 해당 날짜·시간 카드 visible 단정. (2) reservations.spec '서버 하이드레이션: 하드 새로고침 후 유지'(BUG-2) — 위저드 예약(2026-07-03 13:00) 후 page.reload()해도 카드 유지 단정. (3) bo.spec '본인 휴무 시간대 대행 실패 메시지'(BUG-3) — mgr1 휴무일 2026-06-22 대행 시 proxy-result '실패' 노출. 회귀 보존 핵심 결정: BUG-2 fetchMine을 '교체'에서 'serverId 기준 중복 없는 append'로 변경 — 세션 내 로컬 예약(rsv-1, reservationDraft 순번 id)을 보존해 rsv-1에 의존하는 기존 reservations.spec/review.spec 무수정 통과, 동시에 서버 전용(대행)·새로고침 전체를 보강해 두 결함 모두 해소. 종합 게이트 전부 통과: FE npm run type-check EXIT=0, BE ./gradlew test BUILD SUCCESSFUL, npm run test:e2e 40 passed(신규 3 + 기존 37, 회귀 0). 결정적 실행 위해 BE/FE 클린 재기동(H2 초기화) 후 reuseExistingServer로 실행. 수동 MCP에서 보였던 버튼 클릭 플레이키니스는 e2e 헬퍼(networkidle+visible 대기)로 미재현 확인. 변경 파일: e2e/bo.spec.ts, e2e/reservations.spec.ts, app/stores/reservation.ts(append 보정).",
       "completedAt": "2026-06-20T23:48:24.471Z"
+    },
+    {
+      "id": "c8e2604f-b626-4aee-b506-a97859523c33",
+      "name": "v1.10 매니저 예약목록 의미정정 문서화 + 대행 날짜·시간 휠 통일 + 휠 스크롤 수정",
+      "description": "매니저 예약 목록을 '본인(userId)'이 아닌 '담당(managerId)' 예약으로 바로잡는 요구사항을 require_v1.md §6.6 신설 및 ROADMAP_1/2에 정정 기재. 매니저 대행 예약(/manager/reserve)의 자유텍스트 날짜·시간 입력을 일반예약과 동일한 WheelPicker(오늘+21일 날짜휠·30분 시간휠, 대행 매니저 휴무 비활성)로 통일. /reserve/slot WheelPicker의 마우스 드래그 스크롤 부재 및 드래그 추가로 인한 클릭 선택 깨짐을 lazy-engage(임계값 4px)로 수정.",
+      "notes": "이전 세션 연속분 포함. 데이터모델 블로킹(User↔Manager)은 v1.11에서 해소.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:38:35.454Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/manager/reserve.vue",
+          "type": "TO_MODIFY",
+          "description": "대행 예약 날짜·시간 휠 교체"
+        },
+        {
+          "path": "app/components/WheelPicker.vue",
+          "type": "TO_MODIFY",
+          "description": "드래그 스크롤 + 클릭 선택 수정"
+        },
+        {
+          "path": "docs/require_v1.md",
+          "type": "TO_MODIFY",
+          "description": "§6.6 신설·v1.10 이력"
+        }
+      ],
+      "implementationGuide": "docs 3종 정정. manager/reserve.vue 입력을 WheelPicker로 교체(buildDateItems 21일, dayoff 비활성). WheelPicker.vue 포인터 드래그 핸들러를 임계값 초과 이동 시에만 setPointerCapture하여 순수 클릭 억제 회피. e2e/bo.spec 대행 휠 클릭으로 갱신.",
+      "verificationCriteria": "type-check 0, e2e 통과, 대행 휠 렌더·휴무 비활성 확인, 휠 드래그/클릭 동작",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). require_v1 §6.6 신설 및 ROADMAP_1/2 정정, manager/reserve.vue 대행 날짜·시간 WheelPicker 통일(21일·휴무 비활성), WheelPicker 드래그 lazy-engage(4px)로 클릭 억제 회피. type-check 0, e2e 통과로 검증 완료.",
+      "completedAt": "2026-06-21T02:38:35.445Z"
+    },
+    {
+      "id": "0711d76e-593c-4ebd-84c8-40ff8586a9a9",
+      "name": "v1.11 예약목록 역할별 분기 + users.manager_id FK 연결",
+      "description": "/reservations를 역할별 분기 — USER=본인(userId), MANAGER=내예약+담당 2탭(managerId), STORE_ADMIN=매장전체(storeId), ADMIN=매장 선택형 담당. v1.10 §6.6 블로킹이던 사용자 계정↔매니저 엔티티 연결을 users.manager_id FK 신설(시드 manager1→mgr1)로 해소. BE ReservationMapper.findByManager + GET /api/manager/reservations(담당)·/api/store-admin/reservations(매장전체) 신설. 공통 ReservationCard 추출. ADMIN은 기존 S4 GET /api/admin/stores/{id}/reservations 재사용.",
+      "notes": "신규 매니저 가입분은 manager_id NULL(담당 빈 목록) — 운영 연결은 후속.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c8e2604f-b626-4aee-b506-a97859523c33"
+        }
+      ],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:38:52.819Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "users.manager_id 컬럼"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReservationMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findByManager"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/StoreAdminReservationController.java",
+          "type": "CREATE",
+          "description": "매장 전체 예약 GET"
+        },
+        {
+          "path": "app/components/ReservationCard.vue",
+          "type": "CREATE",
+          "description": "공통 예약 카드"
+        },
+        {
+          "path": "app/pages/reservations.vue",
+          "type": "TO_MODIFY",
+          "description": "역할 분기+탭"
+        }
+      ],
+      "implementationGuide": "schema/data.sql manager_id 컬럼·시드. User.managerId + UserMapper SELECT/insert(필드 직접주입 매핑). ReservationMapper.findByManager(+XML). ReservationService listByManagerId/listByStoreId. ManagerReservationService listAssignedToManager/listStoreReservations. StoreAdminReservationController 신설. reservations.vue 역할분기+매니저 2탭+ADMIN 매장 select, reservation.ts fetchManagerAssigned/fetchStoreReservations/fetchAdminStoreReservations.",
+      "verificationCriteria": "ManagerStoreReservationsApiTest 통과(managerId/storeId 기준·403/401·미연결 빈목록), e2e 크로스롤(담당 탭·매장전체·관리자 매장선택), type-check 0",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). users.manager_id FK 신설(시드 manager1→mgr1)로 로그인 매니저↔manager 엔티티 연결. ReservationMapper.findByManager + GET /api/manager/reservations·/api/store-admin/reservations 신설. reservations.vue 역할 분기(USER/MANAGER 2탭/STORE_ADMIN/ADMIN 매장선택), ReservationCard 추출. ManagerStoreReservationsApiTest·크로스롤 e2e·type-check 0 통과.",
+      "completedAt": "2026-06-21T02:38:52.812Z"
+    },
+    {
+      "id": "8c78d984-9907-4840-b783-497a4717c34d",
+      "name": "v1.12 회원가입 일반/매니저 분기 + 관리자 매니저 직접 등록",
+      "description": "/signup을 일반/매니저 토글로 분기(매니저는 소속 매장 추가 입력→PENDING_APPROVAL_L1, 기존 signupManager 재사용). 관리자 매니저 직접 등록(/admin/managers, POST /api/admin/managers)에서 역할(MANAGER/STORE_ADMIN) 선택 + 소속 매장 지정. 관리자 등록분은 1차(매장매니저관리자) 생략하고 PENDING_APPROVAL_L2로 생성되어 기존 '가입 최종 승인' 목록에 합류 → 2차 최종 승인 후 ACTIVE.",
+      "notes": "잘못된 역할(USER/ADMIN) 400, 중복 이메일 409.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "0711d76e-593c-4ebd-84c8-40ff8586a9a9"
+        }
+      ],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:39:07.536Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/signup.vue",
+          "type": "TO_MODIFY",
+          "description": "일반/매니저 토글"
+        },
+        {
+          "path": "app/pages/admin/managers.vue",
+          "type": "CREATE",
+          "description": "관리자 매니저 등록 폼"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminManagerController.java",
+          "type": "CREATE",
+          "description": "POST /api/admin/managers"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/AuthService.java",
+          "type": "TO_MODIFY",
+          "description": "adminCreateManager(L2)"
+        }
+      ],
+      "implementationGuide": "signup.vue 유형 토글(기존 USER testid·동작 보존). AdminCreateManagerRequest DTO, AuthService.adminCreateManager(role 검증·L2 생성), AdminManagerController 신설(/api/admin/managers). admin/managers.vue 등록 폼. AppNav 관리자 '매니저 등록' 메뉴.",
+      "verificationCriteria": "AdminManagerRegisterApiTest 통과(L2 생성·승인 후 로그인·USER 400·중복 409·403/401), e2e 가입 분기·관리자 등록→최종승인 목록 노출, type-check 0",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). /signup 일반/매니저 토글 분기(매니저 소속 매장 입력→PENDING_APPROVAL_L1). 관리자 매니저 직접 등록 AdminManagerController(POST /api/admin/managers)+AuthService.adminCreateManager로 역할(MANAGER/STORE_ADMIN) 선택·PENDING_APPROVAL_L2 생성, 가입 최종 승인 합류. admin/managers.vue·AppNav 메뉴 추가. AdminManagerRegisterApiTest·e2e·type-check 0 통과.",
+      "completedAt": "2026-06-21T02:39:07.532Z"
+    },
+    {
+      "id": "719dbccc-1d49-42b9-95cf-018daf38c0be",
+      "name": "v1.13 매니저 가입 최종승인 상세 모달",
+      "description": "/admin/manager-approvals에서 신청 행 클릭 시 상세 모달(이름·이메일·역할 라벨·소속 매장·승인 상태·계정ID)을 띄우고 모달 안에서 최종 승인/반려를 수행. 상세 표시를 위해 BE ManagerSignupResponse에 storeId 추가(가산적).",
+      "notes": "역할 라벨(일반매니저/매장관리매니저)·매장명 매핑.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8c78d984-9907-4840-b783-497a4717c34d"
+        }
+      ],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:39:17.281Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/admin/manager-approvals.vue",
+          "type": "TO_MODIFY",
+          "description": "행 클릭형 상세 모달"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/ManagerSignupResponse.java",
+          "type": "TO_MODIFY",
+          "description": "storeId 추가"
+        }
+      ],
+      "implementationGuide": "manager-approvals.vue 행을 클릭 버튼화 + Teleport 모달, manager-confirm/reject 버튼을 모달로 이동(testid 유지). ManagerSignupResponse.storeId 추가. e2e approval.spec를 '행 클릭→모달→승인'으로 갱신.",
+      "verificationCriteria": "e2e 행 클릭→모달→최종 승인 + 모달 역할/매장 검증, BE 전체 테스트 통과, type-check 0",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). manager-approvals.vue 신청 행을 클릭 버튼화하고 Teleport 모달에서 이름·이메일·역할·소속 매장·상태·계정ID 상세 표시 + 승인/반려(testid 유지). ManagerSignupResponse에 storeId 추가(가산적). e2e를 행 클릭→모달→승인으로 갱신, 모달 역할/매장 검증. BE 전체 테스트·type-check 0 통과.",
+      "completedAt": "2026-06-21T02:39:17.277Z"
+    },
+    {
+      "id": "c45cb00d-e26c-4e02-826e-c40ff378a0c3",
+      "name": "v1.14 휴가/반차 신청 날짜 휠 통일",
+      "description": "/manager/dayoffs의 휴무 날짜 입력을 일반예약(/reserve/slot)과 동일한 WheelPicker(오늘+21일 날짜 휠)로 교체. 자유 텍스트(YYYY-MM-DD) 입력 폐지로 날짜 선택 UX를 예약/대행/휴무 전반에 일관화.",
+      "notes": "휴무 신청 화면이라 매니저 휴무 비활성 로직은 적용하지 않음(위젯/범위만 통일).",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "719dbccc-1d49-42b9-95cf-018daf38c0be"
+        }
+      ],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:39:27.562Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/manager/dayoffs.vue",
+          "type": "TO_MODIFY",
+          "description": "날짜 휠 교체"
+        },
+        {
+          "path": "e2e/approval.spec.ts",
+          "type": "TO_MODIFY",
+          "description": "휠 클릭·범위내 날짜"
+        }
+      ],
+      "implementationGuide": "dayoffs.vue buildDateItems(21일) + WheelPicker(dayoff-date-wheel, ClientOnly). e2e/approval.spec 휴무 날짜를 휠 범위 내 날짜(2026-07-01)로 변경하고 .fill→휠 항목 클릭으로 전환.",
+      "verificationCriteria": "e2e 휴가/반차 1단계 승인 휠 플로우 통과, type-check 0",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). dayoffs.vue 휴무 날짜 입력을 buildDateItems(오늘+21일) + WheelPicker(dayoff-date-wheel, ClientOnly)로 교체해 자유 텍스트 폐지, 날짜 선택 UX를 예약/대행/휴무 전반에 일관화. e2e/approval.spec를 휠 범위 내 날짜(2026-07-01) 휠 클릭으로 갱신. 휴가/반차 1단계 승인 e2e·type-check 0 통과.",
+      "completedAt": "2026-06-21T02:39:27.557Z"
+    },
+    {
+      "id": "3d49f163-1777-48d4-bfef-31dee077c3db",
+      "name": "v1.15 매장 휴일 신청 영역 제거",
+      "description": "/manager/dayoffs의 '매장 휴일 날짜' 신청 영역을 제거한다. v1.11에서 관리자 '휴일 결재'(/admin/approvals) 메뉴를 제거하면서 매장 휴일은 상신해도 승인 진입 메뉴가 없어 end-to-end가 단절된 고아 기능이 되었기 때문. 페이지를 휴가/반차 신청 전용으로 정리하고, 휴무 신청 버튼에 미선택 시 안내 메시지를 추가해 '무반응' 혼동을 해소.",
+      "notes": "사용자 결정에 따라 '영역 제거' 선택. BE 변경 없이 FE만 정리.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c45cb00d-e26c-4e02-826e-c40ff378a0c3"
+        }
+      ],
+      "createdAt": "2026-06-21T02:37:56.345Z",
+      "updatedAt": "2026-06-21T02:39:39.836Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/manager/dayoffs.vue",
+          "type": "TO_MODIFY",
+          "description": "매장 휴일 영역 제거 + 검증 메시지"
+        }
+      ],
+      "implementationGuide": "dayoffs.vue holidayDate ref·submitHoliday·매장 휴일 섹션 제거, 제목/설명 정리, submitDayoff에 미선택 안내 메시지 추가. BE POST /api/manager/holidays·/admin/approvals 페이지는 존속(메뉴만 미노출).",
+      "verificationCriteria": "type-check 0, e2e 45 passed, 매장 휴일 영역 미노출, 휴가/반차 신청 정상",
+      "analysisResult": "ROADMAP_2 본선(Phase 0~9) 및 BUG-1/2/3 완료 이후 추가된 요구(require_v1 v1.10~v1.15)의 사후 등록. 모든 항목은 이미 구현·검증(type-check 0, BE gradlew test BUILD SUCCESSFUL, e2e 최종 45 passed)·커밋(6e31118, origin/main 푸시)되어 완료 상태로 기록한다. 추적 공백 보완 목적.",
+      "summary": "사후 등록(이미 구현·커밋 6e31118). dayoffs.vue에서 holidayDate·submitHoliday·매장 휴일 섹션을 제거(v1.11 휴일 결재 메뉴 제거로 승인 경로 단절된 고아 기능 정리), 페이지를 휴가/반차 신청 전용으로 정리하고 제목/설명 갱신. submitDayoff에 미선택 안내 메시지 추가로 무반응 혼동 해소. BE는 존속(메뉴만 미노출). type-check 0, e2e 45 passed 통과.",
+      "completedAt": "2026-06-21T02:39:39.831Z"
+    },
+    {
+      "id": "eefca857-b7da-4148-8f65-dfc05bb8eb23",
+      "name": "R2P10-1 Flyway+MySQL 의존성 도입 + 운영 프로파일 분리(application-prod.yml)",
+      "description": "ROADMAP_2 Phase 10의 MySQL 이행 기반을 만든다. build.gradle에 mysql-connector-j(runtimeOnly)와 flyway-core(+flyway-mysql) 의존성을 추가하고, application-prod.yml에 MySQL 데이터소스(jdbc:mysql://.../carwash)를 신설한다. 운영(prod) 프로파일에서는 spring.sql.init(schema.sql/data.sql 자동 실행)을 비활성하여 스키마 소유권을 Flyway로 이전한다. 기존 기본(H2) 프로파일은 무변경으로 두어 2단계 개발/테스트·1차 E2E 회귀를 보존한다.",
+      "notes": "운영 자격증명은 환경변수. H2 프로파일에서는 Flyway 비활성(또는 H2용 분리)로 두어 회귀 보호. require v1.5대로 JPA ddl-auto는 도입 금지.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "5341822e-3381-47c3-8cba-9a899b4a4ac6"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T10:58:30.987Z",
+      "relatedFiles": [
+        {
+          "path": "backend/build.gradle",
+          "type": "TO_MODIFY",
+          "description": "MySQL 드라이버·Flyway 의존성"
+        },
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "프로파일 분리(H2 기본 유지)"
+        },
+        {
+          "path": "backend/src/main/resources/application-prod.yml",
+          "type": "CREATE",
+          "description": "MySQL 데이터소스 + Flyway 소유"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "REFERENCE",
+          "description": "Phase 10 정의/설정 예시",
+          "lineStart": 1384,
+          "lineEnd": 1430
+        }
+      ],
+      "implementationGuide": "1) build.gradle: runtimeOnly 'com.mysql:mysql-connector-j', implementation 'org.flywaydb:flyway-core', implementation 'org.flywaydb:flyway-mysql'. 2) application-prod.yml: spring.datasource(MySQL url/username/password 환경변수), spring.sql.init.mode=never, spring.flyway.enabled=true, mybatis 설정은 공통 상속. 3) 기본 application.yml은 H2 유지(개발/테스트). 4) spring.profiles.active로 전환.",
+      "verificationCriteria": "기본(H2) 프로파일 기동·테스트 무회귀. prod 프로파일 설정이 로드되고 spring.sql.init이 비활성·Flyway 활성으로 분리됨.",
+      "analysisResult": "ROADMAP_2.md(2차 백엔드 진화 + BO) 잔여 미완료 구간 작업화. Phase 0~8 및 BUG·v1.10~v1.15는 기존 87건으로 완료됨(pending 0). 남은 것은 Phase 9(알림: SMTP 인프라+정책)와 Phase 10(데이터 3단계: MySQL 이행) 두 Phase 전체다. 사전 grep 실측: backend 코드에 EmailSender·JavaMailSender·AsyncConfig·@Async·Flyway·MySQL 드라이버가 전무 → 두 Phase 모두 신규(greenfield) 구축. 공통 제약: ① JPA/Hibernate 금지(MyBatis 유지, require v1.5) ② 신규 코드 oxfmt/Java 컨벤션·한국어 주석 ③ DTO는 record, 도메인 POJO는 Lombok ④ 기존 H2 기본 프로파일·1차 E2E 회귀·BE 통합테스트 무회귀(additive). 기존 P9-*/P7-* 태스크는 ROADMAP 'Phase 7(휴무 1단계+가입 2단계)' 작업으로, 본 배치의 R2P9-*(ROADMAP Phase 9=SMTP)와 무관하므로 접두사로 구분."
+    },
+    {
+      "id": "e75e1ea1-108f-4624-ab30-a223c007e647",
+      "name": "R2P10-2 Flyway 마이그레이션 V1(스키마 + 슬롯 유니크 인덱스 최종 방어선)",
+      "description": "2단계 db/schema.sql DDL을 Flyway 마이그레이션 db/migration/V1__init_schema.sql로 이관한다. 슬롯 UNIQUE(store_id, bay_id, date, time_slot)를 DB 유니크 인덱스로 확정하여 중복 INSERT를 원천 차단한다(require 7·12.3, 동시성 최종 방어선). MySQL 문법에 맞춰 타입/제약을 정리하고(VARCHAR 길이·BIGINT AUTO_INCREMENT 등), 시드(data.sql) 이행 전략(개발용 afterMigrate 또는 별도 시드 경로)을 정한다. notification_log(R2P9-3)를 포함한 전체 테이블을 반영한다.",
+      "notes": "schema.sql(H2)과 V1(MySQL)의 DDL 드리프트 방지 — 단일 출처 원칙을 메모로 남긴다. UNIQUE 인덱스명은 기존 uk_slot 규약과 정합.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "eefca857-b7da-4148-8f65-dfc05bb8eb23"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T10:58:30.987Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/db/migration/V1__init_schema.sql",
+          "type": "CREATE",
+          "description": "MySQL DDL + 슬롯 유니크 인덱스"
+        },
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "REFERENCE",
+          "description": "이관 원본(H2)"
+        },
+        {
+          "path": "backend/src/main/resources/db/data.sql",
+          "type": "REFERENCE",
+          "description": "시드 이행 전략 참조"
+        }
+      ],
+      "implementationGuide": "1) db/migration/V1__init_schema.sql: 기존 schema.sql 10테이블 + notification_log를 MySQL DDL로 작성, slot에 CONSTRAINT uk_slot_store_bay_date_time UNIQUE. 2) 예약어 충돌(date 컬럼) 백틱 처리. 3) 시드: 운영은 미적용, 개발/데모용은 V2__seed 또는 분리 스크립트로(테스트는 H2 data.sql 유지). 4) Flyway 마이그레이션이 prod에서 1회 적용됨을 확인.",
+      "verificationCriteria": "prod 프로파일 기동 시 Flyway V1이 적용되어 전체 테이블이 생성되고, 슬롯 (store,bay,date,time) 중복 INSERT가 유니크 인덱스로 차단된다.",
+      "analysisResult": "ROADMAP_2.md(2차 백엔드 진화 + BO) 잔여 미완료 구간 작업화. Phase 0~8 및 BUG·v1.10~v1.15는 기존 87건으로 완료됨(pending 0). 남은 것은 Phase 9(알림: SMTP 인프라+정책)와 Phase 10(데이터 3단계: MySQL 이행) 두 Phase 전체다. 사전 grep 실측: backend 코드에 EmailSender·JavaMailSender·AsyncConfig·@Async·Flyway·MySQL 드라이버가 전무 → 두 Phase 모두 신규(greenfield) 구축. 공통 제약: ① JPA/Hibernate 금지(MyBatis 유지, require v1.5) ② 신규 코드 oxfmt/Java 컨벤션·한국어 주석 ③ DTO는 record, 도메인 POJO는 Lombok ④ 기존 H2 기본 프로파일·1차 E2E 회귀·BE 통합테스트 무회귀(additive). 기존 P9-*/P7-* 태스크는 ROADMAP 'Phase 7(휴무 1단계+가입 2단계)' 작업으로, 본 배치의 R2P9-*(ROADMAP Phase 9=SMTP)와 무관하므로 접두사로 구분."
+    },
+    {
+      "id": "d379d9c1-3c3f-4536-89c3-76467621a0c1",
+      "name": "R2P10-3 MyBatis 매퍼 SQL MySQL 방언 호환 점검",
+      "description": "H2(MODE=MySQL)에서 동작하던 매퍼 XML/애너테이션 SQL이 실제 MySQL에서도 동일 동작하는지 전수 점검·수정한다. 점검 대상: 예약어 충돌(date 컬럼 백틱), SELECT ... FOR UPDATE(비관락), 낙관락 UPDATE ... WHERE version=?, 희소 슬롯 INSERT-on-hold, useGeneratedKeys/자동증가 컬럼, 날짜·문자 함수, boolean/문자열 매핑 차이. 동시성 3종 경로(UNIQUE·낙관락·비관락)가 MySQL에서 의미 보존되는지 확인한다.",
+      "notes": "H2와 MySQL 양쪽에서 동일 SQL이 통하도록(이중 유지보수 최소화) 표준 SQL 우선. 수정 시 H2 기반 기존 테스트 회귀 즉시 확인.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "e75e1ea1-108f-4624-ab30-a223c007e647"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T10:58:30.987Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/resources/mapper",
+          "type": "TO_MODIFY",
+          "description": "매퍼 XML 전수(슬롯/예약/휴무 등) 방언 점검"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper",
+          "type": "REFERENCE",
+          "description": "매퍼 인터페이스 시그니처"
+        }
+      ],
+      "implementationGuide": "1) mapper/*.xml 전수 검토 — `date` 등 예약어 백틱, FOR UPDATE 절, version 비교 UPDATE 영향행수 판정 유지. 2) SlotMapper.insertHold/updateStatusWithVersion/findForUpdate, ReservationMapper insert/updateStatus, ManagerDayoffMapper useGeneratedKeys 등 MySQL 정합 확인. 3) 차이 발견 시 XML 수정(H2 회귀도 동시 보존). 4) map-underscore-to-camel-case 설정 의존 컬럼 확인.",
+      "verificationCriteria": "MySQL에서 카탈로그 조회·예약 hold/confirm/전이·결재·후기 SQL이 정상 동작하고, 동시성 3경로(UNIQUE/낙관락/비관락)가 의미 보존된다. H2 기존 테스트도 무회귀.",
+      "analysisResult": "ROADMAP_2.md(2차 백엔드 진화 + BO) 잔여 미완료 구간 작업화. Phase 0~8 및 BUG·v1.10~v1.15는 기존 87건으로 완료됨(pending 0). 남은 것은 Phase 9(알림: SMTP 인프라+정책)와 Phase 10(데이터 3단계: MySQL 이행) 두 Phase 전체다. 사전 grep 실측: backend 코드에 EmailSender·JavaMailSender·AsyncConfig·@Async·Flyway·MySQL 드라이버가 전무 → 두 Phase 모두 신규(greenfield) 구축. 공통 제약: ① JPA/Hibernate 금지(MyBatis 유지, require v1.5) ② 신규 코드 oxfmt/Java 컨벤션·한국어 주석 ③ DTO는 record, 도메인 POJO는 Lombok ④ 기존 H2 기본 프로파일·1차 E2E 회귀·BE 통합테스트 무회귀(additive). 기존 P9-*/P7-* 태스크는 ROADMAP 'Phase 7(휴무 1단계+가입 2단계)' 작업으로, 본 배치의 R2P9-*(ROADMAP Phase 9=SMTP)와 무관하므로 접두사로 구분."
+    },
+    {
+      "id": "728d6204-be68-42e5-9204-7e1a73b59c11",
+      "name": "R2P10-4 MySQL 동시성 통합테스트 재실행 + Phase 10 게이트/ROADMAP 갱신",
+      "description": "ROADMAP_2 Phase 10 DoD를 충족·고정한다. Testcontainers MySQL(권장) 또는 로컬 MySQL로 동시성 락 통합테스트(6장)를 재실행하여 동시 N confirm 중 정확히 1건만 성공(UNIQUE+낙관락/비관락)함을 검증한다. 운영 프로파일 기동·Flyway 적용·전체 회귀를 확인하고, ROADMAP_2 Phase 10 체크리스트/DoD를 [x]로 갱신한다. (선택) 인증/진행상태 영속화(JWT·Redis, require 12.3 교체 경계)는 검토 노트로 남긴다.",
+      "notes": "Testcontainers 사용 시 Docker 필요 — 환경 부재 시 로컬 MySQL 폴백 절차를 메모. 선택 항목(JWT·Redis 영속화)은 본 Phase 필수 DoD가 아니므로 후속 과제로 분리 가능.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "e75e1ea1-108f-4624-ab30-a223c007e647"
+        },
+        {
+          "taskId": "d379d9c1-3c3f-4536-89c3-76467621a0c1"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T10:58:30.987Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/concurrency",
+          "type": "TO_MODIFY",
+          "description": "MySQL 대상 동시성 통합테스트"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 10 체크리스트·DoD 갱신",
+          "lineStart": 1391,
+          "lineEnd": 1418
+        }
+      ],
+      "implementationGuide": "1) Testcontainers MySQL 모듈로 ReservationConcurrencyTest를 MySQL 대상 재실행(또는 프로파일 분기) — 1건 성공·나머지 409/충돌 단정. 2) prod 기동 시 Flyway V1 적용·유니크 인덱스 확인. 3) ./gradlew build 전건 + npm run test:e2e 회귀. 4) ROADMAP_2.md Phase 10 체크리스트·DoD [ ]→[x], 시드/마이그레이션 전략·(선택)JWT/Redis 검토 메모 기재.",
+      "verificationCriteria": "MySQL에서 동시 예약 1건만 성공 검증 통과, 운영 프로파일 기동·Flyway 적용 확인, ./gradlew build·E2E 전건 green, ROADMAP_2 Phase 10 DoD가 [x]로 갱신됨.",
+      "analysisResult": "ROADMAP_2.md(2차 백엔드 진화 + BO) 잔여 미완료 구간 작업화. Phase 0~8 및 BUG·v1.10~v1.15는 기존 87건으로 완료됨(pending 0). 남은 것은 Phase 9(알림: SMTP 인프라+정책)와 Phase 10(데이터 3단계: MySQL 이행) 두 Phase 전체다. 사전 grep 실측: backend 코드에 EmailSender·JavaMailSender·AsyncConfig·@Async·Flyway·MySQL 드라이버가 전무 → 두 Phase 모두 신규(greenfield) 구축. 공통 제약: ① JPA/Hibernate 금지(MyBatis 유지, require v1.5) ② 신규 코드 oxfmt/Java 컨벤션·한국어 주석 ③ DTO는 record, 도메인 POJO는 Lombok ④ 기존 H2 기본 프로파일·1차 E2E 회귀·BE 통합테스트 무회귀(additive). 기존 P9-*/P7-* 태스크는 ROADMAP 'Phase 7(휴무 1단계+가입 2단계)' 작업으로, 본 배치의 R2P9-*(ROADMAP Phase 9=SMTP)와 무관하므로 접두사로 구분."
+    },
+    {
+      "id": "f918a8f0-14dd-4eb3-9798-ace9f098583c",
+      "name": "R2P9-1 SMTP 인프라 셋업 (mail 의존성·application.yml·AsyncConfig)",
+      "description": "ROADMAP_2 Phase 9 발송 인프라 기반(greenfield). spring-boot-starter-mail 의존성, application.yml spring.mail.*(개발=로컬 캐처 localhost:1025·auth off, 운영=환경변수), @EnableAsync + 전용 ThreadPoolTaskExecutor(config/AsyncConfig). grep 실측상 mail/Async 전무. 기존 H2/MyBatis/server.port 보존(additive).",
+      "notes": "운영 자격증명 하드코딩 금지(${ENV}). 개발 기본 host로 자동설정 기동실패 회피.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T11:33:03.285Z",
+      "relatedFiles": [
+        {
+          "path": "backend/build.gradle",
+          "type": "TO_MODIFY",
+          "description": "mail 의존성"
+        },
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "type": "TO_MODIFY",
+          "description": "spring.mail.*"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/config/AsyncConfig.java",
+          "type": "CREATE",
+          "description": "@EnableAsync+TaskExecutor"
+        }
+      ],
+      "implementationGuide": "1) build.gradle: implementation 'org.springframework.boot:spring-boot-starter-mail'. 2) application.yml spring.mail{host:${MAIL_HOST:localhost},port:${MAIL_PORT:1025},properties.mail.smtp.auth:false}. 3) config/AsyncConfig @Configuration @EnableAsync + ThreadPoolTaskExecutor 빈(core/max/queue, 한국어 주석). 4) ./gradlew compileJava 확인.",
+      "verificationCriteria": "./gradlew build 성공, MailSender·AsyncConfig 빈 로드, 기존 테스트 무회귀.",
+      "analysisResult": "ROADMAP_2 Phase 9(알림 SMTP+정책) 확정 설계(plan→analyze→reflect 완료). 2계층(EmailSender=전송/@Async dispatch, NotificationService=정책·수신자해석·이력 동기) + 4개 도메인 지점 배선 + NotificationLog(MyBatis). 핵심 결정: 수신자/본문은 호출자 트랜잭션에서 동기 해석하고 메일 dispatch만 @Async로 분리해 uncommitted-read race를 제거하면서 발송 실패의 도메인 트랜잭션 비전파를 보장. 코드 검증: UserMapper에 managerId 조회 부재 → findByManagerId 신설 필요(휴가/반차 수신자 해석). 제약: JPA 금지(MyBatis), 도메인=Lombok, FE 무변경 additive, 운영 자격증명 환경변수, GreenMail/MockBean 결정적 테스트, schema 멱등 DROP. R2P10·완료 태스크 불변.",
+      "summary": "R2P9-1 완료. (1) build.gradle에 implementation 'org.springframework.boot:spring-boot-starter-mail' 추가(H2 다음, JPA 미도입 유지). (2) application.yml spring.mail.* 추가 — 개발 기본 ${MAIL_HOST:localhost}:${MAIL_PORT:1025}, auth/starttls=false(로컬 캐처), username/password·auth·starttls는 환경변수 주입(운영 하드코딩 금지). host 기본값으로 자동설정 기동 실패 회피. (3) config/AsyncConfig 신설 — @Configuration @EnableAsync + mailTaskExecutor(ThreadPoolTaskExecutor core2/max5/queue100, prefix mail-async-) 발송 전용 풀로 EmailSender.send 비동기 분리 기반. 검증: JAVA_HOME(Temurin 21.0.11) 설정 후 ./gradlew build BUILD SUCCESSFUL — compileJava·bootJar·test·check 전건 통과, mail 자동설정·AsyncConfig 빈이 @SpringBootTest 컨텍스트 기동을 막지 않음(무회귀). 기존 H2/MyBatis/server.port·FE 무변경(additive). 다음(R2P9-2)에서 EmailSender/SmtpEmailSender(@Async)/NotificationService 구현 시 mailTaskExecutor 활용.",
+      "completedAt": "2026-06-21T11:33:03.283Z"
+    },
+    {
+      "id": "a94b8ff0-d11b-4bb2-845f-4d38e256df8b",
+      "name": "R2P9-2 EmailSender 인터페이스 + SmtpEmailSender(@Async) + NotificationService 정책",
+      "description": "2계층 구현. EmailSender(send(to,subject,body)) 인터페이스 신설(현재 부재). SmtpEmailSender: JavaMailSender 주입, send에 @Async + SimpleMailMessage(별도 빈이라 self-invocation 무효화 없음). NotificationService(동기, 호출자 tx 내 실행): 수신자email·제목·본문 해석 + NotificationLog insert + emailSender.send 위임. 정책 3종 메서드 — notifyEmailVerification(User)/notifyReservationConfirmed(userId)/notifyApprovalResult(수신자,종류,결과). 본문 한국어 템플릿 상수 분리.",
+      "notes": "인증 토큰/링크는 MVP 단순 문자열(영속 별도과제). 실제 dispatch만 비동기 → 발송실패 도메인 tx 비전파.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "f918a8f0-14dd-4eb3-9798-ace9f098583c"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T11:37:46.687Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/EmailSender.java",
+          "type": "CREATE",
+          "description": "전송 추상화"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/SmtpEmailSender.java",
+          "type": "CREATE",
+          "description": "@Async 구현"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/NotificationService.java",
+          "type": "CREATE",
+          "description": "정책·수신자해석·이력"
+        }
+      ],
+      "implementationGuide": "1) service/EmailSender(IF). 2) service/SmtpEmailSender implements, @Async send. 3) service/NotificationService: UserMapper+NotificationLogMapper 주입. 수신자 해석은 동기(전달된 도메인객체 또는 findById/findByManagerId), 이후 emailSender.send 비동기 fire. race 회피=동기해석. 결재결과는 휴가반차(APPROVED/REJECTED)·가입(L1→L2→ACTIVE/REJECTED) 포괄.",
+      "verificationCriteria": "3종 메서드가 수신자 해석 후 EmailSender.send 호출, @Async 적용, 컴파일 통과.",
+      "analysisResult": "ROADMAP_2 Phase 9(알림 SMTP+정책) 확정 설계(plan→analyze→reflect 완료). 2계층(EmailSender=전송/@Async dispatch, NotificationService=정책·수신자해석·이력 동기) + 4개 도메인 지점 배선 + NotificationLog(MyBatis). 핵심 결정: 수신자/본문은 호출자 트랜잭션에서 동기 해석하고 메일 dispatch만 @Async로 분리해 uncommitted-read race를 제거하면서 발송 실패의 도메인 트랜잭션 비전파를 보장. 코드 검증: UserMapper에 managerId 조회 부재 → findByManagerId 신설 필요(휴가/반차 수신자 해석). 제약: JPA 금지(MyBatis), 도메인=Lombok, FE 무변경 additive, 운영 자격증명 환경변수, GreenMail/MockBean 결정적 테스트, schema 멱등 DROP. R2P10·완료 태스크 불변.",
+      "summary": "R2P9-2 완료. 2계층 구현: (1) service/EmailSender — send(to,subject,body) 전송 추상화 인터페이스. (2) service/SmtpEmailSender — JavaMailSender 주입, @Async(\"mailTaskExecutor\")로 R2P9-1 발송 전용 풀에서 SimpleMailMessage 비동기 발송(별도 빈→self-invocation 무효화 없음, 발송 예외 비동기 스레드 격리). (3) service/NotificationService(@Service) — EmailSender+UserMapper 주입, 정책 3종: notifyEmailVerification(User)=도메인 객체로 수신자 직접 해석, notifyReservationConfirmed(userId)=UserMapper.findById로 호출자 tx 내 동기 해석(uncommitted-read race 회피), notifyApprovalResult(recipientEmail,kind,result)=결재결과 통지(휴가반차·가입 공통, 수신자 email은 호출측 해석). 한국어 본문 템플릿·SUBJECT_PREFIX 상수 분리, 수신자 null/blank 시 skip 가드. 검증: ./gradlew compileJava BUILD SUCCESSFUL. NotificationLog 이력 기록·4개 도메인 지점 배선·UserMapper.findByManagerId(휴가반차 수신자)는 R2P9-3 범위로 의도적 이연(이 태스크 검증 기준=3종 메서드+수신자해석+@Async+컴파일 충족). FE 무변경.",
+      "completedAt": "2026-06-21T11:37:46.682Z"
+    },
+    {
+      "id": "427e6008-5d49-4529-8fd9-6c0a0f64a9e1",
+      "name": "R2P9-3 발송 시점 배선(가입·예약·결재) + 발송 이력 로깅(NotificationLog)",
+      "description": "NotificationService를 4개 지점에 배선(생성자 주입+호출 1줄, additive): AuthService.signup/signupManager(인증), ReservationService.confirm(예약확정, 대행 위임 경로 자동 포함), ApprovalService.approveDayoff/rejectDayoff(휴가반차 1단계), SignupApprovalService.approveL1/confirmL2/reject(가입 단계전이). 휴가/반차 수신자 해석 위해 UserMapper.findByManagerId(@Param) 신설(+XML) — users.manager_id FK 재사용. manager_id 미연결(null)이면 발송 skip + NotificationLog status=SKIPPED. NotificationLog 도메인(Lombok)+NotificationLogMapper(+XML, useGeneratedKeys=ManagerDayoff 패턴)+schema.sql 테이블(멱등 DROP).",
+      "notes": "발송 호출이 도메인 tx 예외로 전파되지 않게 @Async 격리. notification_log는 Phase10 R2P10-2 Flyway V1에 반드시 포함(누락 시 prod 부재) — R2P10-2 노트 반영.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "a94b8ff0-d11b-4bb2-845f-4d38e256df8b"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T11:43:52.807Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/service/AuthService.java",
+          "type": "TO_MODIFY",
+          "description": "가입 인증메일"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ReservationService.java",
+          "type": "TO_MODIFY",
+          "description": "예약확정 안내"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/ApprovalService.java",
+          "type": "TO_MODIFY",
+          "description": "휴가반차 결과"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/SignupApprovalService.java",
+          "type": "TO_MODIFY",
+          "description": "가입승인 결과"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/UserMapper.java",
+          "type": "TO_MODIFY",
+          "description": "findByManagerId 신설"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/domain/NotificationLog.java",
+          "type": "CREATE",
+          "description": "발송 이력 POJO"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/NotificationLogMapper.java",
+          "type": "CREATE",
+          "description": "이력 insert 매퍼"
+        },
+        {
+          "path": "backend/src/main/resources/db/schema.sql",
+          "type": "TO_MODIFY",
+          "description": "notification_log 테이블"
+        }
+      ],
+      "implementationGuide": "1) domain/NotificationLog(@Getter/@Builder: id BIGINT, recipient, type, subject, status, createdAt). 2) mapper/NotificationLogMapper.insert(+XML namespace=FQN, useGeneratedKeys). 3) schema.sql: drop+create notification_log(FK 없음). 4) UserMapper.findByManagerId+XML. 5) 4개 서비스에 NotificationService 주입+호출(이미 로드된 User/Dayoff 전달해 race 회피).",
+      "verificationCriteria": "가입·예약확정·결재(휴가반차/가입) 시 정책 메일 발송+이력 기록. manager_id null이면 SKIPPED 기록. 발송 실패 주입해도 본 tx 커밋.",
+      "analysisResult": "ROADMAP_2 Phase 9(알림 SMTP+정책) 확정 설계(plan→analyze→reflect 완료). 2계층(EmailSender=전송/@Async dispatch, NotificationService=정책·수신자해석·이력 동기) + 4개 도메인 지점 배선 + NotificationLog(MyBatis). 핵심 결정: 수신자/본문은 호출자 트랜잭션에서 동기 해석하고 메일 dispatch만 @Async로 분리해 uncommitted-read race를 제거하면서 발송 실패의 도메인 트랜잭션 비전파를 보장. 코드 검증: UserMapper에 managerId 조회 부재 → findByManagerId 신설 필요(휴가/반차 수신자 해석). 제약: JPA 금지(MyBatis), 도메인=Lombok, FE 무변경 additive, 운영 자격증명 환경변수, GreenMail/MockBean 결정적 테스트, schema 멱등 DROP. R2P10·완료 태스크 불변.",
+      "summary": "R2P9-3 완료. (1) NotificationLog 도메인(Lombok @Getter/@NoArgsConstructor/@Builder: id/recipient/type/subject/status/createdAt) + NotificationLogMapper(insert) + XML(useGeneratedKeys, ManagerDayoff 패턴) + schema.sql notification_log 테이블(FK 없는 독립, 멱등 DROP, created_at DEFAULT CURRENT_TIMESTAMP). (2) UserMapper.findByManagerId(+XML) 신설 — users.manager_id FK 재사용으로 휴가/반차 수신자 해석. (3) NotificationService에 발송 이력 기록 추가 + dispatch() 도입(동기 이력 insert→수신자 있으면 @Async send, 수신자 없으면 SKIPPED 이력만). notifyApprovalResult를 notifySignupApprovalResult(User)·notifyDayoffApprovalResult(managerId→findByManagerId)로 분리해 수신자 해석 중앙화. (4) 4개 서비스 배선(생성자 주입+호출 1줄 additive): AuthService.signup/signupManager→notifyEmailVerification, ReservationService.confirm/confirmPessimistic→notifyReservationConfirmed(userId), ApprovalService.approveDayoff/rejectDayoff→notifyDayoffApprovalResult(승인/반려), SignupApprovalService.approveL1/confirmL2/reject→notifySignupApprovalResult(1차승인/최종승인/반려). 검증: ./gradlew build BUILD SUCCESSFUL 82건 전건 통과. notification_log 추가로 SchemaIntegrityTest 테이블 수 10→11 정당 갱신(메서드명·주석 동기화). @Async 발송이 기존 테스트(예약/가입/결재 트리거)에서 localhost:1025 연결 실패해도 비동기 스레드 격리로 도메인 tx·테스트 단정 무영향(비롤백 설계 실증). 순환참조 없음(NotificationService는 서비스 비의존). manager_id null→SKIPPED 경로 구현. GreenMail/MockBean 명시적 발송·비롤백·이력 단정 테스트는 R2P9-4 범위. FE 무변경.",
+      "completedAt": "2026-06-21T11:43:52.802Z"
+    },
+    {
+      "id": "5341822e-3381-47c3-8cba-9a899b4a4ac6",
+      "name": "R2P9-4 알림 발송 테스트 + Phase 9 게이트/ROADMAP 갱신",
+      "description": "Phase 9 DoD 충족·고정. GreenMail 임베디드 SMTP(통합 발송 검증)·@MockBean JavaMailSender(비롤백 단위)로 정책 3건 발송·비동기 비롤백·이력 기록 검증. ./gradlew build 전건 + npm run test:e2e 무회귀. ROADMAP_2 Phase 9 체크리스트/DoD [ ]→[x] + 구현 메모 보강.",
+      "notes": "외부 SMTP 의존 0(GreenMail/MockBean). 테스트 프로파일로 mail 호스트 격리.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "427e6008-5d49-4529-8fd9-6c0a0f64a9e1"
+        }
+      ],
+      "createdAt": "2026-06-21T10:58:30.987Z",
+      "updatedAt": "2026-06-21T11:54:33.527Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash",
+          "type": "CREATE",
+          "description": "발송/비롤백/이력 테스트"
+        },
+        {
+          "path": "docs/roadmaps/ROADMAP_2.md",
+          "type": "TO_MODIFY",
+          "description": "Phase 9 DoD 갱신",
+          "lineStart": 1320,
+          "lineEnd": 1377
+        }
+      ],
+      "implementationGuide": "1) GreenMail로 정책3건(인증/예약/결재) 발송 캡처 단정. 2) @MockBean으로 send 예외 주입 시 가입/예약 tx 커밋 유지(비롤백). 3) NotificationLog row(SKIPPED 포함) 단정. 4) build+e2e 회귀. 5) ROADMAP_2 Phase 9 갱신.",
+      "verificationCriteria": "정책3건·비동기 비롤백·이력 테스트 통과, build·e2e green, ROADMAP_2 Phase 9 DoD [x].",
+      "analysisResult": "ROADMAP_2 Phase 9(알림 SMTP+정책) 확정 설계(plan→analyze→reflect 완료). 2계층(EmailSender=전송/@Async dispatch, NotificationService=정책·수신자해석·이력 동기) + 4개 도메인 지점 배선 + NotificationLog(MyBatis). 핵심 결정: 수신자/본문은 호출자 트랜잭션에서 동기 해석하고 메일 dispatch만 @Async로 분리해 uncommitted-read race를 제거하면서 발송 실패의 도메인 트랜잭션 비전파를 보장. 코드 검증: UserMapper에 managerId 조회 부재 → findByManagerId 신설 필요(휴가/반차 수신자 해석). 제약: JPA 금지(MyBatis), 도메인=Lombok, FE 무변경 additive, 운영 자격증명 환경변수, GreenMail/MockBean 결정적 테스트, schema 멱등 DROP. R2P10·완료 태스크 불변.",
+      "summary": "R2P9-4 완료 — Phase 9 게이트 충족. (1) NotificationPolicyTest(5건, @MockBean EmailSender로 @Async 제거→동기 verify): 가입→인증메일+EMAIL_VERIFICATION QUEUED 이력, 예약확정(user1)→예약안내+RESERVATION_CONFIRMED, 휴가반차 승인(mgr1↔manager1 연결)→담당매니저 통지+APPROVAL_RESULT, 미연결 매니저(mgr2)→발송 never+SKIPPED 이력, 가입 2단계(pending1 approveL1→confirmL2)→pending1@test.com 2회 통지. (2) NotificationNonRollbackTest(1건, @MockBean JavaMailSender throw 주입→실제 SmtpEmailSender @Async가 호출): 발송 실패해도 가입 트랜잭션 커밋(findByEmail not null)으로 비롤백 실증. 결과 리포트 확인: Policy 5/0실패, NonRollback 1/0실패. (3) ./gradlew build BUILD SUCCESSFUL(알림 6건 포함 전건). (4) E2E: 첫 실행 22실패는 reuseExistingServer로 누적된 인메모리 예약 상태 오염(슬롯 RESERVED)이 원인임을 단건 디버그(slot store1-A1 11:00 disabled)로 규명 → 8080/3000 서버 종료 후 콜드 재실행 시 45건 전건 green(회귀 0). (5) ROADMAP_2 Phase 9 체크리스트/DoD [ ]→[x] 갱신(선택 푸시채널만 미구현 명시), 생성수정파일 실제 반영, 구현메모 5종 추가(2계층 race 회피·findByManagerId 수신자해석·스텁부재 정정·결정적 MockBean 테스트·Phase10 Flyway 연계 경고). Phase 9 전체(R2P9-1~4) 완료.",
+      "completedAt": "2026-06-21T11:54:33.525Z"
     }
   ]
 }

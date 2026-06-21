@@ -32,4 +32,10 @@
         SELECT id, email, name, role, approval_status, store_id, manager_id
         FROM users WHERE approval_status = #{approvalStatus} ORDER BY id
     </select>
+
+    <!-- 매니저 엔티티 id로 로그인 계정 조회 (Phase 9 휴가/반차 결재 수신자) — manager_id FK 재사용 -->
+    <select id="findByManagerId" resultType="com.carwash.domain.User">
+        SELECT id, email, name, role, approval_status, store_id, manager_id
+        FROM users WHERE manager_id = #{managerId}
+    </select>
 </mapper>

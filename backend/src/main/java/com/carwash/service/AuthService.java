@@ -24,12 +24,17 @@ public class AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final NotificationService notificationService;
 
     public AuthService(
-            UserMapper userMapper, PasswordEncoder passwordEncoder, JwtTokenProvider tokenProvider) {
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder,
+            JwtTokenProvider tokenProvider,
+            NotificationService notificationService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.notificationService = notificationService;
     }
 
     // 이메일/비번 검증 후 JWT 발급 (실패 시 401 — 계정/비번 구분 없는 통합 응답)
@@ -61,6 +66,7 @@ public class AuthService {
                 .approvalStatus(UserApprovalStatus.ACTIVE)   // USER는 가입 즉시 활성(승인 분기 없음, require §4.4)
                 .build();
         userMapper.insert(user);
+        notificationService.notifyEmailVerification(user);   // 이메일 인증 안내(Phase 9, 비동기 발송)
         return new LoginResponse(tokenProvider.createToken(user), UserResponse.from(user));
     }
 
@@ -81,6 +87,7 @@ public class AuthService {
                 .storeId(storeId)
                 .build();
         userMapper.insert(user);
+        notificationService.notifyEmailVerification(user);   // 이메일 인증 안내(Phase 9, 비동기 발송)
     }
 
     // 관리자 직접 매니저 등록 (require v1.12 §4.1) — role(MANAGER|STORE_ADMIN) 지정, PENDING_APPROVAL_L2로 생성.
