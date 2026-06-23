@@ -40,4 +40,9 @@
         SET status = #{status}, version = version + 1
         WHERE id = #{id} AND version = #{version}
     </update>
+
+    <!-- 매장 삭제 무결성(v2.4) — 매장 귀속 슬롯 수 -->
+    <select id="countByStore" resultType="int">
+        SELECT COUNT(*) FROM slot WHERE store_id = #{storeId}
+    </select>
 </mapper>

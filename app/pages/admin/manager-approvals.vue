@@ -3,6 +3,7 @@
 //   PENDING_APPROVAL_L2 목록을 행 클릭 시 모달로 상세 표시하고, 모달에서 최종 확정(→ACTIVE)·반려한다.
 import { onMounted, ref } from 'vue'
 import { getApprovedStores } from '~/services/storeService'
+import { reloadCatalog } from '~/services/catalogCache'
 import type { UserRole } from '~/types/enums'
 
 definePageMeta({ middleware: ['auth', 'role-guard'], roles: ['ADMIN'] })
@@ -67,10 +68,12 @@ function closeDetail() {
 
 // 2차 최종 확정(L2→ACTIVE) / 반려 — 모달에서 호출, 완료 후 모달 닫고 목록 갱신
 async function patch(url: string) {
-  const { $apiFetch } = useNuxtApp()
+  const nuxtApp = useNuxtApp()
   try {
-    await $apiFetch(url, { method: 'PATCH' })
+    await nuxtApp.$apiFetch(url, { method: 'PATCH' })
     message.value = '처리되었습니다.'
+    // 최종 승인 시 BE가 manager 엔티티를 생성하므로 카탈로그를 갱신해 예약 매니저 목록에 반영(v2.4)
+    await nuxtApp.runWithContext(() => reloadCatalog())
   } catch {
     message.value = '처리에 실패했습니다.'
   }

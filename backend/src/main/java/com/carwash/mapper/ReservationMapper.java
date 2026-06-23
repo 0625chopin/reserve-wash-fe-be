@@ -19,6 +19,9 @@ public interface ReservationMapper {
     // 매장별 예약 조회 — BO 관리자 예약자/사용자 관리(S4·S5, Phase 6) + 매장 전체 예약 목록(require v1.10 §6.6 STORE_ADMIN)
     List<Reservation> findByStore(String storeId);
 
+    // 매장 삭제 무결성(v2.4) — 매장에 귀속된 예약 수
+    int countByStore(@Param("storeId") String storeId);
+
     int insert(Reservation reservation);
 
     // 상태 전이 영속화 — id로 status만 갱신(전이 가드는 도메인 메서드가 담당)

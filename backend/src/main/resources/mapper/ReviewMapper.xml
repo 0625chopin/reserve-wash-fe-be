@@ -27,6 +27,11 @@
         SELECT COUNT(*) FROM review WHERE reservation_id = #{reservationId}
     </select>
 
+    <!-- 매장 삭제 무결성(v2.4) — 매장 귀속 후기 수 -->
+    <select id="countByStore" resultType="int">
+        SELECT COUNT(*) FROM review WHERE store_id = #{storeId}
+    </select>
+
     <insert id="insert">
         INSERT INTO review
             (id, reservation_id, user_id, store_id, manager_id, rating, `text`, created_at)

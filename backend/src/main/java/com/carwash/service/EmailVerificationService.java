@@ -2,6 +2,7 @@ package com.carwash.service;
 
 import com.carwash.domain.EmailVerification;
 import com.carwash.domain.enums.UserRole;
+import com.carwash.domain.enums.VerificationMethod;
 import com.carwash.dto.LoginResponse;
 import com.carwash.dto.VerificationResponse;
 import com.carwash.dto.VerifyResponse;
@@ -64,6 +65,7 @@ public class EmailVerificationService {
         verificationMapper.deleteByEmail(email);
         verificationMapper.insert(EmailVerification.builder()
                 .email(email)
+                .method(VerificationMethod.EMAIL.name())   // 현재 가입 인증은 EMAIL 방법
                 .code(code)
                 .role(role.name())
                 .name(name)

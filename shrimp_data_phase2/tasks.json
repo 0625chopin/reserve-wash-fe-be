@@ -3497,6 +3497,301 @@
       "analysisResult": "ROADMAP_2 Phase 9(알림 SMTP+정책) 확정 설계(plan→analyze→reflect 완료). 2계층(EmailSender=전송/@Async dispatch, NotificationService=정책·수신자해석·이력 동기) + 4개 도메인 지점 배선 + NotificationLog(MyBatis). 핵심 결정: 수신자/본문은 호출자 트랜잭션에서 동기 해석하고 메일 dispatch만 @Async로 분리해 uncommitted-read race를 제거하면서 발송 실패의 도메인 트랜잭션 비전파를 보장. 코드 검증: UserMapper에 managerId 조회 부재 → findByManagerId 신설 필요(휴가/반차 수신자 해석). 제약: JPA 금지(MyBatis), 도메인=Lombok, FE 무변경 additive, 운영 자격증명 환경변수, GreenMail/MockBean 결정적 테스트, schema 멱등 DROP. R2P10·완료 태스크 불변.",
       "summary": "R2P9-4 완료 — Phase 9 게이트 충족. (1) NotificationPolicyTest(5건, @MockBean EmailSender로 @Async 제거→동기 verify): 가입→인증메일+EMAIL_VERIFICATION QUEUED 이력, 예약확정(user1)→예약안내+RESERVATION_CONFIRMED, 휴가반차 승인(mgr1↔manager1 연결)→담당매니저 통지+APPROVAL_RESULT, 미연결 매니저(mgr2)→발송 never+SKIPPED 이력, 가입 2단계(pending1 approveL1→confirmL2)→pending1@test.com 2회 통지. (2) NotificationNonRollbackTest(1건, @MockBean JavaMailSender throw 주입→실제 SmtpEmailSender @Async가 호출): 발송 실패해도 가입 트랜잭션 커밋(findByEmail not null)으로 비롤백 실증. 결과 리포트 확인: Policy 5/0실패, NonRollback 1/0실패. (3) ./gradlew build BUILD SUCCESSFUL(알림 6건 포함 전건). (4) E2E: 첫 실행 22실패는 reuseExistingServer로 누적된 인메모리 예약 상태 오염(슬롯 RESERVED)이 원인임을 단건 디버그(slot store1-A1 11:00 disabled)로 규명 → 8080/3000 서버 종료 후 콜드 재실행 시 45건 전건 green(회귀 0). (5) ROADMAP_2 Phase 9 체크리스트/DoD [ ]→[x] 갱신(선택 푸시채널만 미구현 명시), 생성수정파일 실제 반영, 구현메모 5종 추가(2계층 race 회피·findByManagerId 수신자해석·스텁부재 정정·결정적 MockBean 테스트·Phase10 Flyway 연계 경고). Phase 9 전체(R2P9-1~4) 완료.",
       "completedAt": "2026-06-21T11:54:33.525Z"
+    },
+    {
+      "id": "bf656684-b58b-43d9-96fe-2d9d02c71aff",
+      "name": "V2.4-1 BE 매장 CRUD·삭제의존성 매퍼 보강",
+      "description": "관리자 매장 CRUD와 삭제 무결성 검사를 위한 MyBatis 매퍼/SQL을 보강한다. StoreMapper에 insert/update/deleteById, BayMapper에 insert/deleteByStore, 그리고 삭제 의존성 카운트를 위해 Reservation/Review/Manager/Slot/Bay 매퍼에 countByStore(storeId)를 추가한다. 기존 select 스타일(map-underscore-to-camel-case, ORDER BY)을 따른다.",
+      "notes": "slot/review/manager/reservation 테이블 모두 store_id 컬럼 보유(schema.sql 확인됨). 기존 메서드/SQL은 절대 변경하지 말고 추가만.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:09:31.275Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/StoreMapper.java",
+          "type": "TO_MODIFY",
+          "description": "insert/update/deleteById 추가"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/StoreMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "insert/update/delete SQL 추가"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/BayMapper.java",
+          "type": "TO_MODIFY",
+          "description": "insert/deleteByStore/countByStore"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/BayMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "insert/deleteByStore/countByStore SQL"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/mapper/ReservationMapper.java",
+          "type": "TO_MODIFY",
+          "description": "countByStore"
+        },
+        {
+          "path": "backend/src/main/resources/mapper/ReservationMapper.xml",
+          "type": "TO_MODIFY",
+          "description": "countByStore SQL"
+        }
+      ],
+      "implementationGuide": "StoreMapper.java: int insert(Store), int update(Store), int deleteById(@Param id). StoreMapper.xml: insert(id,name,bay_count,approved) / update SET name,bay_count,approved WHERE id / delete FROM store WHERE id. BayMapper.java: int insert(Bay), int deleteByStore(@Param storeId), int countByStore(@Param storeId). BayMapper.xml 동 SQL. 의존성 카운트: ReservationMapper.countByStore, ReviewMapper.countByStore, ManagerMapper.countByStore, SlotMapper.countByStore 각각 'SELECT COUNT(*) FROM <table> WHERE store_id=#{storeId}'. @Param 사용, enum/boolean 기본 핸들러.",
+      "verificationCriteria": "compileJava 성공. 각 countByStore가 store_id 기준 COUNT 반환, insert/update/delete가 1행 영향. 기존 매퍼 테스트(StoreMapperTest/BayMapperTest) 회귀 없음.",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "StoreMapper에 insert/update/deleteById, BayMapper에 insert/deleteByStore/countByStore, Reservation/Review/Manager/Slot 매퍼에 countByStore(store_id 기준 COUNT)를 추가하고 XML SQL을 보강했다. 기존 메서드/SQL은 무변경. compileJava 성공, 전체 105 백엔드 테스트 그린(기존 매퍼 테스트 회귀 없음).",
+      "completedAt": "2026-06-23T11:09:31.270Z"
+    },
+    {
+      "id": "b54bbd11-35b7-419e-89f5-8d5bf07d82fe",
+      "name": "V2.4-2 BE 매장 CRUD 서비스·DTO·예외·컨트롤러",
+      "description": "관리자 매장 CRUD REST를 구현한다. GET /api/admin/stores(승인/미승인 포함 전체)·POST(생성, approved 미입력 시 false)·PUT/{id}(수정, 베이 교체)·DELETE/{id}(연관 데이터 존재 시 409 STORE_HAS_DEPENDENCIES). 베이 구성을 함께 반영하고, 삭제 의존성 검사를 서비스에서 수행한다.",
+      "notes": "id 생성은 Math.random 금지 환경 아님(런타임 서버라 무관). UUID.randomUUID().toString().substring 사용 가능. bay id는 storeId+'-'+code 규칙(기존 'store1-A1'과 동일). 삭제 의존성: reservation+review+manager+slot+bay 카운트 합. 단 생성 직후 베이만 있는 매장은 베이도 의존성으로 보면 삭제 불가가 되므로, 베이는 의존성에서 제외하고 reservation/review/manager/slot만 검사(베이는 매장 구성요소라 함께 삭제). ROADMAP 문구는 베이 포함이나 실용상 베이는 자식이라 함께 제거 — 의존성은 예약/후기/매니저/슬롯으로 한정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "bf656684-b58b-43d9-96fe-2d9d02c71aff"
+        }
+      ],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:09:48.105Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto/AdminStoreRequest.java",
+          "type": "CREATE",
+          "description": "매장 등록/수정 요청"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/AdminStoreResponse.java",
+          "type": "CREATE",
+          "description": "매장+베이 응답"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/exception/StoreHasDependenciesException.java",
+          "type": "CREATE",
+          "description": "삭제 차단 예외"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/exception/GlobalExceptionHandler.java",
+          "type": "TO_MODIFY",
+          "description": "409 매핑 추가"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/AdminStoreService.java",
+          "type": "CREATE",
+          "description": "CRUD+의존성 검사"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/AdminStoreController.java",
+          "type": "CREATE",
+          "description": "/api/admin/stores"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/dto/BayResponse.java",
+          "type": "REFERENCE",
+          "description": "베이 응답 record 패턴"
+        }
+      ],
+      "implementationGuide": "dto/AdminStoreRequest(record: String name, int bayCount, Boolean approved, List<BayInput> bays; nested record BayInput(String code, String size); approvedOrDefault()= approved!=null&&approved). dto/AdminStoreResponse(record: id,name,bayCount,approved,List<BayResponse> bays; from(Store, List<Bay>)). exception/StoreHasDependenciesException extends RuntimeException. GlobalExceptionHandler: @ExceptionHandler(StoreHasDependenciesException)→409 ErrorResponse('STORE_HAS_DEPENDENCIES', msg). service/AdminStoreService(@Transactional): list()=storeMapper.findAll()+bayMapper.findByStore each→AdminStoreResponse; create(req)= id 생성(예: 'store'+UUID 또는 max+1; 간단히 'store-'+랜덤 단축), Store.builder approved(req.approvedOrDefault()) bayCount 저장, bays insert(id= storeId+'-'+code); update(id,req)= findById null→404(ResponseStatusException), store update, bayMapper.deleteByStore+재insert; delete(id)= 의존성 카운트 합>0 → throw StoreHasDependenciesException, 아니면 bayMapper.deleteByStore + storeMapper.deleteById. controller/AdminStoreController(@RequestMapping /api/admin/stores): GET ''→list, POST ''(@RequestBody)→create 201, PUT '/{id}'→update, DELETE '/{id}'→delete 204.",
+      "verificationCriteria": "compileJava 성공. POST 시 approved 미입력→false. GET /api/admin/stores가 미승인 포함 반환. 연관 데이터 있는 매장 DELETE→409 STORE_HAS_DEPENDENCIES, 무연관 매장 DELETE→204.",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "AdminStoreRequest(approvedOrDefault null→false, baysOrEmpty)·AdminStoreResponse·StoreHasDependenciesException·AdminStoreService·AdminStoreController를 구현했다. GET(미승인 포함)·POST(기본 미승인, 201)·PUT(베이 deleteByStore 후 재insert)·DELETE(예약/후기/매니저/슬롯 의존성>0이면 409 STORE_HAS_DEPENDENCIES, 204). 베이는 매장 구성요소라 의존성 제외하고 함께 삭제. GlobalExceptionHandler 409 매핑. AdminStoreApiTest로 검증.",
+      "completedAt": "2026-06-23T11:09:48.102Z"
+    },
+    {
+      "id": "1c54f524-c46f-4831-bf74-eb8e5639aad0",
+      "name": "V2.4-3 BE 전 매장 매출 비중 집계 API",
+      "description": "매출 원차트용 전 매장 매출 비중 집계 GET /api/admin/sales/by-store를 추가한다. 매장별 COMPLETED 예약 금액 합산을 내림차순으로 반환한다. 상위5+ETC·비중% 가공은 FE에서 수행하므로 서버는 매장별 합계 목록만 반환.",
+      "notes": "기존 storeSales(단건) 메서드/엔드포인트는 유지. SalesService 생성자에 StoreMapper 추가 주입.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:09:51.074Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/main/java/com/carwash/dto/SalesByStoreResponse.java",
+          "type": "CREATE",
+          "description": "매장별 매출 응답"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/service/SalesService.java",
+          "type": "TO_MODIFY",
+          "description": "salesByStore 추가"
+        },
+        {
+          "path": "backend/src/main/java/com/carwash/controller/SalesController.java",
+          "type": "TO_MODIFY",
+          "description": "GET /sales/by-store"
+        }
+      ],
+      "implementationGuide": "dto/SalesByStoreResponse(record: String storeId, String storeName, long amount). SalesService에 StoreMapper 주입 + List<SalesByStoreResponse> salesByStore(): storeMapper.findAll() 각 매장에 대해 reservationMapper.findByStore filter COMPLETED sum → SalesByStoreResponse(store.id, store.name, total), amount 내림차순 정렬. SalesController에 @GetMapping('/sales/by-store') 추가.",
+      "verificationCriteria": "GET /api/admin/sales/by-store가 매장별 COMPLETED 합계를 내림차순으로 반환. 비ADMIN 403. compileJava 성공.",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "SalesByStoreResponse(storeId·storeName·amount)와 SalesService.salesByStore()(storeMapper.findAll 각 매장 COMPLETED 금액 합산, amount 내림차순)·SalesController GET /api/admin/sales/by-store를 추가했다. 기존 storeSales 단건은 completedTotal 헬퍼로 공통화하며 유지. ADMIN 인가·내림차순을 SalesByStoreApiTest로 검증.",
+      "completedAt": "2026-06-23T11:09:51.070Z"
+    },
+    {
+      "id": "31210347-cad0-488a-9433-304a8089f974",
+      "name": "V2.4-4 BE 통합 테스트(매장 CRUD·매출 비중)",
+      "description": "AdminStoreApiTest와 SalesByStoreApiTest를 추가해 신규 API를 검증한다. JWT bearer 헬퍼(기존 BoApiTest 패턴) 사용.",
+      "notes": "삭제 성공 테스트는 반드시 POST로 새로 만든 매장(무연관) 대상. 시드 매장 삭제는 409 확인용. CatalogApiTest 등 기존 카운트 단정은 트랜잭션 롤백 안 되는 통합테스트라 POST가 데이터 증가시킬 수 있음 — 테스트 간 격리 위해 고유 매장명 사용, 단정은 생성 매장 id 기준으로.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b54bbd11-35b7-419e-89f5-8d5bf07d82fe"
+        },
+        {
+          "taskId": "1c54f524-c46f-4831-bf74-eb8e5639aad0"
+        }
+      ],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:10:07.873Z",
+      "relatedFiles": [
+        {
+          "path": "backend/src/test/java/com/carwash/controller/AdminStoreApiTest.java",
+          "type": "CREATE",
+          "description": "매장 CRUD 통합테스트"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/controller/SalesByStoreApiTest.java",
+          "type": "CREATE",
+          "description": "매출 비중 통합테스트"
+        },
+        {
+          "path": "backend/src/test/java/com/carwash/bo/BoApiTest.java",
+          "type": "REFERENCE",
+          "description": "bearer/JWT 헬퍼 패턴"
+        }
+      ],
+      "implementationGuide": "AdminStoreApiTest(@SpringBootTest @AutoConfigureMockMvc): (1) ADMIN POST /api/admin/stores(approved 미포함)→201, GET 응답에서 해당 매장 approved=false. (2) GET /api/admin/stores length>8(시드8+생성). (3) 비ADMIN(USER) POST→403. (4) 연관 데이터 있는 시드 매장 DELETE store1→409 code=STORE_HAS_DEPENDENCIES. (5) 방금 POST한 무연관 매장 DELETE→204. (6) PUT 수정 반영. SalesByStoreApiTest: ADMIN GET /api/admin/sales/by-store→200, 배열, 내림차순(첫 amount>=둘째), 비ADMIN 403. bearer 헬퍼는 JwtTokenProvider로 생성(BoApiTest 참고).",
+      "verificationCriteria": "gradle test 두 신규 클래스 그린. 전체 백엔드 테스트 BUILD SUCCESSFUL(기존 회귀 없음).",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "AdminStoreApiTest(등록 기본 미승인+베이 반영·미승인 매장 관리목록 노출 vs FO 제외·비관리자 403·연관 시드매장(store1) 409 STORE_HAS_DEPENDENCIES·무연관 매장 204+삭제후 404·수정 반영·미인증 401)와 SalesByStoreApiTest(내림차순 검증·403·401)를 추가했다. 전역 H2 공유 통합테스트라 생성 매장을 모두 삭제 정리해 CatalogApiTest 베이/매장 카운트 단정을 보호. 전체 105 테스트 BUILD SUCCESSFUL.",
+      "completedAt": "2026-06-23T11:10:07.871Z"
+    },
+    {
+      "id": "cf1477b2-f72f-4442-9564-d8369c48c7f0",
+      "name": "V2.4-5 FE 관리자 매장 CRUD 화면·서비스",
+      "description": "관리자 매장 등록/수정/삭제 화면을 추가한다. app/services/adminStoreService.ts(API 래퍼) + app/pages/admin/stores/index.vue(목록·삭제)·new.vue(등록)·[id].vue(수정). 삭제 409는 토스트 안내. ADMIN 전용(auth+role-guard).",
+      "notes": "useToast 컴포저블 존재(app/composables). 베이 size 옵션 SMALL/MID/LARGE/XLARGE. approved 기본 false 명시. 인증 호출이므로 $apiFetch.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b54bbd11-35b7-419e-89f5-8d5bf07d82fe"
+        }
+      ],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:10:11.928Z",
+      "relatedFiles": [
+        {
+          "path": "app/services/adminStoreService.ts",
+          "type": "CREATE",
+          "description": "매장 CRUD API 래퍼"
+        },
+        {
+          "path": "app/pages/admin/stores/index.vue",
+          "type": "CREATE",
+          "description": "매장 목록·삭제"
+        },
+        {
+          "path": "app/pages/admin/stores/new.vue",
+          "type": "CREATE",
+          "description": "매장 등록 폼"
+        },
+        {
+          "path": "app/pages/admin/stores/[id].vue",
+          "type": "CREATE",
+          "description": "매장 수정 폼"
+        },
+        {
+          "path": "app/pages/admin/managers.vue",
+          "type": "REFERENCE",
+          "description": "$apiFetch·폼·role-guard 패턴"
+        }
+      ],
+      "implementationGuide": "adminStoreService.ts: export 함수 listAdminStores()/createStore(payload)/updateStore(id,payload)/deleteStore(id) — 내부에서 useNuxtApp().$apiFetch + useRuntimeConfig().public.apiBase 사용(managers.vue 패턴). index.vue: definePageMeta auth+role-guard roles ADMIN; onMounted load 목록; 표(이름·베이수·승인여부); '매장 등록' 링크(/admin/stores/new); 행별 '수정'(/admin/stores/[id]) '삭제' 버튼→deleteStore, catch에서 status 409면 useToast로 '연관 데이터가 있어 삭제할 수 없습니다' 안내. new.vue: 폼(name, bayCount, approved 토글 기본 false, 베이 목록 A1~A{bayCount} size select)→createStore→/admin/stores 이동. [id].vue: 기존 값 로드 후 수정→updateStore. data-testid: admin-store-name/baycount/approved/submit, admin-store-row-{id}, admin-store-delete-{id}, page-admin-stores.",
+      "verificationCriteria": "type-check 통과. /admin/stores 목록 렌더, 등록 시 기본 미승인 생성, 연관 매장 삭제 시 토스트 안내(409), 무연관 매장 삭제 성공.",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "adminStoreService.ts($apiFetch 래퍼 list/get/create/update/delete)와 admin/stores/index.vue(목록·삭제, 409→인라인 안내)·new.vue(등록, approved 기본 false 체크박스)·[id].vue(수정)를 추가했다. 베이 수 변경 시 A1~AN 코드 동기화, size는 SMALL/MID/LARGE/XLARGE. v-model은 루프 항목 b.size로 바인딩(noUncheckedIndexedAccess 대응). type-check·eslint 통과. useToast가 실제로 없어 인라인 message/error 패턴 채택(managers.vue와 동일).",
+      "completedAt": "2026-06-23T11:10:11.921Z"
+    },
+    {
+      "id": "e1080219-438c-430a-8f96-25b5f272b320",
+      "name": "V2.4-6 FE 매출 원차트(Top5+ETC)",
+      "description": "매출 페이지에 전 매장 매출 비중 파이차트를 추가한다. useSalesChart.ts(buildSalesSlices: 상위5 + 나머지 ETC 합산, 비중%) + SalesPieChart.vue(외부 의존 없는 SVG/conic-gradient 차트) + sales.vue가 GET /api/admin/sales/by-store를 불러 차트·표를 렌더. 후기 영역은 V2.4-7에서 분리하므로 여기서는 차트 추가에 집중.",
+      "notes": "차트 라이브러리 추가 금지(Tailwind+순수 SVG/conic-gradient). 컴포넌트 자동 임포트라 <SalesPieChart> 직접 사용. 비중 합 100% 근사.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "1c54f524-c46f-4831-bf74-eb8e5639aad0"
+        }
+      ],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:10:23.308Z",
+      "relatedFiles": [
+        {
+          "path": "app/composables/useSalesChart.ts",
+          "type": "CREATE",
+          "description": "buildSalesSlices Top5+ETC"
+        },
+        {
+          "path": "app/components/SalesPieChart.vue",
+          "type": "CREATE",
+          "description": "파이차트 컴포넌트"
+        },
+        {
+          "path": "app/pages/admin/sales.vue",
+          "type": "TO_MODIFY",
+          "description": "by-store 호출+차트 추가"
+        }
+      ],
+      "implementationGuide": "composables/useSalesChart.ts: export function buildSalesSlices(rows:{storeId,storeName,amount}[]): {label,amount,percent,color}[] — amount 내림차순 정렬 가정, 상위5 그대로 + 6번째 이후 합산 'ETC', total로 percent 계산(소수1자리), color 팔레트 6색. SalesPieChart.vue: props slices; conic-gradient 배경으로 원형 + 범례(label·percent·금액). sales.vue: onMounted/watch로 $apiFetch GET /admin/sales/by-store → byStore.value; computed slices=buildSalesSlices(byStore); 템플릿에 <SalesPieChart :slices/> + 매장별 표. 기존 매장 단건 매출(storeId select+admin-sales-total)은 유지. data-testid: admin-sales-pie, admin-sales-slice-{label}.",
+      "verificationCriteria": "type-check 통과. /admin/sales에 상위5+ETC 파이차트·범례 렌더, 비중% 합 ~100%.",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "useSalesChart.ts(buildSalesSlices: 금액 0 제외·내림차순·상위5+나머지 ETC 합산·비중% 소수1자리·6색 팔레트)와 SalesPieChart.vue(외부 라이브러리 없이 누적 비중 conic-gradient 원형+범례)를 추가하고, sales.vue가 onMounted로 GET /api/admin/sales/by-store를 불러 computed slices로 원차트를 렌더하도록 했다. 기존 매장 단건 매출(select+admin-sales-total)은 유지. type-check 통과.",
+      "completedAt": "2026-06-23T11:10:23.306Z"
+    },
+    {
+      "id": "3b90d17c-bfd5-4083-908a-4ff36a1a215e",
+      "name": "V2.4-7 FE 후기 페이지 분리 + 네비 탭",
+      "description": "매출 페이지의 후기 영역을 /admin/reviews로 분리하고, AppNav에 관리자용 '매장 관리'·'후기' 탭을 추가한다. 후기는 기존 GET /api/admin/stores/{id}/reviews(S6) 재사용. sales.vue에서는 후기 영역 제거(매출 표+원차트만 잔존).",
+      "notes": "후기 신규 엔드포인트 없음(S6 재사용, 화면 이전만). sales.vue의 reviews ref/AdminReview interface/후기 템플릿 제거 확인.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e1080219-438c-430a-8f96-25b5f272b320"
+        },
+        {
+          "taskId": "cf1477b2-f72f-4442-9564-d8369c48c7f0"
+        }
+      ],
+      "createdAt": "2026-06-23T10:56:07.736Z",
+      "updatedAt": "2026-06-23T11:10:54.556Z",
+      "relatedFiles": [
+        {
+          "path": "app/pages/admin/reviews.vue",
+          "type": "CREATE",
+          "description": "후기 분리 페이지"
+        },
+        {
+          "path": "app/pages/admin/sales.vue",
+          "type": "TO_MODIFY",
+          "description": "후기 영역 제거"
+        },
+        {
+          "path": "app/components/AppNav.vue",
+          "type": "TO_MODIFY",
+          "description": "매장 관리·후기 탭 추가"
+        }
+      ],
+      "implementationGuide": "app/pages/admin/reviews.vue 신규: auth+role-guard ADMIN; 매장 select(getApprovedStores)→watch로 $apiFetch GET /admin/stores/{id}/reviews → 목록 렌더(기존 sales.vue 후기 마크업 이전). data-testid page-admin-reviews, nav-admin-reviews. sales.vue: 후기 관련 ref/로드/템플릿 제거(매출만 잔존), 제목 '매출 · 후기'→'매출'. AppNav.vue isAdmin 블록에 <NuxtLink to='/admin/stores' data-testid='nav-admin-stores'>매장 관리</NuxtLink>와 <NuxtLink to='/admin/reviews' data-testid='nav-admin-reviews'>후기</NuxtLink> 추가(매출 탭 옆).",
+      "verificationCriteria": "type-check 통과. /admin/reviews에서 매장별 후기 조회, sales.vue에 후기 영역 없음, 네비에 '매장 관리'·'후기' 탭 노출(ADMIN).",
+      "analysisResult": "ROADMAP_2 v2.4 신규 요구 3건(전체 관리자 ADMIN 페이지 보강)을 2차(Spring Boot REST + MyBatis + Nuxt) 코드에 구현한다. ① 관리자 매장 등록/수정/삭제 CRUD(`/api/admin/stores`, 기본 approved=false, 연관 데이터 존재 시 삭제 409 STORE_HAS_DEPENDENCIES), ② 매출 원차트(전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE 파이차트 Top5+ETC), ③ 매출 페이지의 후기 영역을 `/admin/reviews`로 분리 + 네비 \"후기\" 탭. 인가는 기존 SecurityConfig `/api/admin/**`→hasRole(ADMIN) 경로 인가로 이미 커버됨. 기존 패턴: 컨트롤러는 `/api/admin` 매핑·생성자 주입, MyBatis 매퍼 XML(map-underscore-to-camel-case), DTO는 record(`from()` 팩토리), FE 페이지는 `useNuxtApp().$apiFetch`로 보호 API 호출(managers.vue 패턴), 카탈로그는 catalogCache 동기 읽기. 데이터: data.sql의 8개 시드 매장은 모두 예약/베이/매니저 연관이 있어 삭제 시 409가 정상(삭제 성공 테스트는 POST로 생성한 무연관 매장으로 검증).",
+      "summary": "admin/reviews.vue를 신설(매장 select→기존 S6 GET /api/admin/stores/{id}/reviews 재사용, 신규 엔드포인트 없음)하고 sales.vue에서 후기 ref/interface/템플릿을 제거해 매출+원차트만 잔존시켰으며 제목을 '매출'로 변경했다. AppNav 관리자 블록에 '매장 관리'(nav-admin-stores)·'후기'(nav-admin-reviews) 탭을 추가했다. type-check·eslint 통과, e2e 단정 충돌 없음.",
+      "completedAt": "2026-06-23T11:10:54.552Z"
     }
   ]
 }

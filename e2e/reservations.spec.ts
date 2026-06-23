@@ -11,14 +11,15 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/reserve$/)
 }
 
-// 1페이지(강남점→이매니저→소형→외부세차) 선택 후 다음 → /reserve/slot
+// 1페이지(소형→강남점→이매니저→외부세차) 선택 후 다음 → /reserve/slot
+//   순서 변경(v2.4): 차종 → 매장 → 매니저 → 서비스
 async function step1(page: Page) {
+  await page.getByTestId('cartype-select-input').click()
+  await page.getByTestId('cartype-select-option').filter({ hasText: '소형' }).click()
   await page.getByTestId('store-select-input').click()
   await page.getByTestId('store-select-option').filter({ hasText: '강남점' }).click()
   await page.getByTestId('manager-select-input').click()
   await page.getByTestId('manager-select-option').filter({ hasText: '이매니저' }).click()
-  await page.getByTestId('cartype-select-input').click()
-  await page.getByTestId('cartype-select-option').filter({ hasText: '소형' }).click()
   await page.getByTestId('service-select-input').click()
   await page.getByTestId('service-select-option').filter({ hasText: '외부세차' }).click()
   await page.getByTestId('reserve-next').click()

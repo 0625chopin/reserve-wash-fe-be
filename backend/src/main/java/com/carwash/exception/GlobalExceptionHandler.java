@@ -43,6 +43,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("SLOT_CONFLICT", "선택하신 슬롯이 방금 예약되었습니다."));
     }
 
+    // 매장 삭제 무결성(v2.4) — 연관 데이터(예약/후기/매니저/슬롯) 존재 시 409
+    @ExceptionHandler(StoreHasDependenciesException.class)
+    public ResponseEntity<ErrorResponse> handleStoreHasDependencies(StoreHasDependenciesException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("STORE_HAS_DEPENDENCIES", e.getMessage()));
+    }
+
     // 불가능한 상태 전이(도메인 가드) — 409. 예: COMPLETED 예약 재취소 (require 11.3)
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleInvalidTransition(IllegalStateException e) {

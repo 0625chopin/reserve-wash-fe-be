@@ -22,6 +22,9 @@ public interface UserMapper {
     // 가입 승인 상태 갱신 (M7/S3, require v1.7 §4.4)
     int updateApprovalStatus(@Param("id") String id, @Param("approvalStatus") String approvalStatus);
 
+    // 매니저 가입 최종 승인 시 manager 엔티티 연결(v2.4) — users.manager_id 세팅
+    int updateManagerId(@Param("id") String id, @Param("managerId") String managerId);
+
     // 가입 승인 대기 목록 조회(1차 PENDING_APPROVAL_L1 / 2차 PENDING_APPROVAL_L2)
     List<User> findByApprovalStatus(@Param("approvalStatus") String approvalStatus);
 

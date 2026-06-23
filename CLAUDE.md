@@ -71,9 +71,12 @@ E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 
 - `nuxt.config.ts` — Nuxt 설정(모듈/CSS/별칭/runtimeConfig). 진입점 부트스트랩은 Nuxt가 담당하므로 별도 `main.ts`는 없음.
 - `app/app.vue` — 루트 컴포넌트(`<NuxtPage />` 포함). 레이아웃은 `app/layouts/default.vue`.
 - `app/pages/` — **파일 기반 라우트**. FO: `login`·`signup`·`reserve/`(3단계 위저드: index→slot→done)·`reservations`·`review/[reservationId]`. BO: `admin/`·`manager/`·`store-admin/` 하위(역할별 로그인·승인·관리·매출 등). 동적 라우트는 `[param].vue`.
+  - **예약 위저드 1페이지(`reserve/index.vue`) 선택 순서**(v2.4): **차종 → 매장 → 매니저 → 서비스**. 차종을 먼저 골라야 그 차종을 수용하는 베이가 있는 매장만 노출된다(`getStoresForCar`). 특대형(`VAN_ETC`→`XLARGE`)은 XLARGE 베이 보유 매장만 노출. 차종 변경 시 매장·매니저 선택이 cascade 초기화(`reservationDraft` watch).
+  - **관리자(ADMIN) BO 신규 화면**(v2.4): `admin/stores/`(목록·삭제 `index`·등록 `new`·수정 `[id]`)·`admin/reviews`(후기, 매출 페이지에서 분리). 매출 페이지 `admin/sales`에 매장별 매출 비중 원차트(상위 5 + ETC) 추가. 관리자 네비(`AppNav`)에 "매장 관리"·"후기" 탭.
 - `app/middleware/` — 라우트 가드(`defineNuxtRouteMiddleware`): `auth`(인증)·`guest`(비로그인 전용)·`role-guard`(역할 인가)·`reservation-wizard-guard`·`reservation-fresh-entry`·`review-guard`.
 - `app/stores/` — Pinia 스토어(자동 임포트, **setup 문법** `defineStore('id', () => {...})`): `auth`·`reservation`·`reservationDraft`·`review`.
-- `app/services/` — **데이터 접근 추상화 계층**(`storeService`·`priceService`·`reservationService`·`catalogCache`). 단방향 의존(services → catalogCache·data·types). 2차에서 더미 직접 import를 서버 하이드레이트 캐시 동기 읽기로 교체하되 **시그니처를 유지**해 컴포넌트·스토어 무변경(additive)을 지향함 — 새 데이터 소스 연동 시 이 패턴을 따를 것.
+- `app/services/` — **데이터 접근 추상화 계층**(`storeService`·`priceService`·`reservationService`·`catalogCache`·`adminStoreService`). 단방향 의존(services → catalogCache·data·types). 2차에서 더미 직접 import를 서버 하이드레이트 캐시 동기 읽기로 교체하되 **시그니처를 유지**해 컴포넌트·스토어 무변경(additive)을 지향함 — 새 데이터 소스 연동 시 이 패턴을 따를 것.
+  - `adminStoreService`(관리자 매장 CRUD `$apiFetch` 래퍼)는 mutation 성공 직후 `catalogCache.reloadCatalog()`(컨텍스트 보존 위해 `nuxtApp.runWithContext`로 감쌈)로 카탈로그를 재하이드레이트한다. `catalogCache`는 `loadCatalog`/`reloadCatalog`가 **배열을 재할당하지 않고 splice로 제자리 교체** → 컴포넌트가 setup에서 캡처한 배열 참조가 반응형으로 갱신되어, 매장/매니저 변경이 **전체 새로고침 없이** 반영된다.
 - `app/plugins/` — `catalog`(부팅 시 카탈로그 하이드레이트)·`auth-fetch`(JWT 주입 `$apiFetch` 제공).
 - `app/components/` — 재사용 컴포넌트(자동 임포트, `icons/` 하위 포함).
 - `app/composables/` — 재사용 로직(자동 임포트, `useSlots`·`useToast` 등).
@@ -84,7 +87,7 @@ E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 
 
 표준 레이어드 아키텍처(`controller` → `service` → `mapper`):
 
-- `controller/` — REST 엔드포인트(`/api/**`). 역할/도메인별로 다수 분리(`AuthController`·`ReservationController`·`Admin*Controller`·`Manager*Controller`·`StoreAdmin*Controller` 등).
+- `controller/` — REST 엔드포인트(`/api/**`). 역할/도메인별로 다수 분리(`AuthController`·`ReservationController`·`Admin*Controller`(매장 CRUD `AdminStoreController` 포함)·`Manager*Controller`·`StoreAdmin*Controller`·`SalesController` 등).
 - `service/` — 비즈니스 로직(예약 동시성·슬롯 점유·승인 워크플로 등).
 - `mapper/` — MyBatis 매퍼 **인터페이스**. SQL은 `resources/mapper/*.xml`에 분리. `map-underscore-to-camel-case=true`로 snake_case 컬럼 ↔ camelCase 매핑.
 - `domain/` + `domain/enums/` — 가변 도메인 POJO(Lombok), enum. `dto/` — 요청/응답(Java `record`).
@@ -98,6 +101,29 @@ E2E 테스트는 **Playwright**로 수행 (`playwright.config.ts`, 테스트는 
 - 무인증 허용: `/api/auth/**`·`/api/health`·카탈로그 조회(`/api/stores`·`/api/managers`·`/api/bays`·`/api/prices`·`/api/slots`)·`/h2-console/**`.
 - 역할 인가(구체적 매처를 `anyRequest` 앞에 배치): `/api/store-admin/**`→`STORE_ADMIN`, `/api/manager/**`→`MANAGER`·`STORE_ADMIN`, `/api/admin/**`→`ADMIN`, 그 외 인증 필요. 미인증→**401**, 권한부족→403.
 - CORS는 SecurityConfig의 `corsConfigurationSource` 단일 소스에서 FE(`http://localhost:3000`)만 허용(credentials 포함).
+
+### 이메일 인증 가입 (create-after-verify)
+
+회원가입은 **인증 성공 시에만 `users`로 승격**하는 2단계 플로우다(미인증 반쪽 계정 방지). 진행 중 가입 정보는 `users`가 아닌 **`verification` 테이블**에 임시 보관된다.
+
+- 흐름: `POST /api/auth/signup/request`(가입정보+6자리 코드 발급·메일 발송, **이메일당 1건** delete→insert) → `POST /api/auth/signup/verify`(코드 일치+미만료+시도 5회 이내 검증) → USER는 토큰 발급(자동 로그인)·MANAGER는 `PENDING_APPROVAL_L1`(승인 대기). 코드는 3분 TTL, `resend`로 갱신.
+- `verification` 테이블: `email`(PK) 기준 단일 행. `password_hash`(원문 미보관)·`role`·`name`·`store_id`·`expires_at`(epoch millis)·`attempts` 보관. **`method` 컬럼**(`VerificationMethod`: `EMAIL`/`SNS`)으로 인증 방법을 구분 — 현재는 `EMAIL` 단일이나 방법 확장 대비. 도메인/매퍼/서비스의 Java 식별자는 역사적 이유로 `EmailVerification*`이지만 **물리 테이블명은 `verification`**.
+- 개발 백도어: `GET /api/auth/signup/dev-code?email=`로 대기 중인 코드를 조회(메일 없이 E2E 검증). `app.signup.dev-code-peek`(기본 true, 운영 false)로 차단.
+
+### 관리자(ADMIN) BO — 매장 CRUD·매출 비중·후기·매니저 엔티티 (v2.4)
+
+- **매장 CRUD**: `GET/POST/PUT/DELETE /api/admin/stores`(`AdminStoreController`·`AdminStoreService`). `GET`은 승인/미승인 **전체** 반환(FO `GET /api/stores`는 승인 매장만). **🔒 신규 등록 매장 기본 `approved=false`**(미승인 — 베이/매니저 구성 후 별도 토글로 승인). **🔒 삭제 무결성**: 예약·후기·매니저·슬롯 연관 데이터가 있으면 **409 `STORE_HAS_DEPENDENCIES`**(`StoreHasDependenciesException`→`GlobalExceptionHandler`)로 차단(소프트 비활성 미채택). 베이(`bay`)는 매장 구성요소라 매장과 함께 생성/교체/삭제(삭제 의존성 제외). 매장/베이/예약/후기/매니저/슬롯 매퍼에 `countByStore` 추가.
+- **매출 비중**: `GET /api/admin/sales/by-store`(`SalesService.salesByStore`) — 매장별 COMPLETED 금액 합산, 내림차순. 상위 5 + ETC·비중(%) 가공은 FE `useSalesChart.buildSalesSlices`가 수행하고 `SalesPieChart.vue`(외부 차트 라이브러리 없이 conic-gradient)로 렌더. 기존 매장 단건 매출 `GET /api/admin/stores/{id}/sales`(S8)는 유지.
+- **후기 분리**: 기존 `GET /api/admin/stores/{id}/reviews`(S6) **재사용**, 신규 엔드포인트 없이 화면만 `admin/sales`→`admin/reviews`로 이전.
+- **매니저 엔티티 자동 생성**: "매니저 등록"(`POST /api/admin/managers`)은 `users`(로그인 계정)만 만든다. 예약 매니저 드롭다운은 **`manager` 테이블**(`GET /api/managers`)에서 오므로, **최종 승인**(`SignupApprovalService.confirmL2`, `PENDING_APPROVAL_L2`→`ACTIVE`) 시 `role=MANAGER`이면 `manager` 엔티티를 생성하고 `users.manager_id`로 연결한다(`ManagerMapper.insert`·`UserMapper.updateManagerId`). `STORE_ADMIN`·소속 매장(`store_id`) 없음·이미 연결됨은 미생성. FE 가입 최종 승인 화면은 승인 후 `reloadCatalog()`로 드롭다운에 즉시 반영.
+
+### 알림·SMTP (Phase 9)
+
+`NotificationService`가 발송 정책(수신자·본문·이력)을 결정하고, 실제 dispatch만 `EmailSender`(`SmtpEmailSender`, `@Async("mailTaskExecutor")` — `AsyncConfig`의 전용 풀)에 위임한다.
+
+- **수신자는 호출자 트랜잭션 내에서 동기로 해석**(비동기 스레드의 커밋 전 재조회 회피), 발송은 비동기라 **실패해도 도메인 트랜잭션(가입/예약/결재)에 전파되지 않는다**. 발송 예외는 메일 스레드에 격리되어 로그로만 남는다.
+- 발송 이력은 `notification_log`에 기록: 수신자 있으면 `QUEUED`, 없으면 `SKIPPED`. **발송 후 SENT/FAILED 갱신은 없음** — 실제 전송 성패는 메일 스레드 예외 유무로 판단.
+- SMTP 설정은 `application.yml`의 `spring.mail`이 `${MAIL_*}` 자리표시자를 읽고, 값은 **`backend/.env`**(properties 형식, `spring.config.import: optional:file:.env[.properties]`)에서 주입. `.env`는 **상대경로**라 BE를 반드시 `backend/`에서 실행해야 로딩된다(`.gitignore` 제외, 템플릿은 `.env.example`). 기본값은 외부 의존 없는 로컬 캐처(MailHog/Mailpit `localhost:1025`), 실 발송은 Gmail SMTP(587·STARTTLS·앱 비밀번호).
 
 ## FE ↔ BE 연동
 

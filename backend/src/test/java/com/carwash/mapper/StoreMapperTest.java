@@ -16,18 +16,21 @@ class StoreMapperTest {
     private StoreMapper storeMapper;
 
     @Test
-    void findApproved_미승인_매장은_제외한다() {
-        // store3(판교점)은 approved=false → 노출 제외 (require 6.1)
+    void findApproved_전_매장_승인_완료() {
+        // 전 매장 approved=true → 8개 모두 노출 (require 6.1)
         List<Store> approved = storeMapper.findApproved();
 
-        assertThat(approved).hasSize(2);
+        assertThat(approved).hasSize(8);
         assertThat(approved).allMatch(Store::isApproved);
-        assertThat(approved).extracting(Store::getId).containsExactlyInAnyOrder("store1", "store2");
+        assertThat(approved).extracting(Store::getId)
+                .containsExactlyInAnyOrder(
+                        "store1", "store2", "store3", "store4", "store5", "store6", "store7", "store8");
     }
 
     @Test
-    void findAll_전체_3매장() {
-        assertThat(storeMapper.findAll()).hasSize(3);
+    void findAll_전체_8매장() {
+        // 원본 3 + 확장 볼륨 시드 5(store4~store8)
+        assertThat(storeMapper.findAll()).hasSize(8);
     }
 
     @Test

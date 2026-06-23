@@ -16,4 +16,19 @@
     <select id="findById" resultType="com.carwash.domain.Store">
         SELECT id, name, bay_count, approved FROM store WHERE id = #{id}
     </select>
+
+    <!-- 관리자 매장 CRUD (v2.4) — boolean은 H2/MySQL TRUE/FALSE로 바인딩 -->
+    <insert id="insert">
+        INSERT INTO store (id, name, bay_count, approved)
+        VALUES (#{id}, #{name}, #{bayCount}, #{approved})
+    </insert>
+
+    <update id="update">
+        UPDATE store SET name = #{name}, bay_count = #{bayCount}, approved = #{approved}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM store WHERE id = #{id}
+    </delete>
 </mapper>

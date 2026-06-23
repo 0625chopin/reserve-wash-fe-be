@@ -29,6 +29,11 @@
         WHERE store_id = #{storeId} ORDER BY `date`, time_slot
     </select>
 
+    <!-- 매장 삭제 무결성(v2.4) — 매장 귀속 예약 수 -->
+    <select id="countByStore" resultType="int">
+        SELECT COUNT(*) FROM reservation WHERE store_id = #{storeId}
+    </select>
+
     <!-- id는 앱이 부여(문자열). enum은 기본 EnumTypeHandler(name) 매핑 -->
     <insert id="insert">
         INSERT INTO reservation

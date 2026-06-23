@@ -76,6 +76,9 @@ function onLogout() {
           </NuxtLink>
         </template>
         <template v-if="isAdmin">
+          <NuxtLink data-testid="nav-admin-stores" to="/admin/stores" class="nav-link">
+            매장 관리
+          </NuxtLink>
           <NuxtLink data-testid="nav-admin-managers" to="/admin/managers" class="nav-link">
             매니저 등록
           </NuxtLink>
@@ -88,6 +91,9 @@ function onLogout() {
           </NuxtLink>
           <NuxtLink data-testid="nav-admin-sales" to="/admin/sales" class="nav-link">
             매출
+          </NuxtLink>
+          <NuxtLink data-testid="nav-admin-reviews" to="/admin/reviews" class="nav-link">
+            후기
           </NuxtLink>
         </template>
 

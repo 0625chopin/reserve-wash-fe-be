@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class EmailVerification {
 
     private String email;          // 인증 대상(가입 예정 이메일)
+    private String method;         // 인증 방법(VerificationMethod name): EMAIL / SNS …
     private String code;           // 6자리 숫자 코드
     private String role;           // 가입 역할(UserRole name): USER / MANAGER
     private String name;
@@ -22,9 +23,10 @@ public class EmailVerification {
 
     @Builder
     public EmailVerification(
-            String email, String code, String role, String name,
+            String email, String method, String code, String role, String name,
             String passwordHash, String storeId, Long expiresAt, Integer attempts) {
         this.email = email;
+        this.method = method;
         this.code = code;
         this.role = role;
         this.name = name;

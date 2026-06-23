@@ -1,11 +1,12 @@
 <script setup lang="ts">
-// 예약 위저드 1페이지 — 매장 → 매니저 → 차종 → 서비스 (가격 자동 표시) → 다음
+// 예약 위저드 1페이지 — 차종 → 매장 → 매니저 → 서비스 (가격 자동 표시) → 다음
+//   차종을 먼저 고르면, 그 차종을 수용하는 베이가 있는 매장만 노출한다(특대형은 XLARGE 베이 보유 매장만).
 import { computed } from 'vue'
 import {
-  getApprovedStores,
   getCarTypes,
   getManagersByStore,
   getServiceTypes,
+  getStoresForCar,
 } from '~/services/storeService'
 
 definePageMeta({ middleware: ['auth', 'reservation-fresh-entry'] })
@@ -14,10 +15,11 @@ definePageMeta({ middleware: ['auth', 'reservation-fresh-entry'] })
 const draft = useReservationDraftStore()
 
 // 카탈로그 (services 경유)
-const approvedStores = getApprovedStores()
 const carTypeOptions = getCarTypes()
 const serviceTypeOptions = getServiceTypes()
 
+// 선택 차종을 수용하는 매장만 노출 (특대형 → XLARGE 베이 보유 매장만)
+const storesForCar = computed(() => (draft.carType ? getStoresForCar(draft.carType) : []))
 // 선택 매장의 매니저만 노출 (require 6.3)
 const storeManagers = computed(() => (draft.storeId ? getManagersByStore(draft.storeId) : []))
 
@@ -33,23 +35,43 @@ function onNext() {
       <span class="badge-accent mb-2">세차 예약 · 1/3</span>
       <h1 class="text-2xl font-bold">무엇을 예약할까요?</h1>
       <p class="mt-1 text-sm text-[--color-content-muted]">
-        매장 · 매니저 · 차종 · 서비스를 선택하면 다음 단계로 넘어가요.
+        차종 · 매장 · 매니저 · 서비스를 선택하면 다음 단계로 넘어가요.
       </p>
     </header>
 
     <!-- 단계형 폼 카드 -->
     <div class="card space-y-3 p-5 sm:p-6">
-      <!-- 매장 -->
+      <!-- 차종 (최상단) -->
       <div>
+        <span class="field-label">차종 선택</span>
+        <SearchableSelect
+          v-model="draft.carType"
+          testid="cartype-select"
+          :options="carTypeOptions"
+          label-key="name"
+          value-key="code"
+          placeholder="차종 검색 (예: 소형)"
+        />
+      </div>
+
+      <!-- 매장 (차종 선택 시 노출) — 그 차종을 수용하는 매장만 -->
+      <div v-if="draft.carType">
         <span class="field-label">매장 선택</span>
         <SearchableSelect
           v-model="draft.storeId"
           testid="store-select"
-          :options="approvedStores"
+          :options="storesForCar"
           label-key="name"
           value-key="id"
           placeholder="매장 검색"
         />
+        <p
+          v-if="storesForCar.length === 0"
+          data-testid="store-empty-for-car"
+          class="mt-2 text-xs font-medium text-[--color-brand-accent]"
+        >
+          선택하신 차종을 수용할 수 있는 매장이 없어요. 다른 차종을 선택해 주세요.
+        </p>
       </div>
 
       <!-- 매니저 (매장 선택 시 노출) -->
@@ -65,21 +87,8 @@ function onNext() {
         />
       </div>
 
-      <!-- 차종 (매장 선택 시 노출) -->
+      <!-- 서비스 (매장 선택 시 노출) — 차종 × 서비스로 가격 산출 (require 10.2/10.3) -->
       <div v-if="draft.storeId">
-        <span class="field-label">차종 선택</span>
-        <SearchableSelect
-          v-model="draft.carType"
-          testid="cartype-select"
-          :options="carTypeOptions"
-          label-key="name"
-          value-key="code"
-          placeholder="차종 검색 (예: 소형)"
-        />
-      </div>
-
-      <!-- 서비스 (차종 선택 시 노출) — 차종 × 서비스로 가격 산출 (require 10.2/10.3) -->
-      <div v-if="draft.storeId && draft.carType">
         <span class="field-label">서비스 선택</span>
         <SearchableSelect
           v-model="draft.serviceType"
@@ -122,7 +131,7 @@ function onNext() {
           v-if="!draft.canProceedToSlot"
           class="mt-2 text-center text-xs text-[--color-content-muted]"
         >
-          매장 · 매니저 · 차종 · 서비스를 모두 선택해 주세요.
+          차종 · 매장 · 매니저 · 서비스를 모두 선택해 주세요.
         </p>
       </div>
     </div>

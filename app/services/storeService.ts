@@ -17,6 +17,21 @@ export function getApprovedStores(): Store[] {
   return catalogStores()
 }
 
+// 선택 차종을 수용하는 베이가 하나라도 있는 (승인) 매장만 반환.
+//   예약 위저드에서 '차종 → 매장' 순서로 바뀌며, 차종 선택 후 그 차를 받을 수 있는 매장만 노출한다.
+//   특히 특대형(VAN_ETC→XLARGE)은 XLARGE 베이 보유 매장만 노출(require Q5/Q8: 수용 베이 없으면 미노출).
+export function getStoresForCar(carType: CarType): Store[] {
+  const car = carTypes.find((c) => c.code === carType)
+  if (!car) return []
+  const min = SIZE_RANK[car.size]
+  const fitStoreIds = new Set(
+    catalogBays()
+      .filter((b) => SIZE_RANK[b.size] >= min)
+      .map((b) => b.storeId),
+  )
+  return catalogStores().filter((s) => fitStoreIds.has(s.id))
+}
+
 // 특정 매장의 매니저만 반환 (require 6.3 매니저 선택)
 export function getManagersByStore(storeId: string): Manager[] {
   return catalogManagers().filter((m) => m.storeId === storeId)

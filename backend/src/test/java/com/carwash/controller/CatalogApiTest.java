@@ -1,9 +1,12 @@
 package com.carwash.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,32 +21,47 @@ class CatalogApiTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Test
-    void stores_승인_매장만_2건() throws Exception {
-        // store3(판교점) approved=false 제외 (require 6.1)
+    void stores_전_매장_승인_8건() throws Exception {
+        // 전 매장 approved=true → 8개 모두 노출 (require 6.1)
         mvc.perform(get("/api/stores"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$.length()").value(8))
                 .andExpect(jsonPath("$[0].bayCount").isNumber());
     }
 
     @Test
     void managers_dayoffs_포함_isStoreAdmin_키_고정() throws Exception {
-        // findAll ORDER BY id → 첫 매니저 mgr1(isStoreAdmin=true, dayoffs 3건)
-        mvc.perform(get("/api/managers"))
+        // mgr1(isStoreAdmin=true, dayoffs 3건)을 id로 찾아 검증한다.
+        //   ⚠ 전역 H2를 공유하는 통합테스트라 매니저 가입 최종 승인(v2.4)으로 런타임 manager 엔티티가
+        //      추가될 수 있어, 개수(==12)·첫 요소($[0]) 고정 대신 mgr1을 파싱해 견고하게 단정한다.
+        String json = mvc.perform(get("/api/managers"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].id").value("mgr1"))
-                .andExpect(jsonPath("$[0].isStoreAdmin").value(true)) // 키가 storeAdmin이면 실패 → @JsonProperty 검증
-                .andExpect(jsonPath("$[0].dayoffs.length()").value(3))
-                .andExpect(jsonPath("$[0].dayoffs[0].type").exists());
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode arr = objectMapper.readTree(json);
+        JsonNode mgr1 = null;
+        for (JsonNode n : arr) {
+            if ("mgr1".equals(n.get("id").asText())) {
+                mgr1 = n;
+                break;
+            }
+        }
+        assertThat(mgr1).as("시드 mgr1 존재").isNotNull();
+        assertThat(mgr1.has("isStoreAdmin")).as("@JsonProperty 키(storeAdmin 아님)").isTrue();
+        assertThat(mgr1.get("isStoreAdmin").asBoolean()).isTrue();
+        assertThat(mgr1.get("dayoffs").size()).isEqualTo(3);
+        assertThat(mgr1.get("dayoffs").get(0).get("type").asText()).isNotBlank();
     }
 
     @Test
-    void bays_전체_9건_XLARGE_포함() throws Exception {
+    void bays_전체_25건_XLARGE_포함() throws Exception {
         mvc.perform(get("/api/bays"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(9))
+                .andExpect(jsonPath("$.length()").value(25))
                 .andExpect(jsonPath("$[?(@.size=='XLARGE')]").exists());
     }
 

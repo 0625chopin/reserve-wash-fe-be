@@ -34,4 +34,7 @@ public interface SlotMapper {
     int updateStatusWithVersion(@Param("id") Long id,
                                 @Param("status") String status,
                                 @Param("version") Long version);
+
+    // 매장 삭제 무결성(v2.4) — 매장 귀속 슬롯 수
+    int countByStore(@Param("storeId") String storeId);
 }

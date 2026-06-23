@@ -15,4 +15,18 @@
     <select id="findById" resultType="com.carwash.domain.Bay">
         SELECT id, store_id, code, size FROM bay WHERE id = #{id}
     </select>
+
+    <!-- 관리자 매장 CRUD (v2.4) — size enum은 기본 핸들러(name) 바인딩 -->
+    <insert id="insert">
+        INSERT INTO bay (id, store_id, code, size)
+        VALUES (#{id}, #{storeId}, #{code}, #{size})
+    </insert>
+
+    <delete id="deleteByStore">
+        DELETE FROM bay WHERE store_id = #{storeId}
+    </delete>
+
+    <select id="countByStore" resultType="int">
+        SELECT COUNT(*) FROM bay WHERE store_id = #{storeId}
+    </select>
 </mapper>

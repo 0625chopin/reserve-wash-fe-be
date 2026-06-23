@@ -57,12 +57,29 @@ export async function loadCatalog(): Promise<void> {
       $fetch<Bay[]>(`${base}/bays`),
       $fetch<Price[]>(`${base}/prices`),
     ])
-    stores.value = s
-    managers.value = m
-    bays.value = b
-    prices.value = p
+    // ⚠ 재할당(stores.value = s)이 아니라 제자리(splice) 교체.
+    //   getApprovedStores() 등은 이 배열 '참조'를 컴포넌트 setup에서 캡처하므로, 재할당하면 캐시 갱신이
+    //   이미 마운트된 화면에 반영되지 않는다. 같은 반응형 배열을 in-place로 갈아끼우면 reloadCatalog 시
+    //   전체 새로고침 없이도 열려 있는 화면이 즉시 갱신된다.
+    replaceInPlace(stores.value, s)
+    replaceInPlace(managers.value, m)
+    replaceInPlace(bays.value, b)
+    replaceInPlace(prices.value, p)
     loaded.value = true
   } catch (e) {
     console.warn('[catalog] 카탈로그 로드 실패 — 백엔드(:8080) 기동 여부를 확인하세요', e)
   }
+}
+
+// 반응형 배열을 참조 유지한 채 내용만 교체(splice) — 캡처된 참조의 반응성 보존
+function replaceInPlace<T>(target: T[], next: T[]): void {
+  target.splice(0, target.length, ...next)
+}
+
+// 카탈로그 강제 재하이드레이트 — 관리자 매장 CRUD(adminStoreService) 등 카탈로그를 바꾸는 작업 직후 호출.
+//   loaded 가드를 해제하고 4 엔드포인트를 다시 fetch(제자리 교체)하여, 전체 새로고침 없이도 신규/수정/삭제
+//   매장이 이미 열린 화면(예약 위저드·BO 매장 select 등)에까지 반영되게 한다.
+export async function reloadCatalog(): Promise<void> {
+  loadedState().value = false
+  await loadCatalog()
 }

@@ -43,4 +43,15 @@
         WHERE m.id = #{id}
         ORDER BY md.`date`
     </select>
+
+    <!-- 매장 삭제 무결성(v2.4) — 매장 귀속 매니저 수 -->
+    <select id="countByStore" resultType="int">
+        SELECT COUNT(*) FROM manager WHERE store_id = #{storeId}
+    </select>
+
+    <!-- 매니저 가입 최종 승인 시 manager 엔티티 생성(v2.4) -->
+    <insert id="insert">
+        INSERT INTO manager (id, store_id, name, is_store_admin)
+        VALUES (#{id}, #{storeId}, #{name}, #{isStoreAdmin})
+    </insert>
 </mapper>

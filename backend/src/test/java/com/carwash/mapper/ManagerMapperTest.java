@@ -42,10 +42,10 @@ class ManagerMapperTest {
     }
 
     @Test
-    void findAll_전체_매니저_4명_dayoffs_조립() {
+    void findAll_전체_매니저_12명_dayoffs_조립() {
         List<Manager> all = managerMapper.findAll();
 
-        assertThat(all).hasSize(4);   // mgr1~4
+        assertThat(all).hasSize(12);   // 원본 mgr1~4 + 확장 볼륨 시드 mgr5~12
         Manager mgr1 = all.stream().filter(m -> m.getId().equals("mgr1")).findFirst().orElseThrow();
         assertThat(mgr1.getDayoffs()).hasSize(3);   // collection 조립 유지
     }

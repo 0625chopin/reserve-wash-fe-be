@@ -101,11 +101,14 @@ export const useReservationDraftStore = defineStore('reservationDraft', () => {
   }
 
   // NFR-1 cascade — 선행 단계 변경 시 후속 선택 초기화
+  // 선택 순서: 차종 → 매장 → 매니저 → 서비스 (차종이 매장 노출을 좌우하므로 최상단)
   watch(storeId, () => {
     managerId.value = null
     bayId.value = null
   })
   watch(carType, () => {
+    // 차종 변경 시 매장 노출 집합이 바뀌므로 매장(및 매니저·베이)을 초기화한다.
+    storeId.value = null
     bayId.value = null
     releaseHeld()
   })

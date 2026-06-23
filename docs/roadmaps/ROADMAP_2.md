@@ -1,8 +1,16 @@
 # 자동차 세차 예약 서비스 (MVP) 개발 로드맵 — 2차 백엔드 진화(Spring Boot) + BO 전체
 
-> **문서 버전**: v2.3 (require_v1.md **v1.15** 정합 — 4역할·가입 2단계 승인·휴가/반차 1단계 승인·역할별 BO 페이지 분리 + v1.11~v1.15: 예약 목록 역할 분기·`users.manager_id`·관리자 매니저 직접 등록·가입 승인 상세 모달·휴무 WheelPicker·매장 휴일 영역 제거)
-> **작성일**: 2026-06-20 (최종 수정: 2026-06-21)
+> **문서 버전**: v2.5 (require_v1.md **v1.15** 정합 — 4역할·가입 2단계 승인·휴가/반차 1단계 승인·역할별 BO 페이지 분리 + v1.11~v1.15: 예약 목록 역할 분기·`users.manager_id`·관리자 매니저 직접 등록·가입 승인 상세 모달·휴무 WheelPicker·매장 휴일 영역 제거 + v2.4 신규 요구 3건: 관리자 매장 CRUD·매출 원차트(Top5+ETC)·후기 페이지 분리 + **v2.5: 예약 위저드 순서 변경·매니저 엔티티 자동 생성·카탈로그 자동 갱신·볼륨 시드 확장**)
+> **작성일**: 2026-06-20 (최종 수정: 2026-06-23)
 > **작성자**: PM/PL
+>
+> **🔄 v2.5 변경(v2.4 구현 중 도출된 후속 보강 — 2026-06-23 구현 완료)**:
+> - **예약 위저드 선택 순서 변경**(`reserve/index.vue`): 기존 `매장 → 매니저 → 차종 → 서비스` → **`차종 → 매장 → 매니저 → 서비스`**. 차종을 먼저 골라야 그 차종을 **수용하는 베이가 있는 매장만 노출**(`getStoresForCar` 신설). 특히 **특대형(`VAN_ETC`→`XLARGE`)은 XLARGE 베이 보유 매장만 노출**(require Q5/Q8 — 수용 베이 없으면 미노출). 차종 변경 시 매장·매니저 cascade 초기화(`reservationDraft` watch). e2e(`reserve.spec.ts`)에 특대형 필터 검증 추가.
+> - **매니저 엔티티 자동 생성**(예약 배정 노출 결함 해소): 예약 매니저 목록(`GET /api/managers`)은 **`manager` 테이블**에서 오는데 "매니저 등록"(`POST /api/admin/managers`)은 `users`(로그인 계정)만 생성해 등록 매니저가 예약에 안 보이던 문제 → **최종 승인(`confirmL2`, `PENDING_APPROVAL_L2`→`ACTIVE`)** 시 `role=MANAGER`이면 `manager` 엔티티 생성 + `users.manager_id` 연결(`ManagerMapper.insert`·`UserMapper.updateManagerId` 신설). `STORE_ADMIN`·`store_id` 없음은 미생성.
+> - **카탈로그 자동 갱신**(`catalogCache.reloadCatalog`): 매장 CRUD·매니저 최종 승인 직후 카탈로그를 재하이드레이트. `loadCatalog`/`reloadCatalog`가 배열을 재할당이 아닌 **splice 제자리 교체**로 갱신하여, setup에서 캡처한 배열 참조가 반응형으로 갱신 → **전체 새로고침 없이** 신규/수정/삭제 매장·매니저가 예약 화면·BO select에 반영.
+> - **볼륨 시드 확장**(`data.sql`): 매장 8개(전 매장 `approved=true`)·매니저 12명·고객 20명·예약/후기/슬롯/휴무 대량 추가로 BO/FO 화면을 풍부하게 검증. 매퍼/카탈로그 테스트의 개수 단정을 신규 총계로 갱신(전역 H2 공유 통합테스트의 런타임 매니저 증가에 견고하게 단정).
+>
+> **🔄 v2.4 변경(신규 요구 3건 — 관리자 페이지 보강)**: 전체 관리자(ADMIN)용 신규 기능 3건을 기존 Phase에 additive로 끼워 넣었습니다 — ① **관리자 매장 등록/수정/삭제(CRUD)**: `store` 테이블 대상 `POST/PUT/DELETE /api/admin/stores` + MyBatis 매퍼 + BO 화면(`/admin/stores`), 베이(`bay`) 구성·승인 상태(`approved`) 관리 포함 → **Phase 6**(BO 매장 관리, 기존 S4·S5 admin 매장 엔드포인트와 같은 `/api/admin/**` 네임스페이스에 정합). **🔒 운영 정책 확정**: 신규 등록 매장 기본 `approved=false`(미승인 생성), 연관 데이터(예약/후기/베이/슬롯/매니저) 있는 매장 삭제는 **409 Conflict(`STORE_HAS_DEPENDENCIES`)로 차단**(소프트 비활성 미채택). ② **매출 원형(파이) 차트**: 매출 페이지에 상위 5개 매장 매장별 매출 비중(%) + 나머지 합산 "ETC" 표시 → **Phase 8**(기존 S8 매출 집계 `/api/admin/stores/{id}/sales` 확장 — 전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` 추가). ③ **매출 페이지의 후기 영역을 별도 페이지로 분리** + 상단 네비 "후기" 탭 추가 → **Phase 8**(기존 후기 확인 `/api/admin/stores/{id}/reviews` 재사용, `/admin/sales.vue`에서 후기 영역을 `/admin/reviews.vue`로 이전). 역할 인가는 **ADMIN 한정**(`/api/admin/**` → `hasRole(ADMIN)`, Phase 6 경로 기반 인가 방식 일관). 1차([ROADMAP_1.md](./ROADMAP_1.md)) Phase 9에서 더미로 선구현한 동일 3건을 서버로 교체하는 회수 지점입니다.
 >
 > **🔄 v2.2 변경(require v1.7 정합 — 결재 단계 수 재정립)**: require_v1.md가 **v1.7**로 갱신되어, v1.6의 "3역할 단순화·승인 제거"가 **번복**되고 역할이 **4역할(`USER`/`MANAGER`/`STORE_ADMIN`/`ADMIN`)** 로 세분화, **매장매니저관리자(`STORE_ADMIN`)** 가 부활했습니다. 본 로드맵을 v1.7에 정합하도록 다음을 정정합니다:
 > - **가입 승인 = 2단계**(매장매니저관리자 1차 M7 → 관리자 2차 S3, `ACTIVE` 전 로그인 불가, 상태 `PENDING_APPROVAL_L1 → L2`). Phase 3 가입 상태머신·Phase 7 가입 승인 흐름에 반영.
@@ -74,9 +82,9 @@
 | **3** | 인증/인가(실제 토큰) | JWT·역할 가드·이메일 인증(SMTP 연계) | 4장·3.2 | 3.5 | 11.5 |
 | **4** | 예약 API + 동시성 2단계 | 슬롯 `UNIQUE` + 낙관적(version 컬럼)/비관적(`FOR UPDATE`) 락, 충돌 409 | 6·7장 / FW5 | 3.5 | 15.0 |
 | **5** | 예약 상태 전이 API(완료/취소/승인) | M4·M5·M6 서버화, 상태 가드 | 11.3 / FW6·FW7·M6 | 2.5 | 17.5 |
-| **6** | BO — 예약 대행 + 매장 관리 | M3 대행예약, S4 예약자관리·S5 사용자관리 | 3.2·11.1 / M3·S4·S5 | 3.5 | 21.0 |
+| **6** | BO — 예약 대행 + 매장 관리 | M3 대행예약, S4 예약자관리·S5 사용자관리, **관리자 매장 CRUD(v2.4)** | 3.2·11.1·6.1 / M3·S4·S5 | 3.5 | 21.0 |
 | **7** | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 | 휴가/반차 1단계(`SUBMITTED→APPROVED/REJECTED`, M6→M8 매장매니저관리자 종결) + 가입 2단계(M7→S3, `PENDING_APPROVAL_L1→L2`) + 매장휴일 | 4·8장 / M6·M7·M8·S3 | 3.5 | 24.5 |
-| **8** | 후기/평점 API + BO 확인·매출 | S6 후기확인, S8 매출집계 | 9장·11.1 / S6·S8 | 2.5 | 27.0 |
+| **8** | 후기/평점 API + BO 확인·매출 | S6 후기확인, S8 매출집계, **매출 원차트(Top5+ETC)·후기 페이지 분리(v2.4)** | 9장·11.1 / S6·S8 | 2.5 | 27.0 |
 | **9** | 알림 — SMTP 인프라 + 정책 | 발송 인프라, 메일/푸시 정책 | 13.2 항목 6·7 | 2.5 | 29.5 |
 | **10** | 데이터 3단계 — MySQL 이행 | 트랜잭션 + 유니크 인덱스, Flyway 마이그레이션, 운영 영속화 | 7·12장 | 3.5 | 33.0 |
 
@@ -1018,6 +1026,16 @@ public void cancel(Long reservationId) {
 >    - ✅ **관리자 메뉴 정리(v1.11)**: 관리자(ADMIN) 네비게이션에서 **"예약"(부킹, `/reserve`)·"휴일 결재"(`/admin/approvals`) 메뉴를 제거**한다(관리자는 예약을 생성하지 않으며 예약 목록은 매장 선택형 담당 예약으로 일원화). "예약 목록"·"가입 최종 승인"·"매출"은 유지. ⚠ `/admin/approvals` 페이지·BE 휴일 승인 로직 자체는 존속(메뉴 미노출) — v1.15의 `/manager/dayoffs` 매장 휴일 신청 영역 제거와 짝을 이루는 동선 단절 정리.
 > 2. **매니저 대행 폼 날짜·시간 입력 통일 (구현 완료)** — `manager/reserve.vue`의 자유 텍스트 날짜·시간 입력을 일반예약(`reserve/slot.vue`)과 **동일한 휠 선택기**(`WheelPicker`, 오늘+21일 날짜 휠·30분 시간 휠, 대행 매니저 휴무 비활성)로 교체. 대행 가능 날짜는 휠 범위(21일)로 제한된다.
 
+> **🆕 v2.4 추가 요구 (신규기능 — 관리자 매장 등록/수정/삭제 CRUD)**
+>
+> 전체 관리자(ADMIN)가 매장(`store`)을 **직접 등록/수정/삭제**하는 CRUD 화면·기능을 신설한다. 기존 S4·S5(매장별 예약자/사용자 조회)가 이미 `/api/admin/stores/{id}/**` 네임스페이스를 쓰므로, 매장 CRUD도 **`/api/admin/stores` 네임스페이스에 정합**되게 추가한다(중복 정의 금지).
+>
+> 1. **REST 엔드포인트(`store` 테이블 대상)**: `POST /api/admin/stores`(생성)·`PUT /api/admin/stores/{id}`(수정)·`DELETE /api/admin/stores/{id}`(삭제)·`GET /api/admin/stores`(관리자용 전체 목록 — **승인/미승인 포함**, FO `GET /api/stores`가 승인 매장만 반환하는 것과 구분). 1차(ROADMAP_1 Phase 9)의 in-memory `adminStore`를 본 API로 교체한다.
+> 2. **베이(`bay`) 구성 관리**: 매장 생성/수정 시 베이 코드(`A1~AN`)·등급(`size`: SMALL/MID/LARGE/XLARGE, Phase 0 Q1)을 함께 등록·수정. 매장당 베이 N개를 `bay` 테이블에 일괄 반영(생성 시 insert, 수정 시 교체 또는 추가/삭제).
+> 3. **승인 상태(`approved`) 관리**: 매장 `approved` 플래그를 관리자가 토글(미승인 매장은 FO `GET /api/stores`·예약 화면에 미노출, require 6.1). **🔒 정책 확정**: 신규 등록 매장의 기본 `approved` = **`false`**(등록 직후 미승인 상태 → 베이/매니저 구성 후 ADMIN이 별도 승인 토글로 활성화). `POST /api/admin/stores`는 요청에 `approved`가 없으면 `false`로 생성한다.
+> 4. **역할 인가(ADMIN 한정)**: `/api/admin/**` → `hasRole('ADMIN')`(Phase 6 경로 기반 인가 일관). MANAGER/STORE_ADMIN/USER는 403.
+> 5. **삭제 무결성**: **🔒 정책 확정**: 예약(`reservation`)·후기(`review`)·베이(`bay`)·슬롯(`slot`)·매니저(`manager`) 등 연관 데이터가 **존재하면 삭제를 차단하고 HTTP 409 Conflict**(`ErrorResponse` code `STORE_HAS_DEPENDENCIES`)를 반환한다. **소프트 비활성(`approved=false`) 방식은 채택하지 않는다.** 연관 데이터가 없는 매장만 물리 삭제(`DELETE`)가 허용된다.
+
 #### 태스크 체크리스트
 - [x] `POST /api/manager/reservations` — 매니저 대행 예약(M3), 소속 매장·본인 휴무 반영(require 6.2) *(P6-3·P6-5)*
 - [x] 대행 예약도 동일 동시성 경로(Phase 4 `confirm`) + 동일 베이 노출 규칙(Phase 0 Q7) 재사용 *(proxyReserve가 reservationService.confirm 위임)*
@@ -1029,9 +1047,15 @@ public void cancel(Long reservationId) {
 - [x] *(v1.10)* 매니저 대행 폼 날짜·시간을 일반예약과 동일한 **휠 선택기**(`WheelPicker`)로 통일 — 자유 텍스트 입력 폐지, 대행 매니저 휴무 비활성(require §6.2)
 - [x] *(v1.11)* **예약 목록 역할별 분기**: `ReservationMapper.findByManager` + `GET /api/manager/reservations`(담당, managerId) + `GET /api/store-admin/reservations`(매장 전체, storeId) + FE `/reservations` 역할 분기(USER 본인 / MANAGER 내예약+담당 2탭 / STORE_ADMIN 매장전체), `ReservationCard.vue` 추출 (require §6.6)
 - [x] *(v1.11)* **사용자↔매니저 연결**: `users.manager_id` FK 컬럼 신설(시드 `manager1→mgr1`), `User.managerId`·`UserMapper` 보강 — v1.10 블로킹 해소
+- [ ] *(v2.4)* **관리자 매장 CRUD REST**: `POST /api/admin/stores`(생성)·`PUT /api/admin/stores/{id}`(수정)·`DELETE /api/admin/stores/{id}`(삭제)·`GET /api/admin/stores`(승인/미승인 포함 전체) — `AdminStoreController` + `AdminStoreService` + `StoreMapper`(insert/update/delete)
+- [ ] *(v2.4)* **베이 구성 동반 반영**: 매장 생성/수정 시 베이(`A1~AN`·`size`)를 `bay` 테이블에 insert/교체 — `BayMapper`(insert/deleteByStore) 보강, `AdminStoreRequest`에 베이 목록 포함
+- [ ] *(v2.4)* **승인 상태 토글**: `approved` 플래그를 요청에 포함(미승인 매장은 FO `GET /api/stores` 미노출 유지, require 6.1). **🔒 신규 등록 기본 `approved=false` 확정**(요청에 값 없으면 false로 생성)
+- [ ] *(v2.4)* **삭제 무결성**: **🔒 연관 데이터(예약/후기/베이/슬롯/매니저) 존재 시 삭제 차단 → 409 Conflict(`STORE_HAS_DEPENDENCIES`) 확정**(소프트 비활성 미채택) — `AdminStoreService`에서 의존성 카운트 후 `GlobalExceptionHandler`가 409 매핑
+- [ ] *(v2.4)* 역할 인가(ADMIN 한정): `/api/admin/stores/**` → `hasRole('ADMIN')`(Phase 6 경로 기반 인가 일관) — 권한 외 403
+- [ ] *(v2.4)* FE BO 화면: `app/pages/admin/stores/index.vue`(목록·등록·삭제)·`new.vue`·`[id].vue`(폼) — 1차(ROADMAP_1 Phase 9) in-memory `adminStore`를 본 API 호출로 교체(시그니처 유지, additive)
 
 #### 생성·수정 파일
-`controller/ManagerReservationController.java`, `controller/AdminController.java`, `service/ManagerReservationService.java`, `service/AdminService.java`, `dto/ProxyReservationRequest.java`, `dto/AdminReservationResponse.java`, `dto/AdminUserResponse.java`, FE `app/pages/manager/reserve.vue`(신규), FE `app/pages/admin/stores/[id]/reservations.vue`·`users.vue`(신규), FE `app/middleware/role-guard.ts`(적용)
+`controller/ManagerReservationController.java`, `controller/AdminController.java`, **`controller/AdminStoreController.java`*(v2.4 매장 CRUD)***, `service/ManagerReservationService.java`, `service/AdminService.java`, **`service/AdminStoreService.java`*(v2.4)***, `mapper/StoreMapper.java`·`mapper/BayMapper.java` + XML(수정 — insert/update/delete *(v2.4)*), `dto/ProxyReservationRequest.java`, `dto/AdminReservationResponse.java`, `dto/AdminUserResponse.java`, **`dto/AdminStoreRequest.java`·`dto/AdminStoreResponse.java`*(v2.4)***, FE `app/pages/manager/reserve.vue`(신규), FE `app/pages/admin/stores/[id]/reservations.vue`·`users.vue`(신규), **FE `app/pages/admin/stores/index.vue`·`new.vue`·`[id].vue`*(v2.4 매장 CRUD)***, FE `app/services/adminStoreService.ts`*(v2.4 — 1차 in-memory 교체)*, FE `app/middleware/role-guard.ts`(적용)
 
 #### 권한 매트릭스 매핑 (require 3.2)
 
@@ -1040,6 +1064,10 @@ public void cancel(Long reservationId) {
 | 예약 대행 | M3 | MANAGER, STORE_ADMIN | `POST /api/manager/reservations` |
 | 매장별 예약자 관리 | S4 | ADMIN | `GET /api/admin/stores/{id}/reservations` |
 | 매장별 사용자 관리 | S5 | ADMIN | `GET /api/admin/stores/{id}/users` |
+| 매장 목록(승인/미승인 포함) *(v2.4)* | — | ADMIN | `GET /api/admin/stores` |
+| 매장 등록 *(v2.4)* | — | ADMIN | `POST /api/admin/stores` |
+| 매장 수정 *(v2.4)* | — | ADMIN | `PUT /api/admin/stores/{id}` |
+| 매장 삭제 *(v2.4)* | — | ADMIN | `DELETE /api/admin/stores/{id}` |
 
 #### 구현 예시 — 매니저 대행 예약(M3) & 역할 인가
 
@@ -1073,11 +1101,90 @@ public class ManagerReservationController {
 }
 ```
 
+#### 구현 예시 — 관리자 매장 CRUD (v2.4) & 역할 인가
+
+`controller/AdminStoreController.java`
+```java
+package com.carwash.controller;
+
+import com.carwash.dto.AdminStoreRequest;
+import com.carwash.dto.AdminStoreResponse;
+import com.carwash.service.AdminStoreService;
+import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.*;
+
+// 관리자 매장 등록/수정/삭제 (v2.4) — /api/admin/** → hasRole(ADMIN) (SecurityConfig 경로 기반 인가)
+@RestController
+@RequestMapping("/api/admin/stores")
+public class AdminStoreController {
+
+    private final AdminStoreService adminStoreService;
+
+    public AdminStoreController(AdminStoreService adminStoreService) {
+        this.adminStoreService = adminStoreService;
+    }
+
+    // 관리자용 전체 목록 — 승인/미승인 포함 (FO GET /api/stores 는 승인 매장만, require 6.1)
+    @GetMapping
+    public List<AdminStoreResponse> stores() {
+        return adminStoreService.findAll();
+    }
+
+    @PostMapping
+    public AdminStoreResponse create(@Valid @RequestBody AdminStoreRequest req) {
+        // 🔒 신규 매장 기본 approved=false (요청에 값 없으면 미승인으로 생성)
+        return adminStoreService.create(req);   // store insert + bay 목록 insert
+    }
+
+    @PutMapping("/{id}")
+    public AdminStoreResponse update(@PathVariable String id, @Valid @RequestBody AdminStoreRequest req) {
+        return adminStoreService.update(id, req);   // store update + bay 교체, approved 토글
+    }
+
+    // 🔒 삭제 무결성(확정): 연관 데이터(예약/후기/베이/슬롯/매니저) 존재 시 삭제 차단 → 409 Conflict
+    // (소프트 비활성 미채택) — AdminStoreService.delete가 의존성 검사 후 StoreHasDependenciesException
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable String id) {
+        adminStoreService.delete(id);
+    }
+}
+```
+
+`dto/AdminStoreRequest.java` (record — 베이 구성·승인 상태 포함)
+```java
+package com.carwash.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+
+// 매장 등록/수정 요청 — 베이(A1~AN·size)·승인 상태 포함 (v2.4)
+public record AdminStoreRequest(
+    @NotBlank String name,
+    Boolean approved,                 // 🔒 생성 시 null이면 false로 간주(기본 미승인). 미승인 매장은 FO 미노출 (require 6.1)
+    List<BayInput> bays               // 베이 코드(code)·등급(size: SMALL/MID/LARGE/XLARGE)
+) {
+    // 🔒 신규 등록 기본 approved=false — 서비스에서 Boolean.TRUE.equals(approved)로 해석
+    public boolean approvedOrDefault() {
+        return Boolean.TRUE.equals(approved);
+    }
+
+    public record BayInput(@NotBlank String code, @NotBlank String size) {}
+}
+```
+
 #### 완료기준 (DoD)
 - [x] 매니저가 소속 매장 기준으로 사용자 예약을 대행할 수 있고, 본인 휴무 시간대는 차단된다(M3, require 6.2) *(BoApiTest 대행 성공·휴무 400)*
 - [x] 대행 예약이 일반 예약과 **동일한 동시성/베이 노출 규칙**을 따른다(Phase 0 Q7) *(confirm 위임 — insertHold·UNIQUE·낙관락 동일)*
 - [x] 관리자가 매장별 예약자(S4)·사용자(S5) 목록을 조회할 수 있다(require 11.1) *(BoApiTest S4·S5 200, BO E2E 조회)*
 - [x] 권한 외 역할이 BO 엔드포인트 호출 시 403을 받는다(require 3.2) *(USER 대행 403·MANAGER admin 403)*
+- [ ] *(v2.4)* 관리자가 `POST/PUT/DELETE /api/admin/stores`로 매장을 **등록·수정·삭제**할 수 있고, 베이 구성·`approved` 상태가 함께 반영된다
+- [ ] *(v2.4)* `GET /api/admin/stores`는 **승인/미승인 매장 모두** 반환하고, FO `GET /api/stores`는 승인 매장만 반환한다(require 6.1)
+- [ ] *(v2.4)* **신규 등록 매장의 기본 `approved`가 `false`** 다(요청에 값 없이 `POST` 시 미승인 생성), 미승인 매장은 예약 화면·FO 목록(`GET /api/stores`)에 노출되지 않는다
+- [ ] *(v2.4)* 비관리자(USER/MANAGER/STORE_ADMIN)가 매장 CRUD 엔드포인트 호출 시 403을 받는다
+- [ ] *(v2.4)* **연관 데이터(예약/후기/베이/슬롯/매니저)가 있는 매장 삭제 시 409 Conflict(`STORE_HAS_DEPENDENCIES`)로 차단**되고, 연관 데이터가 없는 매장만 물리 삭제된다(소프트 비활성 미채택)
+- [ ] *(v2.4)* 1차 in-memory `adminStore`를 서버 API로 교체해도 매장 관리 화면 마크업이 무변경이다(additive)
 - [x] `./gradlew build`(BO 8건 포함 전건 green)·`npm run type-check`(0) + BO E2E(대행/조회/role-guard 4건) + 1차 회귀 25건 = **E2E 29건** 통과
 
 #### 구현 메모 (📌)
@@ -1086,6 +1193,7 @@ public class ManagerReservationController {
 - 📌 **S5 정의**: users 테이블에 store 소속 컬럼이 없으므로 "매장별 사용자"는 **해당 매장에 예약 이력이 있는 고객(distinct, 최초 등장 순)**으로 정의. `userMapper.findAll()` 1회 맵으로 조인(N+1 회피), `passwordHash` 미노출.
 - 📌 **휴무 SHIFT 서버 검증**: FE `storeService.isManagerOffAt`와 동일 경계(SHIFT_1 06:00~14:00 / SHIFT_2 14:00~22:00 / SHIFT_3 22:00~06:00, FULL_DAY 전일)를 `ManagerReservationService`에 복제.
 - 📌 **additive**: 기존 컴포넌트·페이지·AppNav 무변경, BO는 신규 파일(미들웨어 1·페이지 3·컨트롤러 2·서비스 2·DTO 3·매퍼 메서드 1). BO E2E는 AppNav 링크 없이 직접 `goto`.
+- 📌 *(v2.4)* **🔒 매장 CRUD 운영 정책 확정**: ① **신규 등록 기본 `approved=false`** — 등록 직후 미승인 상태로 생성하고(요청에 `approved` 없으면 false), 베이/매니저 구성 완료 후 ADMIN이 `PUT`으로 `approved=true` 토글해 FO에 노출시킨다. ② **삭제 시 의존성 차단(409)** — `AdminStoreService.delete`가 예약(`reservation`)·후기(`review`)·베이(`bay`)·슬롯(`slot`)·매니저(`manager`) 연관 데이터를 카운트하여 1건이라도 있으면 `StoreHasDependenciesException`을 던지고 `GlobalExceptionHandler`가 **409 `STORE_HAS_DEPENDENCIES`** 로 매핑한다. **소프트 비활성(`approved=false` 대체)은 채택하지 않는다** — 미승인과 삭제 차단은 별개 의미이므로 혼용하지 않는다. 연관 데이터가 없는 매장만 물리 삭제(`DELETE`)가 허용된다.
 
 ---
 
@@ -1241,6 +1349,14 @@ public void confirmL2(Long userId) {
 #### 목표
 1차의 후기/평점(ROADMAP_1 Phase 7)을 **서버 API**로 교체하고, BO 측 **관리자 후기 확인(S6)** 과 **매출 집계(S8)** 를 구현한다. 후기 작성 자격(세차완료 사용자만, require 9.1)은 서버에서 검증한다.
 
+> **🆕 v2.4 추가 요구 (관리자 매출 원차트 + 후기 페이지 분리)**
+>
+> 1차(ROADMAP_1 Phase 9)에서 더미로 선구현한 매출 원차트·후기 분리를 **서버 집계 기반**으로 교체한다.
+>
+> 1. **매출 원형(파이) 차트 — 상위 5개 + ETC**: 매출 페이지(`/admin/sales`)에 원형 차트를 추가하여 **상위 5개 매장의 매장별 매출 비중(%)** 을 각 영역으로 표시하고, **나머지 매장은 합산하여 "ETC"** 한 영역으로 표시한다. 기존 S8(`GET /api/admin/stores/{id}/sales` — 매장 단건 매출)에 더해, **전 매장 매출 비중 집계** `GET /api/admin/sales/by-store`(매장별 COMPLETED 예약 금액 합산 목록, 내림차순)를 신설한다. 상위 5개 + ETC 합산·비중(%) 가공은 **FE(`buildSalesSlices`, ROADMAP_1 Phase 9 로직 재사용)** 에서 수행하여 차트 컴포넌트를 1차와 무변경으로 둔다.
+> 2. **매출 페이지의 후기 영역 분리 + 네비 "후기" 탭**: 기존 매출 페이지(`/admin/sales`) 안에 함께 있던 **후기 영역을 별도 페이지(`/admin/reviews`)로 분리**하고, **상단 네비(`AppNav`)에 "후기" 탭을 추가**하여 진입하도록 구성한다. 후기 데이터는 **기존 S6 엔드포인트**(`GET /api/admin/stores/{id}/reviews`)를 재사용한다(신규 엔드포인트 없음 — 화면 이전만). 관리자 매출 페이지에는 매출 표 + 원차트만 잔존한다.
+> 3. **역할 인가(ADMIN 한정)**: `GET /api/admin/sales/by-store`·`/api/admin/stores/{id}/reviews` 모두 `/api/admin/**` → `hasRole('ADMIN')`(Phase 6 경로 기반 인가 일관).
+
 #### 태스크 체크리스트
 - [x] `POST /api/reviews` — 후기 작성, 작성 자격(COMPLETED + 본인 + 중복 방지) 서버 검증(require 9.1) *(P8-2·P8-3)*
 - [x] `GET /api/reviews/stores/{id}/average`·`/managers/{id}/average` — 평균 평점 집계 *(Java 집계, AverageRatingResponse)*
@@ -1248,9 +1364,14 @@ public void confirmL2(Long userId) {
 - [x] `GET /api/admin/stores/{id}/sales` — 매장별 매출 집계(S8) — COMPLETED 예약 금액 합산 *(findByStore 재사용)*
 - [x] FE `review/[reservationId].vue`를 서버 API(POST /reviews, serverId)로 교체 + 서버 매장 평균 표시 — `reservations.vue`는 로컬 미러 유지(additive)
 - [x] FE BO 화면(신규): 관리자 후기 확인·매출 대시보드(`admin/sales.vue`)
+- [ ] *(v2.4)* **전 매장 매출 비중 집계** `GET /api/admin/sales/by-store` — 매장별 COMPLETED 예약 금액 합산 목록(내림차순) 반환. `SalesService.salesByStore()` + `SalesByStoreResponse`(`storeId`·`storeName`·`amount`)
+- [ ] *(v2.4)* **매출 원차트(파이)**: FE `app/components/SalesPieChart.vue`(상위 5개 영역 + ETC) + `buildSalesSlices`(ROADMAP_1 Phase 9 재사용 — Top5+ETC·비중%). `app/pages/admin/sales.vue`에 원차트 섹션 추가
+- [ ] *(v2.4)* **후기 페이지 분리**: `app/pages/admin/reviews.vue` 신규 — `GET /api/admin/stores/{id}/reviews`(기존 S6) 재사용, 매장/매니저 평균·후기 목록 표시. `app/pages/admin/sales.vue`에서 후기 영역 제거(매출 표+원차트만 잔존)
+- [ ] *(v2.4)* **네비 "후기" 탭**: `app/components/AppNav.vue`에 관리자용 "후기" 탭(`<NuxtLink to="/admin/reviews">`) 추가(`data-testid="nav-admin-reviews"`, ADMIN 분기)
+- [ ] *(v2.4)* 역할 인가(ADMIN 한정): `GET /api/admin/sales/by-store`·`/api/admin/stores/{id}/reviews` → `hasRole('ADMIN')`, 권한 외 403
 
 #### 생성·수정 파일
-`controller/ReviewController.java`, `controller/AdminReviewController.java`, `controller/SalesController.java`, `service/ReviewService.java`, `service/SalesService.java`, `dto/ReviewRequest.java`, `dto/AverageRatingResponse.java`, `dto/SalesResponse.java`, FE `app/pages/review/[reservationId].vue`(교체), FE `app/pages/admin/sales.vue`(신규)
+`controller/ReviewController.java`, `controller/AdminReviewController.java`, `controller/SalesController.java`, `service/ReviewService.java`, `service/SalesService.java`(수정 — `salesByStore` *(v2.4)*), `dto/ReviewRequest.java`, `dto/AverageRatingResponse.java`, `dto/SalesResponse.java`, **`dto/SalesByStoreResponse.java`*(v2.4)***, FE `app/pages/review/[reservationId].vue`(교체), FE `app/pages/admin/sales.vue`(수정 — 원차트 추가·후기 제거 *(v2.4)*), **FE `app/pages/admin/reviews.vue`*(v2.4 후기 분리)***, **FE `app/components/SalesPieChart.vue`*(v2.4 매출 원차트)***, FE `app/composables/useSalesChart.ts`*(v2.4 — ROADMAP_1 Phase 9 재사용)*, FE `app/components/AppNav.vue`(수정 — "후기" 탭 *(v2.4)*)
 
 #### 구현 예시 — 작성 자격 검증 & 매출 집계
 
@@ -1293,13 +1414,41 @@ public SalesResponse storeSales(Long storeId) {
         .sumAmountByStoreIdAndStatus(storeId, ReservationStatus.COMPLETED);
     return new SalesResponse(storeId, total);
 }
+
+// v2.4: 전 매장 매출 비중 집계 — 매장별 COMPLETED 금액 합산(내림차순)
+// 상위 5개 + ETC 합산·비중(%)은 FE(buildSalesSlices)에서 가공 → 차트 컴포넌트 1차 무변경
+@Transactional(readOnly = true)
+public List<SalesByStoreResponse> salesByStore() {
+    // 매장별 COMPLETED 예약 amount 합산. 기존 findByStore 재사용 또는 GROUP BY 집계
+    return salesMapper.sumAmountGroupByStore(ReservationStatus.COMPLETED.name());
+}
 ```
+
+#### 구현 예시 — 매출 원차트 가공 & 후기 분리 (v2.4)
+
+FE `app/pages/admin/sales.vue` (서버 비중 집계 → 상위 5개 + ETC 가공)
+```ts
+import { buildSalesSlices } from '~/composables/useSalesChart'
+
+// GET /api/admin/sales/by-store → [{ storeId, storeName, amount }] (내림차순)
+const { data } = await useFetch<{ storeName: string; amount: number }[]>(
+  `${useRuntimeConfig().public.apiBase}/admin/sales/by-store`,
+)
+// 상위 5개 + 나머지 합산 'ETC' (ROADMAP_1 Phase 9 로직 재사용 — 서버/더미 동일 규칙)
+const slices = computed(() => buildSalesSlices(data.value ?? []))
+```
+
+> 📌 **후기 분리 = 화면 이전(신규 엔드포인트 없음)**: `/admin/reviews.vue`는 기존 S6(`GET /api/admin/stores/{id}/reviews`)를 그대로 호출합니다. 매출 페이지에서 후기 마크업을 제거하고 후기 페이지로 이전하는 **라우트 이동**이며, BE는 무변경입니다. 상단 네비 "후기" 탭만 추가합니다.
 
 #### 완료기준 (DoD)
 - [x] COMPLETED가 아닌/타인/중복 후기 작성이 **서버에서 차단**된다(require 9.1) *(ReviewApiTest 미완료400·타인404·중복409)*
 - [x] 평점(1~5) 범위를 벗어나면 거부된다(Bean Validation) *(`평점_범위_초과는_400`, `@Min(1)@Max(5)`)*
 - [x] 매장/매니저 평균 평점이 서버 집계로 표시된다 *(GET .../average + review 페이지 avg-store)*
 - [x] 관리자가 매장별 후기(S6)·매출(S8)을 조회할 수 있다(권한 인가) *(ADMIN 200·USER 403, admin/sales.vue)*
+- [ ] *(v2.4)* `GET /api/admin/sales/by-store`가 매장별 COMPLETED 매출 합산을 내림차순으로 반환한다(ADMIN 한정, 권한 외 403)
+- [ ] *(v2.4)* `/admin/sales`에 원형 차트가 렌더되고 **상위 5개 매장 비중(%) + 나머지 합산 "ETC"** 영역으로 표시된다(매장 5개 이하면 ETC 없음, 6개 이상이면 ETC 1개 영역)
+- [ ] *(v2.4)* 매출 페이지의 **후기 영역이 `/admin/reviews`로 분리**되고, 상단 네비 "후기" 탭으로 진입된다(매출 페이지에는 후기 영역이 없음)
+- [ ] *(v2.4)* 1차(ROADMAP_1 Phase 9) 더미 원차트·후기 분리가 서버 집계 기반으로 교체되어도 화면 마크업이 무변경이다(additive)
 - [x] **1차 후기 E2E 회귀**(자격 가드·평점 제출·평균)가 서버 API로도 통과한다 *(review.spec 2건 — 서버 POST 위임 후 로컬 미러 표시)*
 - [x] `./gradlew build`(후기/매출 8건 포함 green)·`npm run test:e2e`(31건) 통과
 
@@ -1642,9 +1791,9 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 | Phase 3 | 인증/인가(JWT·이메일 인증·승인 분리, 가입 2단계 상태머신) | 4장(4.2·4.4)·3.2 | **FW2, M2, S2 / M7·S3(가입 2단계 승인 연계)** |
 | Phase 4 | 예약 API + 동시성 2단계(낙관/비관 락) | 6장·7장(7.3) | **FW5** |
 | Phase 5 | 예약 상태 전이(완료/취소) | 11.3 | **FW6, FW7 / M4, M5** |
-| Phase 6 | BO 예약 대행 + 매장 관리 + **예약 목록 역할 분기(v1.10/v1.11)** | 3.2·11.1·**6.6** | **M3 / S4, S5** |
+| Phase 6 | BO 예약 대행 + 매장 관리 + **예약 목록 역할 분기(v1.10/v1.11)** + **관리자 매장 CRUD(v2.4)** | 3.2·11.1·**6.6**·**6.1** | **M3 / S4, S5** |
 | Phase 7 | 휴가/반차 1단계 승인 + 가입 2단계 승인 + 매장휴일 + **관리자 매니저 직접 등록(v1.12)·가입 승인 상세 모달(v1.13)·휴무 WheelPicker(v1.14)·매장 휴일 영역 제거(v1.15)** | 4장(4.1·4.4)·8장(8.1·8.2·8.3)·5.5·6.5·**12.4** | **M6·M8(휴가/반차 1단계) / M7·S3(가입 2단계) / 8.1(매장휴일)** |
-| Phase 8 | 후기/평점 API + BO 확인·매출 | 9장·11.1 | **S6, S8** |
+| Phase 8 | 후기/평점 API + BO 확인·매출 + **매출 원차트 Top5+ETC·후기 페이지 분리(v2.4)** | 9장·11.1·12.4 | **S6, S8** |
 | Phase 9 | 알림 — SMTP 인프라 + 정책 | 13.2 항목 6·7 | — |
 | Phase 10 | 데이터 3단계 — MySQL 이행 | 7장·12장(12.3) | — |
 
@@ -1652,7 +1801,7 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 
 > ℹ️ **require_v1.md 12장(스택) 참조 시 주의**: require 12.1(FE)은 Nuxt 4 확정, 12.2(BE)는 "Java(LTS) + Spring Boot(최신 무료), 2단계에서 도입"입니다. 본 로드맵 BE 스택(Java 21 + Spring Boot 3.x + H2→MySQL)은 12.2를 정본으로 따릅니다.
 
-> ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로** *(v1.11~v1.15 갱신 반영)*: ① 일반매장매니저 — `/manager/reserve`(대행, 날짜·시간 WheelPicker v1.10·v1.14)·`/reservations`(역할 분기: 내 예약+담당 2탭 v1.11)·`/manager/dayoffs`(휴가/반차 신청 M6 — **날짜 WheelPicker v1.14·매장 휴일 영역 제거 v1.15**). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8) + `/reservations`(매장 전체 v1.11). ③ 관리자 — `/admin/managers`(**매니저 직접 등록 v1.12**)·`/admin/manager-approvals`(가입 2차 최종 승인 S3 — **상세 모달 v1.13**)·`/admin/sales`(매출 S8)·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9)·`/reservations`(매장 선택형 담당 예약 단일 뷰 v1.11). **관리자 네비에서 "예약"(부킹)·"휴일 결재" 메뉴는 제거(v1.11)**. 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
+> ⚠️ **v1.7 역할별 BO 페이지(require §12.4) 제안 경로** *(v1.11~v1.15 갱신 반영)*: ① 일반매장매니저 — `/manager/reserve`(대행, 날짜·시간 WheelPicker v1.10·v1.14)·`/reservations`(역할 분기: 내 예약+담당 2탭 v1.11)·`/manager/dayoffs`(휴가/반차 신청 M6 — **날짜 WheelPicker v1.14·매장 휴일 영역 제거 v1.15**). ② 매장매니저관리자 — ①의 매니저 화면 전부 + `/store-admin/manager-signups`(가입 1차 승인 M7)·`/store-admin/dayoff-approvals`(휴가/반차 승인 M8) + `/reservations`(매장 전체 v1.11). ③ 관리자 — `/admin/managers`(**매니저 직접 등록 v1.12**)·`/admin/manager-approvals`(가입 2차 최종 승인 S3 — **상세 모달 v1.13**)·**`/admin/stores`(매장 등록/수정/삭제 CRUD v2.4)**·`/admin/sales`(매출 S8 — **매출 원차트 Top5+ETC v2.4**)·**`/admin/reviews`(후기 확인 S6 — 매출 페이지에서 분리 + 네비 "후기" 탭 v2.4)**·`/admin/reservations`(예약상태 S4)·`/admin/manager-status`(매니저 근무상태 S9)·`/reservations`(매장 선택형 담당 예약 단일 뷰 v1.11). **관리자 네비에서 "예약"(부킹)·"휴일 결재" 메뉴는 제거(v1.11)**, **"매장 등록"·"후기" 메뉴 추가(v2.4)**. 실제 라우트는 코드 작업 시 확정(파일 기반 라우팅).
 
 > ✅ **v1.8 반영(2026-06-21 구현 완료)**: ① **매니저 BO 매장 컨텍스트 고정** — 일반매장매니저·매장매니저관리자의 BO 화면(`/manager/reserve`·`/manager/dayoffs`)에서 매장 select가 **본인 소속 매장으로 고정·`disabled`**(변경 불가)된다. 이를 위해 BE `users.store_id` 컬럼·`User.storeId` 필드·`UserResponse.storeId`(로그인 응답)를 신설하고, 매니저 계열 시드(`manager1`·`storeadmin1`·`pending1/2` → `store1`)에 소속 매장을 부여한다(`USER`/`ADMIN`은 `NULL`). FE는 `auth.currentUser.storeId`로 매장을 고정. ② **개발용 빠른 로그인 역할별 랜딩**(`login.vue`, dev 전용) — 일반사용자→`/reserve`, 일반매장매니저→`/manager/reserve`, 매장매니저관리자→`/store-admin/dayoff-approvals`, 관리자→`/admin/manager-approvals`. ③ **AppNav 역할별 BO 메뉴 분기** 노출.
 
@@ -1664,8 +1813,10 @@ feat(phase4): 예약 확정 비관적 락 + 충돌 409 매핑
 
 > ✅ **v1.14·v1.15 반영(2026-06-21 구현 완료, Phase 7)**: `/manager/dayoffs` **휴무 날짜 입력을 일반예약과 동일한 `WheelPicker`(오늘+21일)로 통일**(자유 텍스트 폐지, v1.14) + **"매장 휴일 날짜" 신청 영역 제거**(휴일 결재 메뉴 제거로 승인 경로 단절된 고아 기능 정리, 페이지는 휴가/반차 신청 전용, 휴무 신청 버튼에 미선택 안내 메시지 추가, v1.15). ⚠ BE 매장 휴일 신청/승인 로직은 **존속**(FE 상신·승인 진입 동선만 정리).
 
+> 🆕 **v2.4 반영(신규 요구 3건, Phase 6·8)**: ① **관리자 매장 등록/수정/삭제(CRUD)** — `POST/PUT/DELETE /api/admin/stores` + `GET /api/admin/stores`(승인/미승인 포함) + `StoreMapper`·`BayMapper`(insert/update/delete) + FE `/admin/stores`(목록·폼). 베이(`A1~AN`·`size`) 구성·`approved` 토글 포함. **🔒 정책 확정**: 신규 등록 기본 `approved=false`(미승인 생성), 연관 데이터 존재 시 삭제 **409 차단(`STORE_HAS_DEPENDENCIES`, 소프트 비활성 미채택)**. 인가 `/api/admin/**`=ADMIN(**Phase 6**). ② **매출 원형(파이) 차트** — 전 매장 매출 비중 집계 `GET /api/admin/sales/by-store` + FE `SalesPieChart.vue`(상위 5개 비중 + 나머지 합산 "ETC"). Top5+ETC 가공은 FE `buildSalesSlices`(ROADMAP_1 Phase 9 재사용, **Phase 8**). ③ **매출 페이지의 후기 영역 분리** — `/admin/reviews.vue` 신설(기존 S6 `GET /api/admin/stores/{id}/reviews` 재사용, 신규 엔드포인트 없음) + 상단 네비 "후기" 탭 추가, `/admin/sales`에서 후기 영역 제거(**Phase 8**). 1차(ROADMAP_1 Phase 9) 더미 선구현분을 서버로 교체하는 회수 지점이며, **컴포넌트 마크업 무변경(additive)** 을 목표로 한다.
+
 > ℹ️ **명세 Q1~Q8 참조 시 주의**: 예약_규칙_명세_v1.md 8장의 미해결 질문은 **Phase 0 결정표에서 확정**되며, 그 결과가 Phase 1(도메인·스키마)·Phase 4(베이 노출)에 반영됩니다. 명세 문서 자체는 읽기 전용입니다.
 
 ---
 
-> **문서 끝.** 본 로드맵(**v2.3**)은 require_v1.md **v1.15**와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(4역할 기반 매니저·관리자 프로세스·승인 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. v1.7 정합으로 **가입 승인은 2단계(매장매니저관리자 1차 → 관리자 2차), 휴가/반차 승인은 1단계(매장매니저관리자 종결)** 로 단계 수를 구분하며, 역할별 BO 페이지를 4그룹으로 분리합니다(§12.4). **v1.11~v1.15 후속 델타**(예약 목록 역할별 분기·`users.manager_id` FK·관리자 메뉴 정리 / `/signup` 유형 분기·관리자 매니저 직접 등록 / 가입 최종 승인 상세 모달 / 휴무 신청 WheelPicker 통일·매장 휴일 영역 제거)는 Phase 3·6·7에 반영했습니다(모두 2026-06-21 구현 완료). 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다. ⚠️ 기존 BE 구현의 휴무 2단계 결재는 v1.7(1단계)과 충돌하므로 Phase 7 구현 메모의 재정합 과제를 따릅니다.
+> **문서 끝.** 본 로드맵(**v2.4**)은 require_v1.md **v1.15**와 예약_규칙_명세_v1.md(Q1~Q8)를 기준으로, 1차([ROADMAP_1.md](./ROADMAP_1.md)) FO + 프론트 더미 자산을 **유지(additive)** 한 채 **백엔드 진화(데이터 2단계 Spring Boot/H2 → 3단계 MySQL)** 와 **BO 전체(4역할 기반 매니저·관리자 프로세스·승인 워크플로우·SMTP/알림)** 를 구현하는 단계에 집중합니다. v1.7 정합으로 **가입 승인은 2단계(매장매니저관리자 1차 → 관리자 2차), 휴가/반차 승인은 1단계(매장매니저관리자 종결)** 로 단계 수를 구분하며, 역할별 BO 페이지를 4그룹으로 분리합니다(§12.4). **v1.11~v1.15 후속 델타**(예약 목록 역할별 분기·`users.manager_id` FK·관리자 메뉴 정리 / `/signup` 유형 분기·관리자 매니저 직접 등록 / 가입 최종 승인 상세 모달 / 휴무 신청 WheelPicker 통일·매장 휴일 영역 제거)는 Phase 3·6·7에 반영했습니다(모두 2026-06-21 구현 완료). 동시성 검증 위치는 클라이언트 → 서버 → DB로 이동하며, 슬롯 `UNIQUE` 제약이 모든 단계의 최종 방어선입니다. ⚠️ 기존 BE 구현의 휴무 2단계 결재는 v1.7(1단계)과 충돌하므로 Phase 7 구현 메모의 재정합 과제를 따릅니다. **v2.4 신규 요구 3건**(관리자 매장 등록/수정/삭제 CRUD → Phase 6, 매출 원차트 Top5+ETC → Phase 8, 후기 페이지 분리 + 네비 "후기" 탭 → Phase 8)은 모두 **ADMIN 한정**(`/api/admin/**` → `hasRole(ADMIN)`)이며 1차([ROADMAP_1.md](./ROADMAP_1.md)) Phase 9 더미 선구현분을 서버로 교체하는 회수 지점입니다.
